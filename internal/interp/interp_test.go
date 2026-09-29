@@ -15,6 +15,8 @@ import (
 func str(v string) *ast.StringLit                     { return &ast.StringLit{Value: v} }
 func cat(l, r ast.Expr) *ast.BinaryExpr               { return &ast.BinaryExpr{Op: ast.Add, Left: l, Right: r} }
 func num(v float64) *ast.NumberLit                    { return &ast.NumberLit{Value: v} }
+func bin(op ast.Op, l, r ast.Expr) *ast.BinaryExpr    { return &ast.BinaryExpr{Op: op, Left: l, Right: r} }
+func neg(x ast.Expr) *ast.NegExpr                     { return &ast.NegExpr{X: x} }
 func item(e ast.Expr) *ast.ExprItem                   { return &ast.ExprItem{Expr: e} }
 func printStmt(items ...ast.PrintItem) *ast.PrintStmt { return &ast.PrintStmt{Items: items} }
 func line(stmts ...ast.Stmt) *ast.Line                { return &ast.Line{Statements: stmts} }
@@ -520,4 +522,79 @@ func TestNumberOutputCountsColumns(t *testing.T) {
 	if got := in.Column(); got != 3 {
 		t.Errorf("after PRINT 5; column %d, want 3", got)
 	}
+}
+
+// @spec INTERP-026
+func TestSubtractMultiplyDivide(t *testing.T) {
+	runPrintCases(t, []printCase{
+		{"subtract", line(printStmt(item(bin(ast.Sub, num(8), num(2))))), " 6 \n"},
+		{"negative result", line(printStmt(item(bin(ast.Sub, num(2), num(8))))), "-6 \n"},
+		{"multiply", line(printStmt(item(bin(ast.Mul, num(5), num(9))))), " 45 \n"},
+		{"divide", line(printStmt(item(bin(ast.Div, num(1), num(3))))), " .333333333 \n"},
+		{"divide evenly", line(printStmt(item(bin(ast.Div, num(10), num(4))))), " 2.5 \n"},
+		{"divide then multiply", line(printStmt(item(bin(ast.Mul, bin(ast.Div, num(1), num(3)), num(3))))), " 1 \n"},
+	})
+}
+
+// @spec INTERP-027
+func TestArithmeticOnStringsIsTypeMismatch(t *testing.T) {
+	cases := map[string]ast.Expr{
+		"string - number": bin(ast.Sub, str("A"), num(1)),
+		"number * string": bin(ast.Mul, num(2), str("A")),
+		"string / string": bin(ast.Div, str("A"), str("B")),
+		"string / zero":   bin(ast.Div, str("A"), num(0)),
+		"negated string":  neg(str("A")),
+		"string - string": bin(ast.Sub, str("A"), str("B")),
+	}
+	for name, e := range cases {
+		if _, err := exec(line(printStmt(item(e)))); !isKind(err, basicerr.TypeMismatch) {
+			t.Errorf("%s: error = %v, want TYPE MISMATCH", name, err)
+		}
+	}
+}
+
+// @spec INTERP-028
+func TestDivisionByZero(t *testing.T) {
+	rec, err := exec(line(printStmt(item(str("A")), semi, item(bin(ast.Div, num(1), num(0))))))
+	if !isKind(err, basicerr.DivisionByZero) {
+		t.Errorf("error = %v, want DIVISION BY ZERO", err)
+	}
+	if got := rec.String(); got != "A" {
+		t.Errorf("output %q, want %q (items before the failure)", got, "A")
+	}
+	if _, err := exec(line(printStmt(item(bin(ast.Div, num(0), num(0)))))); !isKind(err, basicerr.DivisionByZero) {
+		t.Errorf("0/0: error = %v, want DIVISION BY ZERO", err)
+	}
+	runPrintCases(t, []printCase{
+		{"zero divided", line(printStmt(item(bin(ast.Div, num(0), num(5))))), " 0 \n"},
+	})
+}
+
+// @spec INTERP-029, INTERP-019
+func TestNegate(t *testing.T) {
+	runPrintCases(t, []printCase{
+		{"negate", line(printStmt(item(neg(num(5))))), "-5 \n"},
+		{"double negate", line(printStmt(item(neg(neg(num(5)))))), " 5 \n"},
+		{"negate a decimal", line(printStmt(item(neg(num(0.5))))), "-.5 \n"},
+		{"negative zero prints as zero", line(printStmt(item(neg(num(0))))), " 0 \n"},
+		{"zero times negative", line(printStmt(item(bin(ast.Mul, num(0), neg(num(1)))))), " 0 \n"},
+	})
+}
+
+// @spec INTERP-023, INTERP-024
+func TestArithmeticRange(t *testing.T) {
+	for name, e := range map[string]ast.Expr{
+		"product":           bin(ast.Mul, num(1e38), num(10)),
+		"difference":        bin(ast.Sub, neg(num(1e38)), num(1e38)),
+		"quotient":          bin(ast.Div, num(1e38), num(0.1)),
+		"intermediate only": bin(ast.Div, bin(ast.Mul, num(1e38), num(10)), num(100)),
+	} {
+		if _, err := exec(line(printStmt(item(e)))); !isKind(err, basicerr.Overflow) {
+			t.Errorf("%s: error = %v, want OVERFLOW", name, err)
+		}
+	}
+	runPrintCases(t, []printCase{
+		{"tiny product", line(printStmt(item(bin(ast.Mul, num(1e-30), num(1e-30))))), " 0 \n"},
+		{"tiny quotient", line(printStmt(item(bin(ast.Div, num(1e-30), num(1e30))))), " 0 \n"},
+	})
 }

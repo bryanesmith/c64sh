@@ -29,6 +29,11 @@ var symbols = map[byte]token.Kind{
 	';': token.Semicolon,
 	',': token.Comma,
 	'+': token.Plus,
+	'-': token.Minus,
+	'*': token.Star,
+	'/': token.Slash,
+	'(': token.LParen,
+	')': token.RParen,
 }
 
 // Lex returns the tokens of line. The last token is always EOL.

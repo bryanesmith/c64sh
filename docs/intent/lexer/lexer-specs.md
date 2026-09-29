@@ -23,7 +23,7 @@ Design: `lexer-design.md`
 
 ## Punctuation and illegal input
 
-- [x] **LEXER-011**: When the lexer encounters `:`, `;`, `,`, or `+` outside a string literal, it shall produce a `Colon`, `Semicolon`, `Comma`, or `Plus` token respectively.
+- [x] **LEXER-011**: When the lexer encounters `:`, `;`, `,`, `+`, `-`, `*`, `/`, `(`, or `)` outside a string literal and outside a number literal's exponent, it shall produce a `Colon`, `Semicolon`, `Comma`, `Plus`, `Minus`, `Star`, `Slash`, `LParen`, or `RParen` token respectively (so `1-2` is `Number Minus Number`, while `1E-2` is one `Number`).
 - [x] **LEXER-012**: If the lexer encounters, outside a string literal, a valid UTF-8 character that no other scanning rule accepts (including letters not starting a keyword, and whitespace other than space and tab), then it shall produce an `Illegal` token whose value is that one character.
 - [x] **LEXER-013**: If the lexer encounters, outside a string literal, a byte that is not valid UTF-8, then it shall produce an `Illegal` token whose value is that one byte.
 

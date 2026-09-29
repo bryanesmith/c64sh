@@ -5,7 +5,7 @@ REM actually runs. The others are described here:
 REM
 REM   print "HI"          keywords must be uppercase: PRINT "HI"
 REM   PRINT "A"+          "+" needs a string after it: PRINT "A"+"B"
-REM   PRINT 2*3           only + works on numbers so far
+REM   PRINT (1+2          a ( needs its matching ): PRINT (1+2)
 REM   10 PRINT "HI"       line numbers (program mode) are not supported yet
 REM   PRINT "HI" REM X    a comment needs a colon first: PRINT "HI":REM X
 REM

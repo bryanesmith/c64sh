@@ -20,6 +20,7 @@ import (
 //
 // @spec PARSER-001, PARSER-002, PARSER-003, PARSER-004, PARSER-005, PARSER-006
 // @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011, PARSER-012, PARSER-013
+// @spec PARSER-014, PARSER-015, PARSER-016, PARSER-017, PARSER-018
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -126,7 +127,7 @@ func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	case token.Comma:
 		p.next()
 		return &ast.Comma{}, nil
-	case token.String, token.Number:
+	case token.String, token.Number, token.Minus, token.Plus, token.LParen:
 		expr, err := p.parseExpression()
 		if err != nil {
 			return nil, err
@@ -137,29 +138,91 @@ func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	}
 }
 
-// Expression = Operand { "+" Operand } .
+// Expression = Term { ( "+" | "-" ) Term } .
 func (p *parser) parseExpression() (ast.Expr, error) {
-	left, err := p.parseOperand()
+	left, err := p.parseTerm()
 	if err != nil {
 		return nil, err
 	}
-	for p.accept(token.Plus) {
-		right, err := p.parseOperand()
+	for {
+		var op ast.Op
+		switch {
+		case p.accept(token.Plus):
+			op = ast.Add
+		case p.accept(token.Minus):
+			op = ast.Sub
+		default:
+			return left, nil
+		}
+		right, err := p.parseTerm()
 		if err != nil {
 			return nil, err
 		}
-		left = &ast.BinaryExpr{Op: ast.Add, Left: left, Right: right}
+		left = &ast.BinaryExpr{Op: op, Left: left, Right: right}
 	}
-	return left, nil
 }
 
-// Operand = string | number .
+// Term = Unary { ( "*" | "/" ) Unary } .
+func (p *parser) parseTerm() (ast.Expr, error) {
+	left, err := p.parseUnary()
+	if err != nil {
+		return nil, err
+	}
+	for {
+		var op ast.Op
+		switch {
+		case p.accept(token.Star):
+			op = ast.Mul
+		case p.accept(token.Slash):
+			op = ast.Div
+		default:
+			return left, nil
+		}
+		right, err := p.parseUnary()
+		if err != nil {
+			return nil, err
+		}
+		left = &ast.BinaryExpr{Op: op, Left: left, Right: right}
+	}
+}
+
+// Unary = "-" Unary | "+" Unary | Operand .
+//
+// A leading "+" produces no node: the C64 ROM skips it.
+func (p *parser) parseUnary() (ast.Expr, error) {
+	switch {
+	case p.accept(token.Minus):
+		x, err := p.parseUnary()
+		if err != nil {
+			return nil, err
+		}
+		return &ast.NegExpr{X: x}, nil
+	case p.accept(token.Plus):
+		return p.parseUnary()
+	default:
+		return p.parseOperand()
+	}
+}
+
+// Operand = string | number | "(" Expression ")" .
+//
+// Parentheses produce no node: the tree's shape records the grouping.
 func (p *parser) parseOperand() (ast.Expr, error) {
 	switch p.peek() {
 	case token.String:
 		return &ast.StringLit{Value: p.next().Value}, nil
 	case token.Number:
 		return &ast.NumberLit{Value: numberValue(p.next().Value)}, nil
+	case token.LParen:
+		p.next()
+		x, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+		if !p.accept(token.RParen) {
+			return nil, syntaxError()
+		}
+		return x, nil
 	default:
 		return nil, syntaxError()
 	}

@@ -147,7 +147,12 @@ A `BinaryExpr` evaluates its left operand, then its right operand, then applies 
 |---|---|
 | `StringLit` | Its `Value`, a string. |
 | `NumberLit` | Its `Value`, a number: `OVERFLOW` if its size exceeds `maxNumber`, 0 if its size is below `minNumber`. |
-| `BinaryExpr` `Add` | Two strings: the left followed by the right (see *String length*). Two numbers: their sum, `OVERFLOW` if its size exceeds `maxNumber`, 0 if below `minNumber`. A string and a number, in either order: `TYPE MISMATCH`. |
+| `BinaryExpr` `Add` | Two strings: the left followed by the right (see *String length*). Two numbers: their sum. A string and a number, in either order: `TYPE MISMATCH`. |
+| `BinaryExpr` `Sub`, `Mul` | Two numbers: the difference or product. Any string operand: `TYPE MISMATCH`. |
+| `BinaryExpr` `Div` | Two numbers: the quotient, or `DIVISION BY ZERO` if the right operand is 0. Any string operand: `TYPE MISMATCH`, checked before the divisor. |
+| `NegExpr` | A number: its negation. A string: `TYPE MISMATCH`. |
+
+Every numeric result is limited to the C64's range: `OVERFLOW` if its size exceeds `maxNumber`, and 0 if it is nonzero and its size is below `minNumber`. A negative zero prints as `0`.
 
 ### String length
 
@@ -160,8 +165,9 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | Kind | Cause |
 |---|---|
 | `STRING TOO LONG` | Joining strings with `+` produces more than 255 characters. |
-| `TYPE MISMATCH` | `+` with a string on one side and a number on the other. |
-| `OVERFLOW` | A number literal or sum larger in size than `maxNumber`. |
+| `TYPE MISMATCH` | `+` with a string on one side and a number on the other; `-`, `*`, `/`, or negation with any string operand. |
+| `OVERFLOW` | A number literal or arithmetic result larger in size than `maxNumber`. |
+| `DIVISION BY ZERO` | `/` with a right operand of 0. |
 | `SYNTAX` | A `BadItem` reached while executing `PRINT`; the error is the one the parser stored in it. |
 
 If writing to the output fails (for example, stdout is a closed pipe), `Exec` returns that write error unchanged. It is not a BASIC error.
@@ -183,7 +189,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. Arithmetic (`-`, `*`, `/`, `^`, unary minus) adds operators to `BinaryExpr` evaluation, with `DIVISION BY ZERO` and `ILLEGAL QUANTITY` errors, and reuses the range checks above.
+1. Exponentiation (`^`) adds an operator with `ILLEGAL QUANTITY` for a negative base with a fractional exponent, and reuses the range checks above.
 
 ## References
 

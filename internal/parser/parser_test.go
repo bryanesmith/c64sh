@@ -19,6 +19,11 @@ var (
 	semi  = token.Token{Kind: token.Semicolon, Value: ";"}
 	comma = token.Token{Kind: token.Comma, Value: ","}
 	plus  = token.Token{Kind: token.Plus, Value: "+"}
+	minus = token.Token{Kind: token.Minus, Value: "-"}
+	star  = token.Token{Kind: token.Star, Value: "*"}
+	slash = token.Token{Kind: token.Slash, Value: "/"}
+	lp    = token.Token{Kind: token.LParen, Value: "("}
+	rp    = token.Token{Kind: token.RParen, Value: ")"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -88,10 +93,13 @@ func dumpExpr(e ast.Expr) string {
 	case *ast.NumberLit:
 		return "#" + strconv.FormatFloat(e.Value, 'g', -1, 64)
 	case *ast.BinaryExpr:
-		if e.Op != ast.Add {
+		op, ok := map[ast.Op]string{ast.Add: "+", ast.Sub: "-", ast.Mul: "*", ast.Div: "/"}[e.Op]
+		if !ok {
 			return fmt.Sprintf("<op %d>", e.Op)
 		}
-		return "(" + dumpExpr(e.Left) + "+" + dumpExpr(e.Right) + ")"
+		return "(" + dumpExpr(e.Left) + op + dumpExpr(e.Right) + ")"
+	case *ast.NegExpr:
+		return "(-" + dumpExpr(e.X) + ")"
 	default:
 		return fmt.Sprintf("<expr %T>", e)
 	}
@@ -205,7 +213,13 @@ func TestStatementStartingWithWrongTokenIsSyntaxError(t *testing.T) {
 func TestSyntaxErrorInsidePrintEndsWithBadItem(t *testing.T) {
 	runParseCases(t, []parseCase{
 		{"illegal as first item", toks(pr, ill("X")), `PRINT[BAD(SYNTAX)]`, true},
-		{"plus as first item", toks(pr, plus, str("A")), `PRINT[BAD(SYNTAX)]`, true},
+		{"star as first item", toks(pr, star, number("2")), `PRINT[BAD(SYNTAX)]`, true},
+		{"close paren as first item", toks(pr, rp), `PRINT[BAD(SYNTAX)]`, true},
+		{"missing close paren", toks(pr, str("A"), semi, lp, number("1"), plus, number("2")), `PRINT["A" ; BAD(SYNTAX)]`, true},
+		{"empty parens", toks(pr, lp, rp), `PRINT[BAD(SYNTAX)]`, true},
+		{"dangling minus", toks(pr, number("1"), minus), `PRINT[BAD(SYNTAX)]`, true},
+		{"dangling star", toks(pr, number("1"), star), `PRINT[BAD(SYNTAX)]`, true},
+		{"stray close paren", toks(pr, number("1"), rp), `PRINT[#1 BAD(SYNTAX)]`, true},
 		{"dangling plus", toks(pr, str("A"), plus), `PRINT[BAD(SYNTAX)]`, true},
 		{"plus then separator", toks(pr, str("A"), plus, semi), `PRINT[BAD(SYNTAX)]`, true},
 		{"plus then illegal", toks(pr, str("A"), semi, str("B"), plus, ill("@")), `PRINT["A" ; BAD(SYNTAX)]`, true},
@@ -245,5 +259,67 @@ func TestNumberLiteral(t *testing.T) {
 		{"point then exponent", toks(pr, number(".E5")), `PRINT[#0]`, false},
 		{"too large for float64", toks(pr, number("1E999")), `PRINT[#+Inf]`, false},
 		{"number items", toks(pr, number("1"), semi, number("2"), comma, str("A"), number("3")), `PRINT[#1 ; #2 , "A" #3]`, false},
+	})
+}
+
+// @spec PARSER-006
+func TestAddAndSubtract(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"subtract", toks(pr, number("8"), minus, number("2")), `PRINT[(#8-#2)]`, false},
+		{"left to right", toks(pr, number("8"), minus, number("2"), minus, number("1")), `PRINT[((#8-#2)-#1)]`, false},
+		{"mixed", toks(pr, number("1"), plus, number("2"), minus, number("3")), `PRINT[((#1+#2)-#3)]`, false},
+	})
+}
+
+// @spec PARSER-014
+func TestMultiplyAndDivide(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"multiply", toks(pr, number("2"), star, number("3")), `PRINT[(#2*#3)]`, false},
+		{"binds tighter than +", toks(pr, number("2"), plus, number("3"), star, number("4")), `PRINT[(#2+(#3*#4))]`, false},
+		{"binds tighter than - on the left", toks(pr, number("2"), star, number("3"), minus, number("4")), `PRINT[((#2*#3)-#4)]`, false},
+		{"left to right", toks(pr, number("8"), slash, number("4"), slash, number("2")), `PRINT[((#8/#4)/#2)]`, false},
+		{"mixed", toks(pr, number("8"), slash, number("4"), star, number("2")), `PRINT[((#8/#4)*#2)]`, false},
+	})
+}
+
+// @spec PARSER-015
+func TestNegation(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"negative number", toks(pr, minus, number("5")), `PRINT[(-#5)]`, false},
+		{"binds tighter than *", toks(pr, minus, number("2"), star, number("3")), `PRINT[((-#2)*#3)]`, false},
+		{"after *", toks(pr, number("2"), star, minus, number("3")), `PRINT[(#2*(-#3))]`, false},
+		{"repeated", toks(pr, minus, minus, number("5")), `PRINT[(-(-#5))]`, false},
+		{"after binary minus", toks(pr, number("5"), minus, minus, number("5")), `PRINT[(#5-(-#5))]`, false},
+		{"of a string", toks(pr, minus, str("A")), `PRINT[(-"A")]`, false},
+	})
+}
+
+// @spec PARSER-016
+func TestLeadingPlusIsDropped(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"number", toks(pr, plus, number("5")), `PRINT[#5]`, false},
+		{"string", toks(pr, plus, str("A")), `PRINT["A"]`, false},
+		{"after an operator", toks(pr, number("2"), star, plus, number("3")), `PRINT[(#2*#3)]`, false},
+		{"mixed signs", toks(pr, minus, plus, minus, number("5")), `PRINT[(-(-#5))]`, false},
+	})
+}
+
+// @spec PARSER-017
+func TestParentheses(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"grouping", toks(pr, lp, number("2"), plus, number("3"), rp, star, number("4")), `PRINT[((#2+#3)*#4)]`, false},
+		{"nested", toks(pr, lp, lp, number("1"), rp, rp), `PRINT[#1]`, false},
+		{"negated group", toks(pr, minus, lp, number("1"), plus, number("2"), rp), `PRINT[(-(#1+#2))]`, false},
+		{"string in parens", toks(pr, lp, str("A"), plus, str("B"), rp), `PRINT[("A"+"B")]`, false},
+	})
+}
+
+// @spec PARSER-018
+func TestExpressionEndsBeforeNextItem(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"paren after number", toks(pr, number("2"), lp, number("3"), rp), `PRINT[#2 #3]`, false},
+		{"string after expression", toks(pr, number("1"), plus, number("1"), str("A")), `PRINT[(#1+#1) "A"]`, false},
+		{"minus continues", toks(pr, number("1"), minus, number("1")), `PRINT[(#1-#1)]`, false},
+		{"minus after string continues", toks(pr, str("A"), minus, number("1")), `PRINT[("A"-#1)]`, false},
 	})
 }

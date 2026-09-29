@@ -7,7 +7,7 @@ prefix: PARSER
 
 ## Context and Design Philosophy
 
-The parser turns the lexer's tokens for one line into an abstract syntax tree (AST). It is a hand-written recursive-descent parser with one function per syntactic (uppercase) rule of `grammar/c64basic.ebnf`. Each function carries its rule as a comment directly above it, so the grammar and the code can be read side by side.
+The parser turns the lexer's tokens for one line into an abstract syntax tree (AST). It is a hand-written recursive-descent parser with one function per grammar rule. Each function carries its rule, in EBNF in the notation of the Go language specification, as a comment directly above it. Together with the token rules documented in the lexer, these comments are the grammar of the language, each beside the code that implements it.
 
 The parser owns all syntax errors. When it cannot continue, it returns the statements it parsed successfully before the problem together with a `SYNTAX` error, so the shell can run those statements first and then report the error, as a C64 does.
 
@@ -61,7 +61,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
 | `Expression = string { "+" string } .` | `parseExpression` | `ast.Expr` |
 
-These functions are registered in a table keyed by rule name, used by the grammar conformance test.
+Lowercase names in these rules (`print`, `rem`, `string`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 
@@ -109,7 +109,7 @@ Examples:
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
-| Parsing technique | Recursive descent, one function per rule | Parser generator; Pratt parser | Mirrors the grammar one to one, which the conformance test depends on. A Pratt parser suits operator precedence and can be introduced inside `parseExpression` when math is added, without changing the rule-per-function structure. |
+| Parsing technique | Recursive descent, one function per rule | Parser generator; Pratt parser | Each function implements, and documents, exactly one grammar rule, so the code reads as the grammar. A Pratt parser suits operator precedence and can be introduced inside `parseExpression` when math is added, without changing the rule-per-function structure. |
 | Error with partial result | Return the statements before the error, plus a partially parsed `PRINT` ending in a `BadItem`, together with the error | Return only an error; drop the statement containing the error; a `BadStmt` node replacing the whole failing statement | Reproduces what a C64 prints before a syntax error: earlier statements run, and so do the earlier items of a failing `PRINT`. The error travels with the partial result, as in `go/parser`. `BadItem` is limited to print items, the only place where a C64 produces output partway through a statement. |
 | Syntax error inside a string-too-long expression | SYNTAX is reported; the concatenation is never evaluated | Evaluate operands up to the syntax error, as a C64 does | In `PRINT <long>+<long>+`, a C64 reports `STRING TOO LONG` before reaching the dangling `+`. Reproducing this needs expression evaluation interleaved with parsing, and the case needs an input line longer than a C64 can accept. |
 | Sealed interfaces | Unexported marker methods | Exported marker methods; a single node struct with a kind field | Only `internal/ast` can add node types, so type switches elsewhere can be exhaustive and a panicking `default` reliably signals a missed case. |
@@ -124,6 +124,6 @@ Examples:
 
 ## References
 
-- `docs/intent/grammar/grammar-design.md`
+- [The Go Programming Language Specification — Notation](https://go.dev/ref/spec#Notation)
 - `docs/intent/lexer/lexer-design.md`
 - `docs/intent/interp/interp-design.md`

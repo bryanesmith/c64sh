@@ -3,13 +3,10 @@ package parser
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
-	"unicode"
 
-	"github.com/bryanesmith/c64sh/grammar"
 	"github.com/bryanesmith/c64sh/internal/ast"
 	"github.com/bryanesmith/c64sh/internal/basicerr"
 	"github.com/bryanesmith/c64sh/internal/token"
@@ -221,29 +218,4 @@ func TestParsingStopsAtFirstError(t *testing.T) {
 			toks(pr, str("A"), colon, ill("@"), colon, pr, str("C")),
 			`PRINT["A"]`, true},
 	})
-}
-
-// @spec GRAMMAR-008
-func TestRuleTableMatchesGrammar(t *testing.T) {
-	g, err := grammar.Load()
-	if err != nil {
-		t.Fatalf("grammar.Load() error: %v", err)
-	}
-	var rules []string
-	for name := range g {
-		if unicode.IsUpper(rune(name[0])) {
-			rules = append(rules, name)
-			if grammarRules[name] == nil {
-				t.Errorf("grammar rule %s has no parse function", name)
-			}
-		}
-	}
-	for name := range grammarRules {
-		if !slices.Contains(rules, name) {
-			t.Errorf("parse function table entry %s names no syntactic rule in the grammar", name)
-		}
-	}
-	if len(grammarRules) == 0 {
-		t.Errorf("parse function table is empty")
-	}
 }

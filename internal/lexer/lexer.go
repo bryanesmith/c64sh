@@ -1,4 +1,8 @@
 // Package lexer turns a line of C64 BASIC into tokens.
+//
+// Each token rule of the grammar is written in EBNF, in the notation of the
+// Go language specification, above the code in Lex that scans it. The
+// parser's rule comments are the rest of the grammar.
 package lexer
 
 import (
@@ -7,26 +11,6 @@ import (
 
 	"github.com/bryanesmith/c64sh/internal/token"
 )
-
-// grammarTokens maps each lexical grammar rule, and each literal token used
-// in a syntactic grammar rule (written with its quotes), to its token kind.
-//
-// @spec GRAMMAR-009
-var grammarTokens = map[string]token.Kind{
-	"print":  token.Print,
-	"rem":    token.Rem,
-	"string": token.String,
-	`":"`:    token.Colon,
-	`";"`:    token.Semicolon,
-	`","`:    token.Comma,
-	`"+"`:    token.Plus,
-}
-
-// grammarHelpers lists lexical grammar rules that are used only inside
-// other lexical rules and produce no token of their own.
-var grammarHelpers = map[string]bool{
-	"character": true,
-}
 
 // keywords are matched case-sensitively, at any position outside a string,
 // whatever follows them.
@@ -62,6 +46,8 @@ func Lex(line string) []token.Token {
 			i++
 			continue
 		}
+		// string    = `"` { character } [ `"` ] .
+		// character = /* any character except `"` and a line feed */ .
 		if c == '"' {
 			body := line[i+1:]
 			end := strings.IndexByte(body, '"')
@@ -74,6 +60,8 @@ func Lex(line string) []token.Token {
 			}
 			continue
 		}
+		// print = "PRINT" | "?" .   ("?" is scanned with the symbols below)
+		// rem   = "REM" { character | `"` } .
 		if text, kind, ok := matchKeyword(line[i:]); ok {
 			if kind == token.Rem {
 				// A comment runs to the end of the line, untokenized.

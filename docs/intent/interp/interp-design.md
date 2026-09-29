@@ -76,7 +76,7 @@ A panic here means a node type was added to `internal/ast` without interpreter s
 
 | Item | Output |
 |---|---|
-| `ExprItem` | The expression's string value. |
+| `ExprItem` | A string value as it is; a number value in C64 number format (see *Numbers*) followed by one space. |
 | `Semicolon` | Nothing. It only separates items. |
 | `Comma` | Spaces up to the start of the next print zone: `10 - (column % 10)` spaces, where `column` is the cursor column at that point. This is never 0: at the start of a zone (column 0, 10, 20, …), a comma moves a full 10 columns, as the C64 ROM does. |
 | `BadItem` | Nothing; execution of the `PRINT` fails with the item's error (see below). The parser produces a `BadItem` where a syntax error occurred inside a `PRINT`. |
@@ -95,6 +95,9 @@ After the last item, a newline (`\n`) is written **unless the last item is `;` o
 | `PRINT ,"A"` | 10 spaces + `A\n` (from column 0, a full zone) |
 | `PRINT "0123456789","X"` | `0123456789` + 10 spaces + `X\n` (`X` at column 20) |
 | `PRINT "A","B","C"` | `A` + 9 spaces + `B` + 9 spaces + `C\n` (columns 0, 10, 20) |
+| `PRINT 45` | ` 45 \n` |
+| `PRINT "5*9=";45` | `5*9= 45 \n` |
+| `PRINT 2,3` | ` 2 ` + 7 spaces + ` 3 \n` (` 3 ` at column 10) |
 
 The output for one `PRINT` is collected and written in a single call to the writer. If an item fails, either because evaluating its expression fails or because it is a `BadItem`, the output of the items before it is written (a C64 prints each item as it is evaluated), and then the error is returned. For `PRINT "A";X` where `X` fails, `A` is written, with no newline.
 
@@ -102,16 +105,53 @@ The output for one `PRINT` is collected and written in a single call to the writ
 
 Executing a `RemStmt` does nothing: it writes no output and returns no error, so execution continues with the next statement. A `RemStmt` is always the last statement of a line, because its comment runs to the end of the line.
 
+## Values
+
+Every expression evaluates to a value that is either a **string** or a **number**. Numbers are Go `float64`s kept within the C64's range:
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `maxNumber` | 1.70141183E+38 (`2^127 × (1 − 2^-32)`) | Largest C64 number; anything larger is `OVERFLOW` |
+| `minNumber` | 2.93873588E-39 (`2^-128`) | Smallest positive C64 number; anything smaller in size becomes 0 |
+
+## Numbers
+
+A number is printed as the C64 ROM formats it (`$BDDD`):
+
+1. A **sign character**: a space for zero and positive numbers, `-` for negative ones.
+2. The number rounded to **9 significant digits**.
+3. **Fixed notation** when the rounded value is at least 0.01 and below 1E9: the digits with trailing zeros removed, and the `.` removed if nothing follows it. There is **no leading zero** before the `.`: `.5`, not `0.5`.
+4. **Scientific notation** otherwise: the digits as `d.dddddddd` with trailing zeros (and a bare `.`) removed, then `E`, the exponent's sign (`+` or `-`), and the exponent as at least two digits.
+5. Zero is printed as `0`.
+
+| Value | Printed by `PRINT` |
+|---|---|
+| 45 | ` 45 ` |
+| 3.14 | ` 3.14 ` |
+| 0.5 | ` .5 ` |
+| 1/3 | ` .333333333 ` |
+| 0.01 | ` .01 ` |
+| 0.001 | ` 1E-03 ` |
+| 123456789 | ` 123456789 ` |
+| 999999999.6 | ` 1E+09 ` (rounds up to 1E9) |
+| 1234567890 | ` 1.23456789E+09 ` |
+| 1E38 | ` 1E+38 ` |
+
+The decision between fixed and scientific notation uses the value after rounding to 9 digits, as the ROM does.
+
 ## Expressions
+
+A `BinaryExpr` evaluates its left operand, then its right operand, then applies its operator; the first error met is the one returned. So `1E39+"A"` is `OVERFLOW` (from the left operand), not `TYPE MISMATCH`, as on a C64, which reads the number before it reaches the `+`.
 
 | Node | Value |
 |---|---|
-| `StringLit` | Its `Value`. |
-| `Concat` | Left value followed by right value. |
+| `StringLit` | Its `Value`, a string. |
+| `NumberLit` | Its `Value`, a number: `OVERFLOW` if its size exceeds `maxNumber`, 0 if its size is below `minNumber`. |
+| `BinaryExpr` `Add` | Two strings: the left followed by the right (see *String length*). Two numbers: their sum, `OVERFLOW` if its size exceeds `maxNumber`, 0 if below `minNumber`. A string and a number, in either order: `TYPE MISMATCH`. |
 
 ### String length
 
-On a C64, a string produced at run time can hold at most 255 characters. If a `Concat` would produce a longer string, evaluation fails with a `STRING TOO LONG` error; the `PRINT` containing it writes only the output of items before the failing one (see *PRINT*). Length is counted in characters (Unicode code points), not bytes; each byte that is not valid UTF-8 counts as one character. A string literal printed without concatenation is not limited, as on a C64, where literals are printed directly from the program text.
+On a C64, a string produced at run time can hold at most 255 characters. If joining strings with `+` would produce a longer string, evaluation fails with a `STRING TOO LONG` error; the `PRINT` containing it writes only the output of items before the failing one (see *PRINT*). Length is counted in characters (Unicode code points), not bytes; each byte that is not valid UTF-8 counts as one character. A string literal printed without being joined is not limited, as on a C64, where literals are printed directly from the program text.
 
 ## Errors
 
@@ -119,7 +159,9 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 
 | Kind | Cause |
 |---|---|
-| `STRING TOO LONG` | A concatenation result longer than 255 characters. |
+| `STRING TOO LONG` | Joining strings with `+` produces more than 255 characters. |
+| `TYPE MISMATCH` | `+` with a string on one side and a number on the other. |
+| `OVERFLOW` | A number literal or sum larger in size than `maxNumber`. |
 | `SYNTAX` | A `BadItem` reached while executing `PRINT`; the error is the one the parser stored in it. |
 
 If writing to the output fails (for example, stdout is a closed pipe), `Exec` returns that write error unchanged. It is not a BASIC error.
@@ -128,6 +170,8 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
+| Number type | `float64` with C64 range checks and C64 output format | Emulating the C64's 5-byte float | See HLD *Number representation*. The range constants make overflow and underflow match the C64's limits, and formatting reproduces its output. |
+| Rounding for output | Round to 9 significant digits in decimal, then choose notation | Scale by 10 in binary as the ROM does | Decimal rounding gives the same 9 digits for all but rare boundary cases, and is simple and exact with `strconv`. |
 | Dispatch | Type switch with panicking `default` | Visitor pattern | See HLD *Key Design Decisions*. One pass over the tree; no `Accept`/`Visit` boilerplate. |
 | Comma | Spaces to the next 10-column print zone, a full zone when already at a zone start | Tab character; cursor-right control codes | Print zones are C64 language behavior, and programs lay out columns with them. The count `10 - (column % 10)`, never 0, is what the C64 ROM's PRINT computes (`$AAE8`). Spaces are the terminal equivalent of the C64's on-screen cursor-right moves, and the characters the C64 itself sends to files and printers. |
 | Cursor column owner | The interpreter, which writes all program output | The shell's output wrapper, queried by the interpreter; separate counts in both, kept in step by the shell | One owner means one count that cannot drift, and the interpreter is where a C64 program's cursor lives. `FreshLine` lets the shell start errors and `READY.` on a new line without tracking output itself. The C64's `POS()` function will read the same column. |
@@ -139,7 +183,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. When numbers are added, `PRINT` of a number follows C64 formatting (a leading space or minus sign, and a trailing space), and `ExprItem` evaluation returns a typed value instead of a string.
+1. Arithmetic (`-`, `*`, `/`, `^`, unary minus) adds operators to `BinaryExpr` evaluation, with `DIVISION BY ZERO` and `ILLEGAL QUANTITY` errors, and reuses the range checks above.
 
 ## References
 

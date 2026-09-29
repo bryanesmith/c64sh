@@ -41,8 +41,21 @@ type RemStmt struct{ Text string }
 // StringLit is a string literal; Value holds its contents without quotes.
 type StringLit struct{ Value string }
 
-// Concat is Left + Right.
-type Concat struct{ Left, Right Expr }
+// NumberLit is a number literal.
+type NumberLit struct{ Value float64 }
+
+// Op is a binary operator.
+type Op int
+
+const (
+	Add Op = iota // +: adds numbers, joins strings
+)
+
+// BinaryExpr is Left Op Right.
+type BinaryExpr struct {
+	Op          Op
+	Left, Right Expr
+}
 
 func (*PrintStmt) stmt() {}
 func (*RemStmt) stmt()   {}
@@ -52,5 +65,6 @@ func (*Semicolon) printItem() {}
 func (*Comma) printItem()     {}
 func (*BadItem) printItem()   {}
 
-func (*StringLit) expr() {}
-func (*Concat) expr()    {}
+func (*StringLit) expr()  {}
+func (*NumberLit) expr()  {}
+func (*BinaryExpr) expr() {}

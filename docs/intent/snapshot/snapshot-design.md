@@ -103,6 +103,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `002-concat-strings.bas` | Joining strings with `;`, `+`, and no separator, and combinations of them |
 | `003-print-separators.bas` | `,` moving to the next 10-column print zone (with a printed ruler), the column carrying over between PRINTs, trailing `;` and `,` suppressing the newline, bare `PRINT`, several statements with `:`, empty statements |
 | `004-comments.bas` | `REM` as a whole line, after `:`, without a space (`REMARK`), with colons and quotes inside, and `"REM"` inside a string |
+| `006-numbers.bas` | Number literals (decimals, `E` notation, a lone `.`), C64 number printing (sign and trailing spaces, 9 digits, scientific notation), spaces inside numbers, numbers mixed with strings and in zones, `+` on numbers, the number range, and `?TYPE MISMATCH  ERROR` |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

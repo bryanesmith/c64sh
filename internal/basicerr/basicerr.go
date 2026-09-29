@@ -8,12 +8,16 @@ type Kind int
 const (
 	Syntax        Kind = iota // SYNTAX
 	StringTooLong             // STRING TOO LONG
+	TypeMismatch              // TYPE MISMATCH
+	Overflow                  // OVERFLOW
 )
 
 // names holds each kind's name as the C64 prints it.
 var names = [...]string{
 	Syntax:        "SYNTAX",
 	StringTooLong: "STRING TOO LONG",
+	TypeMismatch:  "TYPE MISMATCH",
+	Overflow:      "OVERFLOW",
 }
 
 // Error is a BASIC error.

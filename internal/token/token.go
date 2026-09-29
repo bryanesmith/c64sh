@@ -12,6 +12,7 @@ const (
 	Illegal               // a character no rule accepts
 	Print                 // PRINT or ?
 	Rem                   // REM and the rest of the line
+	Number                // 12, 3.5, .5, 1E3
 	String                // "…"
 	Colon                 // :
 	Semicolon             // ;
@@ -24,6 +25,7 @@ var kindNames = [...]string{
 	Illegal:   "Illegal",
 	Print:     "Print",
 	Rem:       "Rem",
+	Number:    "Number",
 	String:    "String",
 	Colon:     "Colon",
 	Semicolon: "Semicolon",
@@ -41,6 +43,6 @@ func (k Kind) String() string {
 // Token is one token of a line.
 type Token struct {
 	Kind  Kind
-	Value string // String: contents without quotes; Rem: the text after REM; Illegal: the character; otherwise the source text
+	Value string // String: contents without quotes; Rem: the text after REM; Number: the literal without spaces; Illegal: the character; otherwise the source text
 	Pos   int    // byte offset of the token's first character in the line
 }

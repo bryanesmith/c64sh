@@ -27,6 +27,7 @@ const (
     Illegal               // a character no rule accepts
     Print                 // PRINT or ?
     Rem                   // REM and the rest of the line
+    Number                // 12, 3.5, .5, 1E3 (Value: the literal without spaces)
     String                // "…"
     Colon                 // :
     Semicolon             // ;
@@ -56,6 +57,7 @@ At each position the lexer applies the first matching rule:
 | Other keyword text (see *Keywords*) | Keyword token (`Print`). |
 | `?` | `Print` token (the C64 abbreviation for `PRINT`). |
 | `:` `;` `,` `+` | `Colon`, `Semicolon`, `Comma`, `Plus`. |
+| A digit, or `.` | `Number` token (see *Numbers*). |
 | Any other character | `Illegal` token holding that one character (a full UTF-8 character, not a single byte). |
 | A byte that is not valid UTF-8 | `Illegal` token holding that one byte. |
 
@@ -73,6 +75,17 @@ The keywords are `PRINT` and `REM`.
 
 Keywords are kept in a table, so future keywords are added by extending the table. When more than one keyword could match at a position, the longest match wins.
 
+## Numbers
+
+A number literal is read the way the C64 ROM reads one:
+
+- It starts with a digit or `.`. A lone `.` is a number: zero.
+- Digits follow, with at most one `.`; a second `.` ends the number and starts another (`1.2.3` is `1.2` then `.3`).
+- An `E` may follow, then an optional `+` or `-`, then any number of digits. An `E` with no digits after it means an exponent of 0 (`1E` is `1`). The `E` is not taken if a keyword starts there, because the C64 recognizes keywords before it reads numbers.
+- **Spaces and tabs inside a number are ignored**, as the C64's character reader skips them: `1 2` is `12`, `1 . 5` is `1.5`, and `1 E 3` is `1000`. Whitespace after the last character of the number is not part of it.
+
+The token's value is the literal with its whitespace removed (`1 2` gives `12`), and its position is that of its first character. The lexer does not compute the number's value; the parser converts the text.
+
 ## Token Rules
 
 The lexer's half of the grammar is its token rules. Each is written in EBNF, in the notation of the Go language specification, as a comment directly above the code in `lexer.go` that scans it:
@@ -81,6 +94,9 @@ The lexer's half of the grammar is its token rules. Each is written in EBNF, in 
 print     = "PRINT" | "?" .
 rem       = "REM" { character | `"` } .
 string    = `"` { character } [ `"` ] .
+number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
+            [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
+digit     = "0" … "9" .
 character = /* any character except `"` and a line feed */ .
 ```
 
@@ -109,6 +125,8 @@ Scanning a whole line up front is sufficient: lines are short, and the parser be
 | Comment text | One `Rem` token carrying the rest of the line | Discard the comment in the lexer; tokenize the comment's contents | A C64 ignores everything after `REM`, so its contents must not be tokenized. Keeping the text in the token lets the parser place a node in the AST, which program mode needs for `LIST`, and keeps `PRINT "A" REM` an error as on a C64. |
 | `?` abbreviation | Scanned as `Print` | Not supported until later | It is how the C64 itself tokenizes `?`, and it costs one table entry. |
 | Token rule documentation | EBNF comment above the code that scans each rule | A separate grammar file | The rule sits beside its implementation, so there is one description of each token to keep current (see HLD *Where the syntax is defined*). |
+| Spaces inside numbers | Ignored, so `1 2` is `12` | Spaces end a number | The C64's character reader skips spaces everywhere outside strings, so this is how BASIC V2 reads numbers; `PRINT 1 2` printing ` 12 ` is authentic. |
+| Number value | Computed by the parser from the token text | Computed by the lexer | Tokens carry text; keeping number conversion out of the lexer keeps its job to splitting characters, and one place converts literals. |
 | Output shape | Slice of all tokens for the line | Streaming `Next()` iterator | Lines are short; a slice is simpler to test and gives the parser unlimited lookahead. |
 | Whitespace | Space and tab skipped between tokens | Space only | A tab outside a string has no meaning in BASIC V2; treating it like a space avoids surprising errors from pasted or indented scripts. |
 

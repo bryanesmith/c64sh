@@ -10,6 +10,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Interactive sessions](#interactive-sessions)
 - [Scripts](#scripts)
 - [PRINT](#print)
+- [Numbers](#numbers)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -141,6 +142,28 @@ A string made by joining with `+` may hold at most 255 characters; longer result
 
 **Keywords are uppercase.** `PRINT` must be typed in capitals; `print` is a syntax error. Text inside quotes can use any case.
 
+## Numbers
+
+Numbers can be written as whole numbers (`45`), with a decimal point (`3.14`, `.5`, `5.`), or with `E` for "times ten to the power of" (`1E3` is 1000, `1.5E-3` is .0015). A lone `.` is zero.
+
+`PRINT` shows a number the way a C64 does:
+
+- **A space before it**, where a minus sign would go, **and a space after it**: `PRINT 45` prints ` 45 `, and `PRINT "5*9=";45` prints `5*9= 45 `.
+- **Rounded to 9 significant digits**: `PRINT 3.14159265358979` prints ` 3.14159265 `.
+- **No zero before the decimal point, and no trailing zeros**: `PRINT 0.5` prints ` .5 `, and `PRINT 2.50` prints ` 2.5 `.
+- **In scientific notation** from 1E9 up and below .01: `PRINT 1000000000` prints ` 1E+09 `, and `PRINT .001` prints ` 1E-03 `.
+
+Because each number brings its own spaces, `PRINT 1;2;3` prints ` 1  2  3 `.
+
+A few more rules come straight from the C64:
+
+- **Spaces inside a number are ignored**: `PRINT 1 000 000` prints ` 1000000 `, and `PRINT 1 2` prints ` 12 `.
+- **A second decimal point starts a new number**: `PRINT 1.2.3` prints ` 1.2  .3 `.
+- **`+` adds numbers**: `PRINT 1.5+2.25` prints ` 3.75 `. It cannot join a number and a string: `PRINT "AGE: "+42` is a `?TYPE MISMATCH  ERROR`.
+- **Numbers range up to 1.70141183E+38.** A larger number is an `?OVERFLOW  ERROR`; a number too small for a C64 (below about 2.9E-39) becomes 0.
+
+See [`examples/006-numbers.bas`](../examples/006-numbers.bas) for every form in one script.
+
 ## Comments
 
 `REM` starts a comment. Everything after it, to the end of the line, is ignored:
@@ -172,6 +195,8 @@ Errors are reported the way a C64 reports them, on stderr:
 |---|---|
 | `?SYNTAX  ERROR` | c64sh cannot understand the line: a misspelled or lowercase keyword, a stray character, or a part of BASIC that c64sh does not support yet. |
 | `?STRING TOO LONG  ERROR` | Joining strings with `+` produced more than 255 characters. |
+| `?TYPE MISMATCH  ERROR` | `+` was given a string and a number. |
+| `?OVERFLOW  ERROR` | A number, or the result of `+`, is larger than 1.70141183E+38. |
 
 An error stops the rest of its line. Anything printed before the error stays printed, as on a C64:
 
@@ -197,14 +222,15 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 
 - **`,` fills print zones with spaces.** A C64 moves its cursor right on screen instead, leaving whatever was there; in a terminal, output only ever appears after the cursor, so spaces look the same.
 - **Errors go to stderr** and set a non-zero exit status in scripts.
-- **No screen emulation**: no 40-column wrapping, colors, or graphics characters.
+- **No screen emulation**: no 40-column wrapping, colors, or graphics characters. So a print zone past column 40 stays on the same line: `PRINT 2,3,4,5,6` prints ` 6 ` at column 40, where a C64 would start a new screen line.
+- **Arithmetic uses standard 64-bit floating point**, rounded to the C64's 9 digits when printed. Results match a C64 in nearly every case; a C64's own rounding occasionally differs in the last digit.
 - **The banner** reads `C64SH BASIC V2`.
 
 ## Not yet supported
 
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
-- Numbers and math (`PRINT 1+2`)
+- Arithmetic other than `+` (`PRINT 2*3`), negative numbers (`PRINT -5`), and parentheses
 - Variables (`A$="HI"`)
 - Functions such as `CHR$(34)`
 - Program mode: lines with line numbers (`10 PRINT "HELLO"`), `RUN`, `LIST`, `GOTO`

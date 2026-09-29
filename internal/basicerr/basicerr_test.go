@@ -7,6 +7,8 @@ func TestErrorReturnsC64Name(t *testing.T) {
 	cases := map[Kind]string{
 		Syntax:        "SYNTAX",
 		StringTooLong: "STRING TOO LONG",
+		TypeMismatch:  "TYPE MISMATCH",
+		Overflow:      "OVERFLOW",
 	}
 	for kind, want := range cases {
 		if got := (&Error{Kind: kind}).Error(); got != want {

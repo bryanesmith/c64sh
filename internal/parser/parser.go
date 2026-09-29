@@ -5,6 +5,9 @@
 package parser
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/bryanesmith/c64sh/internal/ast"
 	"github.com/bryanesmith/c64sh/internal/basicerr"
 	"github.com/bryanesmith/c64sh/internal/token"
@@ -16,7 +19,7 @@ import (
 // inside a PRINT statement's items, by that statement ending in a BadItem.
 //
 // @spec PARSER-001, PARSER-002, PARSER-003, PARSER-004, PARSER-005, PARSER-006
-// @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011, PARSER-012
+// @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011, PARSER-012, PARSER-013
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -123,7 +126,7 @@ func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	case token.Comma:
 		p.next()
 		return &ast.Comma{}, nil
-	case token.String:
+	case token.String, token.Number:
 		expr, err := p.parseExpression()
 		if err != nil {
 			return nil, err
@@ -134,26 +137,46 @@ func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	}
 }
 
-// Expression = string { "+" string } .
+// Expression = Operand { "+" Operand } .
 func (p *parser) parseExpression() (ast.Expr, error) {
-	left, err := p.parseString()
+	left, err := p.parseOperand()
 	if err != nil {
 		return nil, err
 	}
 	for p.accept(token.Plus) {
-		right, err := p.parseString()
+		right, err := p.parseOperand()
 		if err != nil {
 			return nil, err
 		}
-		left = &ast.Concat{Left: left, Right: right}
+		left = &ast.BinaryExpr{Op: ast.Add, Left: left, Right: right}
 	}
 	return left, nil
 }
 
-// parseString reads a string token (the grammar's lexical rule string).
-func (p *parser) parseString() (ast.Expr, error) {
-	if p.peek() != token.String {
+// Operand = string | number .
+func (p *parser) parseOperand() (ast.Expr, error) {
+	switch p.peek() {
+	case token.String:
+		return &ast.StringLit{Value: p.next().Value}, nil
+	case token.Number:
+		return &ast.NumberLit{Value: numberValue(p.next().Value)}, nil
+	default:
 		return nil, syntaxError()
 	}
-	return &ast.StringLit{Value: p.next().Value}, nil
+}
+
+// numberValue converts the text of a number token. It first normalizes the
+// forms a C64 accepts and strconv.ParseFloat does not: a leading "." ("." is
+// 0) and an "E" with no exponent digits ("1E" and "1E+" are 1). A literal too
+// large for float64 converts to infinity, which the interpreter reports as
+// OVERFLOW.
+func numberValue(text string) float64 {
+	if strings.HasPrefix(text, ".") {
+		text = "0" + text
+	}
+	if i := strings.IndexByte(text, 'E'); i >= 0 && strings.TrimLeft(text[i+1:], "+-") == "" {
+		text += "0"
+	}
+	v, _ := strconv.ParseFloat(text, 64) // range errors still return ±Inf or 0
+	return v
 }

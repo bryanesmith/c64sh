@@ -144,3 +144,19 @@ func TestGitignoreExcludesBin(t *testing.T) {
 		t.Errorf(".gitignore does not exclude bin/")
 	}
 }
+
+// @spec BUILD-009
+func TestGitignoreExcludesDSStore(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(strings.Split(string(data), "\n"), ".DS_Store") {
+		t.Errorf(".gitignore does not exclude .DS_Store")
+	}
+}
+
+// @spec BUILD-010
+func TestMakeUpdateSnapshots(t *testing.T) {
+	wantContains(t, "make -n update-snapshots", dryRun(t, nil, "update-snapshots"), "UPDATE_SNAPS=true go test ./test/snapshot")
+}

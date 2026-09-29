@@ -1,0 +1,14 @@
+exit status: 0
+--- stdout ---
+HELLO WORLD
+HELLO WORLD
+HELLO WORLD
+C64
+HELLO WORLD
+HELLO WORLD
+ABCD
+HELLOWORLD
+HELLO WORLD
+C64
+
+--- stderr ---

@@ -1,0 +1,6 @@
+exit status: 1
+--- stdout ---
+THIS LINE WORKS
+OK
+--- stderr ---
+?SYNTAX  ERROR

@@ -9,6 +9,8 @@ import (
 )
 
 // grammarRules maps each syntactic grammar rule name to its parse function.
+//
+// @spec GRAMMAR-008
 var grammarRules = map[string]any{
 	"Line":           (*parser).parseLine,
 	"Statement":      (*parser).parseStatement,

@@ -1,0 +1,14 @@
+exit status: 0
+--- stdout ---
+HELLO WORLD
+HELLO WORLD
+HELLO WORLD
+HELLO WORLD
+  HELLO   WORLD  
+HELLO WORLD
+HELLO, WORLD! 1+2=3; A:B
+lowercase is fine inside quotes
+
+HELLO WORLD
+HI:REM THERE
+--- stderr ---

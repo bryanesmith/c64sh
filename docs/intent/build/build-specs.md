@@ -10,4 +10,5 @@ Design: `build-design.md`
 - [x] **BUILD-006**: When `make test` is run, it shall run `go test ./...`.
 - [x] **BUILD-007**: When `make clean` is run, it shall remove the `bin/` directory.
 - [x] **BUILD-008**: The Makefile's recipes shall not echo the commands they run, so `make run` shows only c64sh's own output.
-- [x] **BUILD-009**: `.gitignore` shall exclude the `bin/` directory.
+- [x] **BUILD-009**: `.gitignore` shall exclude the `bin/` directory and `.DS_Store` files.
+- [x] **BUILD-010**: When `make update-snapshots` is run, it shall run `go test ./test/snapshot` with the environment variable `UPDATE_SNAPS` set to `true`.

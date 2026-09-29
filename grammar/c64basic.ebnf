@@ -12,6 +12,8 @@
 // Uppercase rules are parser rules: they combine tokens.
 // lowercase rules are lexer rules: they combine characters.
 // Spaces and tabs between tokens are ignored.
+//
+// @spec GRAMMAR-001, GRAMMAR-002, GRAMMAR-003, GRAMMAR-004, GRAMMAR-005, GRAMMAR-010
 
 
 // ---- Lines ---------------------------------------------------------

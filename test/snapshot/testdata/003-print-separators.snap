@@ -1,0 +1,17 @@
+exit status: 0
+--- stdout ---
+NAME	SCORE
+A	B	C
+	INDENTED
+A		C
+
+HELLO, WORLD
+LEFT	RIGHT
+ABC
+ONE
+TWO
+SAME LINE
+X
+Y
+DONE
+--- stderr ---

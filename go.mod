@@ -1,5 +1,7 @@
 module github.com/bryanesmith/c64sh
 
+// @spec BUILD-001
+
 go 1.27.1
 
 require (

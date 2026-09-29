@@ -4,6 +4,19 @@
 - Mode: Full
 - Version: 1.3.0
 
+## Examples and Snapshot Tests
+
+Every language feature is shown in a script in `examples/`, and each script's output is recorded by a snapshot test in `test/snapshot/`. **When adding or changing a feature, add a new example or extend an existing one in the same change**, then run `make update-snapshots` and review the snapshot diff before committing.
+
+Example scripts follow these conventions (the snapshot tests enforce them):
+
+- Named `NNN-lowercase-words.bas`, numbered sequentially from `001` with no gaps (`001-hello-world.bas`, `002-concat-strings.bas`).
+- Executable (`chmod +x`), with `#!/usr/bin/env c64sh` as the first line and a `REM` comment explaining the file as the second.
+- Show the feature in many forms: they are documentation for users learning how the language is read.
+- End every line containing a `PRINT` with a comment saying what it prints (write a tab as `<TAB>` and a missing newline as `(no newline)`). The comment needs a colon before `REM`, because `PRINT` only ends at `:` or the end of the line: `PRINT "HI":REM HI`, not `PRINT "HI" REM HI` (a syntax error, as on a C64). Where an end-of-line comment is impossible, such as after an unclosed string (`PRINT "HI`, which runs to the end of the line), put the comment on its own `REM` line immediately before.
+- A script may show an error. Scripts stop at their first error, so lines after it do not run; the snapshot records exactly what happens.
+- Hidden files such as `.DS_Store` are ignored; nothing else but example scripts belongs in `examples/`.
+
 ## Linked-Intent Development (MANDATORY)
 
 **Consult the `linked-intent-dev` skill for ALL code changes.** All changes flow through the arrow of intent in one direction:

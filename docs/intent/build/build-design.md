@@ -31,7 +31,8 @@ All are set with `?=` so they can be overridden on the command line (`make insta
 | `build` (default) | — | `$(GO) build -o $(BIN) ./cmd/c64sh`. |
 | `run` | `build` | Runs `$(BIN) $(ARGS)` with the terminal's stdin, stdout, and stderr. |
 | `install` | `build` | Creates `$(INSTALL_DIR)` if missing, then copies `$(BIN)` to `$(INSTALL_DIR)/c64sh` with mode `0755`, replacing any existing file. |
-| `test` | — | `$(GO) test ./...`. |
+| `test` | — | `$(GO) test ./...`. This includes the snapshot tests, so it fails if an example's output differs from its snapshot. |
+| `update-snapshots` | — | `UPDATE_SNAPS=true $(GO) test ./test/snapshot`: rewrites the snapshots of `examples/` from current output, creating missing ones and deleting those without an example (see the snapshot design). |
 | `clean` | — | Removes the `bin/` directory. |
 
 Recipes run silently (each command prefixed with `@`), so `make run` shows only c64sh's own output, not the command line `make` executed.
@@ -42,7 +43,7 @@ Recipes run silently (each command prefixed with `@`), so `make run` shows only 
 
 ## Repository Hygiene
 
-`bin/` is listed in `.gitignore`.
+`bin/` and `.DS_Store` (macOS folder metadata) are listed in `.gitignore`.
 
 ## Testing
 

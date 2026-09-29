@@ -37,7 +37,7 @@ Program mode is a planned feature. It adds a stored program to the shell's state
 
 ### Incremental language growth
 
-The language grows one feature at a time. The language currently supports `PRINT` with string arguments and `REM` comments, in direct mode. Each new feature (numbers and math, functions such as `CHR$`, variables, program mode with line numbers, `LOAD`/`SAVE`) extends the grammar, then the lexer and parser, then the interpreter, and gets its own tests at every layer.
+The language grows one feature at a time. The language currently supports `PRINT` with string arguments and `REM` comments, in direct mode. Each new feature (numbers and math, functions such as `CHR$`, variables, program mode with line numbers, `LOAD`/`SAVE`) extends the grammar, then the lexer and parser, then the interpreter, and gets its own tests at every layer. It also adds or extends a numbered example script in `examples/` that exercises the feature in many ways, with a snapshot test recording that script's exact output.
 
 ## Target Users
 
@@ -53,6 +53,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 - `REM` comments behave as they do on a C64: everything after `REM` to the end of the line is ignored, including colons, so comments can document scripts and follow other statements (`PRINT "A":REM SHOW A`).
 - Input the shell does not accept produces the error a C64 would print for it (for example `?SYNTAX  ERROR`).
 - The lexer, parser, and interpreter each have unit tests; functional tests run the whole shell on given input and assert on captured stdout and stderr.
+- `examples/` holds numbered, executable BASIC scripts (`001-hello-world.bas`, …) that show each language feature in many forms, commented for readers. Snapshot tests run every example and compare its stdout, stderr, and exit status with a recorded snapshot, so any change in behavior appears as a reviewable diff.
 - `make build`, `make run`, and `make install` build the binary, build and start the shell, and install `c64sh` into `~/bin`.
 - `README.md` gives a short description, build and run instructions, and one example, and links to a user guide at `docs/user-guide.md`.
 
@@ -107,6 +108,7 @@ A BASIC error (such as `SYNTAX`) is an ordinary Go error value that carries the 
 - **Unit tests** live beside the code in each package (`lexer_test.go`, `parser_test.go`, …).
 - **Grammar conformance tests** check that the grammar verifies and that every syntactic rule has a parse function.
 - **Functional tests** in `test/functional/` run the shell in-process with given input, capture stdout and stderr, and assert on them. One test builds the real `c64sh` binary and runs a script through its `#!/usr/bin/env c64sh` line.
+- **Snapshot tests** in `test/snapshot/` run each script in `examples/` through the shell, as `c64sh FILE` does, and compare the result with a recorded snapshot in `test/snapshot/testdata/`. `make update-snapshots` rewrites the snapshots from current behavior; the resulting diff is reviewed like code. The same tests check that the examples follow their conventions (numbered names, `#!` line, a leading `REM` comment).
 
 ### Build and installation
 
@@ -117,7 +119,8 @@ A `Makefile` at the repository root is the single entry point for building, runn
 | `make build` | Compiles `cmd/c64sh` to `bin/c64sh` in the repository. `bin/` is build output and is not committed. |
 | `make run` | Runs `make build`, then starts `bin/c64sh`. Arguments are passed with `ARGS`, e.g. `make run ARGS=hello.bas`. |
 | `make install` | Runs `make build`, then copies the binary to `$(INSTALL_DIR)/c64sh`, creating the directory if needed. `INSTALL_DIR` defaults to `~/bin` and can be overridden (`make install INSTALL_DIR=/usr/local/bin`). |
-| `make test` | Runs all unit, grammar conformance, and functional tests (`go test ./...`). |
+| `make test` | Runs all unit, grammar conformance, functional, and snapshot tests (`go test ./...`), failing if any example's output differs from its snapshot. |
+| `make update-snapshots` | Reruns the snapshot tests, rewriting each snapshot from the current output. |
 | `make clean` | Removes `bin/`. |
 
 `make build` is the default target. For `#!/usr/bin/env c64sh` scripts and a bare `c64sh` command to work, the install directory must be on the user's `PATH`; the user guide explains this. `go install ./cmd/c64sh` also works for users who prefer Go's own tooling, but the Makefile is the documented path.
@@ -137,6 +140,8 @@ internal/parser/
 internal/interp/
 internal/shell/
 test/functional/     end-to-end tests
+test/snapshot/       snapshot tests of examples/ (snapshots in testdata/)
+examples/            numbered example scripts, one or more per feature
 docs/                design docs (HLD, docs/intent/) and user-guide.md
 README.md
 ```
@@ -156,6 +161,7 @@ README.md
 ## Success Metrics
 
 - Every example in the user guide produces exactly the documented output when run through `c64sh`. Falsified by any documented example that does not.
+- Every language feature is shown in at least one script in `examples/`, and every script's output matches its snapshot. Falsified by a feature with no example, or a failing snapshot test.
 - Every `PRINT` and `REM` form listed under Goals produces the same text a C64 would, with a tab in place of the C64's print zones. Falsified by any difference in functional tests.
 - Every syntactic rule in `grammar/c64basic.ebnf` has a parse function. Falsified by a failing grammar conformance test.
 - Adding a new statement touches only the grammar, lexer, parser, interpreter, and their tests, not the shell. Falsified if a language feature requires shell changes.

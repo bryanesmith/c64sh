@@ -4,6 +4,8 @@ c64sh is a shell that speaks Commodore 64 BASIC V2. It runs in an ordinary termi
 
 c64sh is being built one command at a time. This guide describes what works today.
 
+For hands-on examples, see the numbered scripts in [`examples/`](../examples/). Each one shows a feature in many forms, with a comment beside every `PRINT` saying what it prints, and each can be run directly: `./examples/001-hello-world.bas`.
+
 - [Installing](#installing)
 - [Interactive sessions](#interactive-sessions)
 - [Scripts](#scripts)

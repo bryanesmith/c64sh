@@ -10,6 +10,8 @@ import (
 
 // grammarTokens maps each lexical grammar rule, and each literal token used
 // in a syntactic grammar rule (written with its quotes), to its token kind.
+//
+// @spec GRAMMAR-009
 var grammarTokens = map[string]token.Kind{
 	"print":  token.Print,
 	"rem":    token.Rem,

@@ -53,18 +53,20 @@ The start rule is `Line`: one line of input, as typed at the prompt or read from
 
 ## Current Grammar
 
-The grammar covers the direct-mode `PRINT` statement with string expressions:
+The grammar covers the direct-mode `PRINT` statement with string expressions, and `REM` comments:
 
 | Rule | Meaning |
 |---|---|
 | `Line` | Statements separated by `:`. |
-| `Statement` | A `PRINT` statement, or nothing (C64 BASIC allows empty statements, so `::` and a line consisting only of `:` are valid). |
+| `Statement` | A `PRINT` statement, a `REM` statement, or nothing (C64 BASIC allows empty statements, so `::` and a line consisting only of `:` are valid). |
 | `PrintStatement` | The `print` keyword followed by any number of print items. |
 | `PrintItem` | An expression, `;`, or `,`. Items may follow each other with no separator (`PRINT "A""B"`), as on a C64. |
 | `Expression` | One or more string literals joined by `+`. |
+| `RemStatement` | A `rem` token: a comment. |
 | `print` | The keyword `PRINT`, or its C64 abbreviation `?`. |
 | `string` | A double quote, any characters except a double quote, and an optional closing double quote. |
-| `character` | Any character except a double quote or a line break. |
+| `character` | Any character except a double quote or a line feed (`\n`). A line never contains a line feed, because the shell splits input into lines on it, so this is every character the lexer can see except the quote. A carriage return in the middle of a line is an ordinary character. |
+| `rem` | The keyword `REM` followed by any characters, including double quotes and colons, up to the end of the line. |
 
 Keywords are case-sensitive: the uppercase text written in the grammar is exactly what is accepted, so `print` is not a keyword.
 
@@ -98,7 +100,8 @@ These tests catch a rule added to the grammar without code, and code for a rule 
 | Role of the grammar | Specification checked by tests; not executed | Runtime-interpreted grammar; generated parser | See HLD *Key Design Decisions*. The grammar stays free to optimize for readability because no code is generated from it. |
 | Location | `grammar/` package at the repository root | `internal/parser/`; `docs/` | The grammar specifies both lexer and parser, so neither owns it. `//go:embed` cannot reference parent directories, so a package is the simplest way for other packages' tests to load it. |
 | Conformance granularity | Rule names ↔ code tables, checked both ways | Parse example inputs extracted from grammar comments | Name tables are simple and catch the drift that matters most (missing or stale rules). Behavior is covered by unit and functional tests, which state expected output precisely. |
-| Empty statements | Allowed (`Statement = [ PrintStatement ] .`) | Require at least one statement per line | Matches C64 BASIC V2, which accepts `::` and leading or trailing colons. |
+| Comment text | Part of the lexical rule `rem` (`rem = "REM" { character \| `"` } .`) | A syntactic rule `RemStatement = "REM" { … } .` over tokens | A C64 does not tokenize the text after `REM`, so colons, quotes, and keywords inside a comment must never become tokens. Only a lexical rule, which works on characters, can say that. |
+| Empty statements | Allowed (`Statement = [ PrintStatement \| RemStatement ] .`) | Require at least one statement per line | Matches C64 BASIC V2, which accepts `::` and leading or trailing colons. |
 
 ## Open Questions & Future Decisions
 

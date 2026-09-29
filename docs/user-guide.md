@@ -8,6 +8,7 @@ c64sh is being built one command at a time. This guide describes what works toda
 - [Interactive sessions](#interactive-sessions)
 - [Scripts](#scripts)
 - [PRINT](#print)
+- [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
 - [Differences from a real C64](#differences-from-a-real-c64)
@@ -123,6 +124,25 @@ prints `HELLO, WORLD`.
 A string made by joining with `+` may hold at most 255 characters; longer results cause `?STRING TOO LONG  ERROR`.
 
 **Keywords are uppercase.** `PRINT` must be typed in capitals; `print` is a syntax error. Text inside quotes can use any case.
+
+## Comments
+
+`REM` starts a comment. Everything after it, to the end of the line, is ignored:
+
+```
+#!/usr/bin/env c64sh
+REM GREET THE USER
+PRINT "HELLO":REM SAYS HELLO
+```
+
+prints `HELLO`.
+
+- **A comment runs to the end of the line**, even past a colon: `REM A:PRINT "X"` prints nothing.
+- **A comment can follow other statements**, after a colon: `PRINT "A":REM SHOW A` prints `A`.
+- **Inside `PRINT`, put a colon before `REM`.** `PRINT "A" REM NOTE` prints `A` and then `?SYNTAX  ERROR`, as on a C64, because `PRINT` only ends at a colon or the end of the line.
+- **`REM` must be uppercase**, like every keyword, and needs no space after it: `REMARK` is a comment.
+- **Inside quotes, `REM` is just text:** `PRINT "REM"` prints `REM`.
+- In an interactive session, a comment line is followed by `READY.`, like any other command.
 
 ## Errors
 

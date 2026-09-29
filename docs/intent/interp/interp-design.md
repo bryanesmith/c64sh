@@ -41,6 +41,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
     switch s := s.(type) {
     case *ast.PrintStmt:
         return in.execPrint(s)
+    case *ast.RemStmt:
+        return nil
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
     }
@@ -74,6 +76,10 @@ After the last item, a newline (`\n`) is written **unless the last item is `;` o
 | `PRINT ,"A"` | `\tA\n` |
 
 The output for one `PRINT` is collected and written in a single call to the writer. If an item fails, either because evaluating its expression fails or because it is a `BadItem`, the output of the items before it is written (a C64 prints each item as it is evaluated), and then the error is returned. For `PRINT "A";X` where `X` fails, `A` is written, with no newline.
+
+## REM
+
+Executing a `RemStmt` does nothing: it writes no output and returns no error, so execution continues with the next statement. A `RemStmt` is always the last statement of a line, because its comment runs to the end of the line.
 
 ## Expressions
 

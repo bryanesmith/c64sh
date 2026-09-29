@@ -11,6 +11,7 @@ const (
 	EOL       Kind = iota // end of line; always the last token
 	Illegal               // a character no rule accepts
 	Print                 // PRINT or ?
+	Rem                   // REM and the rest of the line
 	String                // "…"
 	Colon                 // :
 	Semicolon             // ;
@@ -22,6 +23,7 @@ var kindNames = [...]string{
 	EOL:       "EOL",
 	Illegal:   "Illegal",
 	Print:     "Print",
+	Rem:       "Rem",
 	String:    "String",
 	Colon:     "Colon",
 	Semicolon: "Semicolon",
@@ -39,6 +41,6 @@ func (k Kind) String() string {
 // Token is one token of a line.
 type Token struct {
 	Kind  Kind
-	Value string // String: contents without quotes; Illegal: the character; otherwise the source text
+	Value string // String: contents without quotes; Rem: the text after REM; Illegal: the character; otherwise the source text
 	Pos   int    // byte offset of the token's first character in the line
 }

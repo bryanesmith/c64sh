@@ -26,3 +26,7 @@ Design: `lexer-design.md`
 - [x] **LEXER-011**: When the lexer encounters `:`, `;`, `,`, or `+` outside a string literal, it shall produce a `Colon`, `Semicolon`, `Comma`, or `Plus` token respectively.
 - [x] **LEXER-012**: If the lexer encounters, outside a string literal, a valid UTF-8 character that no other scanning rule accepts (including digits, letters not starting a keyword, and whitespace other than space and tab), then it shall produce an `Illegal` token whose value is that one character.
 - [x] **LEXER-013**: If the lexer encounters, outside a string literal, a byte that is not valid UTF-8, then it shall produce an `Illegal` token whose value is that one byte.
+
+## Comments
+
+- [x] **LEXER-014**: When the characters at the current position outside a string literal are the uppercase letters `REM`, the lexer shall produce a `Rem` token whose value is every byte after `REM` to the end of the line, exactly as written (including a leading space, double quotes, colons, keywords, and bytes that are not valid UTF-8), followed by the `EOL` token (so `REM A:PRINT "X"` produces a `Rem` token with value ` A:PRINT "X"`, and `REMARK` produces a `Rem` token with value `ARK`).

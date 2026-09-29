@@ -81,10 +81,20 @@ func repoRoot(t *testing.T) string {
 
 var (
 	buildOnce sync.Once
+	buildDir  string // temporary directory holding the built binary
 	binPath   string
 	buildErr  error
 	buildOut  []byte
 )
+
+// TestMain removes the binary built by binary once all tests have run.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if buildDir != "" {
+		os.RemoveAll(buildDir)
+	}
+	os.Exit(code)
+}
 
 // binary builds the c64sh command once per test run and returns its path.
 func binary(t *testing.T) string {
@@ -95,6 +105,7 @@ func binary(t *testing.T) string {
 			buildErr = err
 			return
 		}
+		buildDir = dir
 		binPath = filepath.Join(dir, "c64sh")
 		cmd := exec.Command("go", "build", "-o", binPath, "./cmd/c64sh")
 		cmd.Dir = repoRoot(t)

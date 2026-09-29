@@ -42,11 +42,13 @@ func (in *Interp) Exec(line *ast.Line) error {
 	return nil
 }
 
-// @spec INTERP-003
+// @spec INTERP-003, INTERP-014
 func (in *Interp) execStmt(s ast.Stmt) error {
 	switch s := s.(type) {
 	case *ast.PrintStmt:
 		return in.execPrint(s)
+	case *ast.RemStmt:
+		return nil // a comment does nothing
 	default:
 		panic(fmt.Sprintf("interp: unhandled statement %T", s))
 	}

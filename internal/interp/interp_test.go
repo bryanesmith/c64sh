@@ -116,6 +116,20 @@ func TestUnhandledNodeTypesPanic(t *testing.T) {
 	}
 }
 
+// @spec INTERP-014
+func TestRemDoesNothing(t *testing.T) {
+	rem := &ast.RemStmt{Text: " HELLO"}
+	runPrintCases(t, []printCase{
+		{"comment alone", line(rem), ""},
+		{"comment after a print", line(printStmt(item(str("A")), semi), rem), "A"},
+		{"statement after a comment runs", line(rem, printStmt(item(str("B")))), "B\n"},
+	})
+	rec, _ := exec(line(rem))
+	if len(rec.writes) != 0 {
+		t.Errorf("REM made %d writes, want 0", len(rec.writes))
+	}
+}
+
 // @spec INTERP-004
 func TestPrintItems(t *testing.T) {
 	runPrintCases(t, []printCase{

@@ -28,7 +28,7 @@ func dryRun(t *testing.T, env []string, args ...string) string {
 	t.Helper()
 	// "make ... -n" runs Make in dry run. E.g.,
 	//    % make build -n
-        //    go build -o bin/c64sh ./cmd/c64sh
+	//    go build -o bin/c64sh ./cmd/c64sh
 	out, err := makeCmd(t, env, append([]string{"-n"}, args...)...).CombinedOutput()
 	if err != nil {
 		t.Fatalf("make -n %v: %v\n%s", args, err, out)

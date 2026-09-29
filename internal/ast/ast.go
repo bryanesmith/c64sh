@@ -35,6 +35,9 @@ type Comma struct{}
 // It is always the statement's last item.
 type BadItem struct{ Err error }
 
+// RemStmt is REM and its comment, exactly as written after REM.
+type RemStmt struct{ Text string }
+
 // StringLit is a string literal; Value holds its contents without quotes.
 type StringLit struct{ Value string }
 
@@ -42,6 +45,7 @@ type StringLit struct{ Value string }
 type Concat struct{ Left, Right Expr }
 
 func (*PrintStmt) stmt() {}
+func (*RemStmt) stmt()   {}
 
 func (*ExprItem) printItem()  {}
 func (*Semicolon) printItem() {}

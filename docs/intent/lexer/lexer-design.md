@@ -38,6 +38,7 @@ const (
     Slash                 // /
     LParen                // (
     RParen                // )
+    Caret                 // ^ or ↑ (exponentiation)
 )
 
 type Token struct {
@@ -62,6 +63,7 @@ At each position the lexer applies the first matching rule:
 | Other keyword text (see *Keywords*) | Keyword token (`Print`). |
 | `?` | `Print` token (the C64 abbreviation for `PRINT`). |
 | `:` `;` `,` `+` `-` `*` `/` `(` `)` | `Colon`, `Semicolon`, `Comma`, `Plus`, `Minus`, `Star`, `Slash`, `LParen`, `RParen`. |
+| `^` or `↑` (U+2191) | `Caret`, whose value is the character as written. |
 | A digit, or `.` | `Number` token (see *Numbers*). |
 | Any other character | `Illegal` token holding that one character (a full UTF-8 character, not a single byte). |
 | A byte that is not valid UTF-8 | `Illegal` token holding that one byte. |
@@ -105,7 +107,7 @@ digit     = "0" … "9" .
 character = /* any character except `"` and a line feed */ .
 ```
 
-A line never contains a line feed, because the shell splits input into lines at line feeds, so `character` is every character the lexer can see except the double quote; a carriage return inside a line is an ordinary character. The punctuation tokens `:`, `;`, `,`, `+`, `-`, `*`, `/`, `(`, and `)` are written as literal tokens in the parser's rules. A `-` is never part of a number token except as the sign of an exponent (`1E-3`); in `1-2` it is a `Minus` between two numbers.
+A line never contains a line feed, because the shell splits input into lines at line feeds, so `character` is every character the lexer can see except the double quote; a carriage return inside a line is an ordinary character. The punctuation tokens `:`, `;`, `,`, `+`, `-`, `*`, `/`, `(`, `)`, and `^` are written as literal tokens in the parser's rules; the lexer also reads `↑` as `^`. A `-` is never part of a number token except as the sign of an exponent (`1E-3`); in `1-2` it is a `Minus` between two numbers.
 
 Uppercase rule names belong to the parser; lowercase ones are these token rules. Together, the parser's rule comments and these comments are the complete grammar of the language.
 
@@ -132,6 +134,7 @@ Scanning a whole line up front is sufficient: lines are short, and the parser be
 | Token rule documentation | EBNF comment above the code that scans each rule | A separate grammar file | The rule sits beside its implementation, so there is one description of each token to keep current (see HLD *Where the syntax is defined*). |
 | Spaces inside numbers | Ignored, so `1 2` is `12` | Spaces end a number | The C64's character reader skips spaces everywhere outside strings, so this is how BASIC V2 reads numbers; `PRINT 1 2` printing ` 12 ` is authentic. |
 | Number value | Computed by the parser from the token text | Computed by the lexer | Tokens carry text; keeping number conversion out of the lexer keeps its job to splitting characters, and one place converts literals. |
+| Exponentiation character | `^`, and `↑` as an alternative | `↑` only; `^` only; `**` | The C64's up-arrow key produces character code 94, which is `^` in ASCII, so `^` is what a C64 program's bytes contain. `↑` matches what the C64 keyboard and screen show, for users who can type it. `**` is not C64 BASIC. |
 | Output shape | Slice of all tokens for the line | Streaming `Next()` iterator | Lines are short; a slice is simpler to test and gives the parser unlimited lookahead. |
 | Whitespace | Space and tab skipped between tokens | Space only | A tab outside a string has no meaning in BASIC V2; treating it like a space avoids surprising errors from pasted or indented scripts. |
 

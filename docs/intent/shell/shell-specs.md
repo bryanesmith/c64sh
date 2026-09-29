@@ -53,4 +53,4 @@ Design: `shell-design.md`
 
 - [x] **SHELL-ERR-001**: When the shell reports a BASIC error, it shall write to stderr `?`, the error's C64 name, two spaces, `ERROR`, and a newline (such as `?SYNTAX  ERROR` and `?STRING TOO LONG  ERROR`).
 - [x] **SHELL-ERR-002**: When the shell reports a BASIC error, it shall first call the interpreter's `FreshLine`, so that stdout gains a newline when program output left the line unfinished.
-- [x] **SHELL-ERR-003**: `basicerr.Error`'s `Error` method shall return the error kind's C64 name: `SYNTAX` for `Syntax`, `STRING TOO LONG` for `StringTooLong`, `TYPE MISMATCH` for `TypeMismatch`, `OVERFLOW` for `Overflow`, and `DIVISION BY ZERO` for `DivisionByZero`.
+- [x] **SHELL-ERR-003**: `basicerr.Error`'s `Error` method shall return the error kind's C64 name: `SYNTAX` for `Syntax`, `STRING TOO LONG` for `StringTooLong`, `TYPE MISMATCH` for `TypeMismatch`, `OVERFLOW` for `Overflow`, `DIVISION BY ZERO` for `DivisionByZero`, and `ILLEGAL QUANTITY` for `IllegalQuantity`.

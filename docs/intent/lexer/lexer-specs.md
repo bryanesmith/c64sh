@@ -37,3 +37,4 @@ Design: `lexer-design.md`
 - [x] **LEXER-016**: While scanning a number literal, the lexer shall skip spaces and tabs between its characters (`1 2` produces one `Number` token with value `12`, and `1 . 5 E 3` one with value `1.5E3`), and shall not include whitespace after the literal's last character in the token.
 - [x] **LEXER-017**: When a `.` follows a number literal that already contains a `.`, the lexer shall end the literal before it, so that `.` starts the next token (`1.2.3` produces `Number(1.2)` and `Number(.3)`).
 - [D] **LEXER-018**: When a keyword begins at an `E` that would otherwise continue a number literal, the lexer shall end the literal before the `E`, so that the keyword is recognized (the C64 reads keywords before numbers).
+- [x] **LEXER-019**: When the lexer encounters `^` or `↑` (U+2191) outside a string literal, it shall produce a `Caret` token whose value is that character.

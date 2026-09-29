@@ -51,7 +51,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 - `c64sh FILE` and executable files beginning with `#!/usr/bin/env c64sh` execute each line of the file in direct mode, as if typed. Input piped on stdin is executed the same way.
 - `PRINT` with string literals behaves as it does on a C64: optional space after the keyword (`PRINT"X"`), `;` and `+` join strings, and `:` separates statements on one line. `,` moves to the next 10-column print zone, as on a C64.
 - Numbers are written and printed as on a C64: literals such as `5`, `3.14`, `.5`, and `1E3`; printed with a leading space (or `-`) and a trailing space, rounded to 9 significant digits, with no leading zero before the decimal point (`.5`), and in scientific notation below 0.01 and from 1E9 up (`1E-03`, `1E+09`). Numbers and strings mix freely in `PRINT` (`? "5*9=";45`).
-- Arithmetic follows C64 rules: `+`, `-`, `*`, and `/`, a leading `-` (negation) or `+`, and parentheses, with the C64's precedence (negation, then `*` and `/`, then `+` and `-`, each left to right). `+` also joins strings. Dividing by zero is `?DIVISION BY ZERO  ERROR`, and using a string with an arithmetic operator other than joining is `?TYPE MISMATCH  ERROR`.
+- Arithmetic follows C64 rules: `+`, `-`, `*`, `/`, and `^` (exponentiation, also typed `↑`, the same character code as the C64's up-arrow key), a leading `-` (negation) or `+`, and parentheses, with the C64's precedence (`^`, then negation, then `*` and `/`, then `+` and `-`, each left to right, so `-2^2` is -4 and `2^3^2` is 64). `+` also joins strings. Dividing by zero is `?DIVISION BY ZERO  ERROR`, a negative number to a fractional power is `?ILLEGAL QUANTITY  ERROR`, and using a string with an arithmetic operator other than joining is `?TYPE MISMATCH  ERROR`.
 - `REM` comments behave as they do on a C64: everything after `REM` to the end of the line is ignored, including colons, so comments can document scripts and follow other statements (`PRINT "A":REM SHOW A`).
 - Input the shell does not accept produces the error a C64 would print for it (for example `?SYNTAX  ERROR`).
 - The lexer, parser, and interpreter each have unit tests; functional tests run the whole shell on given input and assert on captured stdout and stderr.
@@ -62,7 +62,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 ## Non-Goals
 
 - **Emulating the C64 machine.** No screen memory, 40-column wrapping, colors, cursor control, PETSCII graphics, `PEEK`/`POKE`, or timing.
-- **Supporting the whole language at once.** Exponentiation, comparison and logical operators, variables, functions, program mode (see *Direct mode and program mode*), and device commands are future features, added one at a time.
+- **Supporting the whole language at once.** Comparison and logical operators, variables, functions, program mode (see *Direct mode and program mode*), and device commands are future features, added one at a time.
 - **Rich interactive line editing** (history, arrow keys, tab completion). The interactive prompt reads plain lines.
 - **Extensions beyond BASIC V2.** No keywords from BASIC 3.5/7.0 or third-party extensions.
 - **Real device I/O.** When `LOAD`/`SAVE` are added, the storage behind them will be replaceable, so tests never touch the real filesystem.

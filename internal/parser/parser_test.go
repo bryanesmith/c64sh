@@ -24,6 +24,7 @@ var (
 	slash = token.Token{Kind: token.Slash, Value: "/"}
 	lp    = token.Token{Kind: token.LParen, Value: "("}
 	rp    = token.Token{Kind: token.RParen, Value: ")"}
+	caret = token.Token{Kind: token.Caret, Value: "^"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -93,7 +94,7 @@ func dumpExpr(e ast.Expr) string {
 	case *ast.NumberLit:
 		return "#" + strconv.FormatFloat(e.Value, 'g', -1, 64)
 	case *ast.BinaryExpr:
-		op, ok := map[ast.Op]string{ast.Add: "+", ast.Sub: "-", ast.Mul: "*", ast.Div: "/"}[e.Op]
+		op, ok := map[ast.Op]string{ast.Add: "+", ast.Sub: "-", ast.Mul: "*", ast.Div: "/", ast.Pow: "^"}[e.Op]
 		if !ok {
 			return fmt.Sprintf("<op %d>", e.Op)
 		}
@@ -214,6 +215,8 @@ func TestSyntaxErrorInsidePrintEndsWithBadItem(t *testing.T) {
 	runParseCases(t, []parseCase{
 		{"illegal as first item", toks(pr, ill("X")), `PRINT[BAD(SYNTAX)]`, true},
 		{"star as first item", toks(pr, star, number("2")), `PRINT[BAD(SYNTAX)]`, true},
+		{"caret as first item", toks(pr, caret, number("2")), `PRINT[BAD(SYNTAX)]`, true},
+		{"dangling caret", toks(pr, number("2"), caret), `PRINT[BAD(SYNTAX)]`, true},
 		{"close paren as first item", toks(pr, rp), `PRINT[BAD(SYNTAX)]`, true},
 		{"missing close paren", toks(pr, str("A"), semi, lp, number("1"), plus, number("2")), `PRINT["A" ; BAD(SYNTAX)]`, true},
 		{"empty parens", toks(pr, lp, rp), `PRINT[BAD(SYNTAX)]`, true},
@@ -321,5 +324,28 @@ func TestExpressionEndsBeforeNextItem(t *testing.T) {
 		{"string after expression", toks(pr, number("1"), plus, number("1"), str("A")), `PRINT[(#1+#1) "A"]`, false},
 		{"minus continues", toks(pr, number("1"), minus, number("1")), `PRINT[(#1-#1)]`, false},
 		{"minus after string continues", toks(pr, str("A"), minus, number("1")), `PRINT[("A"-#1)]`, false},
+	})
+}
+
+// @spec PARSER-019
+func TestPower(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"power", toks(pr, number("2"), caret, number("3")), `PRINT[(#2^#3)]`, false},
+		{"left to right", toks(pr, number("2"), caret, number("3"), caret, number("2")), `PRINT[((#2^#3)^#2)]`, false},
+		{"tighter than negation", toks(pr, minus, number("2"), caret, number("2")), `PRINT[(-(#2^#2))]`, false},
+		{"tighter than *", toks(pr, number("2"), star, number("3"), caret, number("2")), `PRINT[(#2*(#3^#2))]`, false},
+		{"tighter than * on the left", toks(pr, number("3"), caret, number("2"), star, number("2")), `PRINT[((#3^#2)*#2)]`, false},
+		{"parenthesized base", toks(pr, lp, minus, number("2"), rp, caret, number("2")), `PRINT[((-#2)^#2)]`, false},
+		{"parenthesized exponent", toks(pr, number("2"), caret, lp, number("1"), plus, number("1"), rp), `PRINT[(#2^(#1+#1))]`, false},
+	})
+}
+
+// @spec PARSER-020
+func TestSignedExponent(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"negative exponent", toks(pr, number("2"), caret, minus, number("1")), `PRINT[(#2^(-#1))]`, false},
+		{"sign takes in a following power", toks(pr, number("2"), caret, minus, number("1"), caret, number("2")), `PRINT[(#2^(-(#1^#2)))]`, false},
+		{"sign stops before *", toks(pr, number("2"), caret, minus, number("3"), star, number("4")), `PRINT[((#2^(-#3))*#4)]`, false},
+		{"plus sign dropped", toks(pr, number("2"), caret, plus, number("3")), `PRINT[(#2^#3)]`, false},
 	})
 }

@@ -105,10 +105,24 @@ In a script:
 | `PRINT "A";"B"` | `AB` |
 | `PRINT "A"+"B"` | `AB` |
 | `PRINT "A""B"` | `AB` |
-| `PRINT "A","B"` | `A`, a tab, then `B` |
+| `PRINT "A","B"` | `A`, then `B` at column 10 (`A         B`) |
 | `PRINT "FOO":PRINT "BAR"` | `FOO`, then `BAR` on the next line |
 
-**Separators.** `;` joins items with nothing between them. `,` puts a tab between them. `+` joins two strings into one.
+**Separators.** `;` joins items with nothing between them. `+` joins two strings into one. `,` moves to the next **print zone**: zones start every 10 columns (0, 10, 20, …), and c64sh fills the gap with spaces, so commas line up columns:
+
+```
+PRINT "NAME","SCORE"
+PRINT "ALICE","12"
+```
+
+prints
+
+```
+NAME      SCORE
+ALICE     12
+```
+
+If the cursor is already at the start of a zone, `,` moves a whole zone: `PRINT "0123456789","X"` puts `X` at column 20. The column carries over from one `PRINT` to the next when a line is left open with `;` or `,`, so later output still lines up with the zones.
 
 **Staying on the same line.** If a `PRINT` ends with `;` or `,`, no newline is printed, so the next `PRINT` continues the same line:
 
@@ -181,7 +195,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 
 ## Differences from a real C64
 
-- **`,` prints a tab** rather than moving to the next 10-column print zone.
+- **`,` fills print zones with spaces.** A C64 moves its cursor right on screen instead, leaving whatever was there; in a terminal, output only ever appears after the cursor, so spaces look the same.
 - **Errors go to stderr** and set a non-zero exit status in scripts.
 - **No screen emulation**: no 40-column wrapping, colors, or graphics characters.
 - **The banner** reads `C64SH BASIC V2`.

@@ -22,7 +22,7 @@ Design: `shell-design.md`
 
 - [x] **SHELL-INT-001**: When interactive mode starts, the shell shall write to stderr a blank line, `    **** C64SH BASIC V2 ****`, a blank line, and `READY.`, each followed by a newline.
 - [x] **SHELL-INT-002**: In interactive mode, after each non-blank line has run, whether it succeeded or reported a BASIC error, the shell shall write `READY.` followed by a newline to stderr.
-- [x] **SHELL-INT-003**: In interactive mode, before writing `READY.`, if the output written to stdout so far does not end with a newline, the shell shall write a newline to stdout.
+- [x] **SHELL-INT-003**: In interactive mode, before writing `READY.`, the shell shall call the interpreter's `FreshLine`, so that stdout gains a newline when program output left the line unfinished.
 - [x] **SHELL-INT-004**: In interactive mode, when a blank line is entered, the shell shall execute nothing and write nothing.
 - [x] **SHELL-INT-005**: In interactive mode, when a line reports a BASIC error, the shell shall continue reading the next line.
 - [x] **SHELL-INT-006**: In interactive mode, when the end of input is reached, the shell shall write a newline to stderr and exit with status 0.
@@ -52,5 +52,5 @@ Design: `shell-design.md`
 ## Error display
 
 - [x] **SHELL-ERR-001**: When the shell reports a BASIC error, it shall write to stderr `?`, the error's C64 name, two spaces, `ERROR`, and a newline (such as `?SYNTAX  ERROR` and `?STRING TOO LONG  ERROR`).
-- [x] **SHELL-ERR-002**: When the shell reports a BASIC error, if the output written to stdout so far does not end with a newline, it shall first write a newline to stdout.
+- [x] **SHELL-ERR-002**: When the shell reports a BASIC error, it shall first call the interpreter's `FreshLine`, so that stdout gains a newline when program output left the line unfinished.
 - [x] **SHELL-ERR-003**: `basicerr.Error`'s `Error` method shall return the error kind's C64 name: `SYNTAX` for `Syntax` and `STRING TOO LONG` for `StringTooLong`.

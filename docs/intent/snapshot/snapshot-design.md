@@ -34,7 +34,7 @@ PRINT "HELLO ";"WORLD":REM HELLO WORLD
 - **Line 1** is exactly `#!/usr/bin/env c64sh`, so the file runs as a script.
 - **Line 2** is a `REM` comment with text explaining what the file shows.
 - **Later lines** exercise the topic in many forms. `REM` lines introduce groups of related forms.
-- **Every line containing a `PRINT` ends with a comment showing what it prints**, written `:REM …` because `PRINT` ends only at `:` or the end of the line. Where an end-of-line comment is impossible (after an unclosed string, which runs to the end of the line) or awkward, the comment goes on its own `REM` line immediately before. Tabs are written `<TAB>` and a missing newline `(no newline)`, so the comment is readable. A line demonstrating a mistake still ends with a comment, saying what goes wrong.
+- **Every line containing a `PRINT` ends with a comment showing what it prints**, written `:REM …` because `PRINT` ends only at `:` or the end of the line. Where an end-of-line comment is impossible (after an unclosed string, which runs to the end of the line) or awkward, the comment goes on its own `REM` line immediately before. Spaces are written exactly as printed and a missing newline as `(no newline)`; an example about print zones may print a ruler line of column digits so the zones can be checked by eye. A line demonstrating a mistake still ends with a comment, saying what goes wrong.
 - **Errors may be shown.** A script stops at its first error, so lines after it do not run; the snapshot records exactly what happens.
 - The file is **executable** (owner execute permission set), so `./examples/001-hello-world.bas` runs.
 
@@ -101,7 +101,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 |---|---|
 | `001-hello-world.bas` | `PRINT` and `?`, with and without a space, unclosed strings |
 | `002-concat-strings.bas` | Joining strings with `;`, `+`, and no separator, and combinations of them |
-| `003-print-separators.bas` | `,` as a tab, trailing `;` and `,` suppressing the newline, bare `PRINT`, several statements with `:`, empty statements |
+| `003-print-separators.bas` | `,` moving to the next 10-column print zone (with a printed ruler), the column carrying over between PRINTs, trailing `;` and `,` suppressing the newline, bare `PRINT`, several statements with `:`, empty statements |
 | `004-comments.bas` | `REM` as a whole line, after `:`, without a space (`REMARK`), with colons and quotes inside, and `"REM"` inside a string |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 

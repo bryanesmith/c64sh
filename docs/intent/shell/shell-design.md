@@ -71,7 +71,7 @@ On startup the shell writes a C64-style banner and a ready prompt to **stderr**:
 READY.
 ```
 
-It then reads lines. After each non-blank line has run (successfully or with an error), it writes `READY.` on its own line to stderr. If the program output written to stdout so far does not end with a newline (for example after `PRINT "A";`), a newline is first written to stdout, so `READY.` starts on a fresh line, as on a C64. A blank line (empty or only spaces and tabs) does nothing and prints no `READY.`, as on a C64.
+It then reads lines. After each non-blank line has run (successfully or with an error), it writes `READY.` on its own line to stderr. Before it, the shell calls the interpreter's `FreshLine`, which writes a newline to stdout if program output left the line unfinished (for example after `PRINT "A";`), so `READY.` starts on a fresh line, as on a C64. A blank line (empty or only spaces and tabs) does nothing and prints no `READY.`, as on a C64.
 
 End of input (Ctrl-D at the start of a line) writes a newline to stderr, so the user's own shell prompt starts on a fresh line, and ends the session with exit status 0. Ctrl-C terminates the process with the default signal behavior.
 
@@ -140,7 +140,7 @@ A BASIC error is written to stderr as:
 
 with **two spaces** between the name and `ERROR`, followed by a newline, exactly as a C64 prints it in direct mode — for example `?SYNTAX  ERROR` and `?STRING TOO LONG  ERROR`.
 
-A C64 moves to a new line before printing an error. The shell does the same: if the program output written to stdout so far does not end with a newline (for example after `PRINT "A";`, on this line or an earlier one), it writes a newline to **stdout** before writing the error to stderr. This keeps the error on its own line in a terminal, and keeps redirected stdout ending in a complete line.
+A C64 moves to a new line before printing an error. The shell does the same: before writing the error to stderr, it calls the interpreter's `FreshLine`, which writes a newline to **stdout** if program output left the line unfinished (for example after `PRINT "A";`, on this line or an earlier one). This keeps the error on its own line in a terminal, and keeps redirected stdout ending in a complete line.
 
 ### Exit statuses
 
@@ -152,7 +152,7 @@ A C64 moves to a new line before printing an error. The shell does the same: if 
 
 ## Output Tracking
 
-To support the newline-before-error and newline-before-`READY.` rules, the shell wraps stdout in a small writer that passes bytes through unchanged and records whether the last byte written was a newline. Nothing else about program output is altered or buffered.
+The shell does not track program output itself. The interpreter writes all program output, keeps the cursor column, and provides `FreshLine`, which the shell calls before errors and `READY.` (see the interpreter design). Every newline on stdout is therefore written by the interpreter, so its column is always accurate. A write error from `FreshLine` is ignored: the next program output hits the same failure and stops the shell.
 
 ## Test Seam
 

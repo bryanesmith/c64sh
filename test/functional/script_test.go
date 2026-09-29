@@ -64,5 +64,5 @@ func TestShebangScriptRunsThroughPath(t *testing.T) {
 // @spec SHELL-SCRIPT-008
 func TestScriptEndAddsNothing(t *testing.T) {
 	check(t, "trailing semicolon", runMain(t, "PRINT \"A\";\n"), result{"A", "", 0})
-	check(t, "two partial lines", runMain(t, "PRINT \"A\";\nPRINT \"B\","), result{"AB\t", "", 0})
+	check(t, "two partial lines", runMain(t, "PRINT \"A\";\nPRINT \"B\","), result{"AB        ", "", 0})
 }

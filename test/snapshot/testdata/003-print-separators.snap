@@ -1,12 +1,17 @@
 exit status: 0
 --- stdout ---
-NAME	SCORE
-A	B	C
-	INDENTED
-A		C
+0123456789012345678901234567890
+NAME      SCORE
+A         B         C
+          INDENTED
+A                   C
+0123456789          X
+012345678 X
+01234567890         X
 
 HELLO, WORLD
-LEFT	RIGHT
+LEFT      RIGHT
+AB        X
 ABC
 ONE
 TWO

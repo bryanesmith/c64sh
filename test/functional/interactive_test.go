@@ -27,7 +27,7 @@ func TestReadyStartsOnFreshLine(t *testing.T) {
 	check(t, "trailing semicolon", runInteractive(t, "PRINT \"A\";\n"),
 		result{"A\n", banner + "READY.\n\n", 0})
 	check(t, "trailing comma", runInteractive(t, "PRINT \"A\",\n"),
-		result{"A\t\n", banner + "READY.\n\n", 0})
+		result{"A         \n", banner + "READY.\n\n", 0})
 }
 
 // @spec SHELL-INT-004

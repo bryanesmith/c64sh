@@ -49,7 +49,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 
 - `c64sh` started from a terminal gives an interactive prompt; each line entered is executed immediately (direct mode).
 - `c64sh FILE` and executable files beginning with `#!/usr/bin/env c64sh` execute each line of the file in direct mode, as if typed. Input piped on stdin is executed the same way.
-- `PRINT` with string literals behaves as it does on a C64: optional space after the keyword (`PRINT"X"`), `;` and `+` join strings, and `:` separates statements on one line. `,` separates items with a tab character.
+- `PRINT` with string literals behaves as it does on a C64: optional space after the keyword (`PRINT"X"`), `;` and `+` join strings, and `:` separates statements on one line. `,` moves to the next 10-column print zone, as on a C64.
 - `REM` comments behave as they do on a C64: everything after `REM` to the end of the line is ignored, including colons, so comments can document scripts and follow other statements (`PRINT "A":REM SHOW A`).
 - Input the shell does not accept produces the error a C64 would print for it (for example `?SYNTAX  ERROR`).
 - The lexer, parser, and interpreter each have unit tests; functional tests run the whole shell on given input and assert on captured stdout and stderr.
@@ -67,7 +67,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 
 ## Tenets
 
-- **C64 language, Unix I/O.** What the language accepts and computes follows C64 BASIC V2, including its lenient syntax (an unterminated string literal is accepted). How the program behaves as a process follows Unix conventions: errors go to stderr, failures set a non-zero exit status, and C64 screen conventions that make no sense in a terminal (such as 10-column print zones) are replaced by their terminal equivalents (a tab). The opposite choice would be to reproduce the C64 screen exactly.
+- **C64 language, Unix I/O.** What the language accepts and computes follows C64 BASIC V2, including its lenient syntax (an unterminated string literal is accepted). How the program behaves as a process follows Unix conventions: errors go to stderr, failures set a non-zero exit status, and C64 screen conventions that make no sense in a terminal are replaced by their terminal equivalents: the cursor-right moves a C64 uses to reach a print zone become spaces. The opposite choice would be to reproduce the C64 screen exactly.
 - **Authentic errors over helpful ones.** When input is valid C64 BASIC that c64sh does not yet support, or is invalid, c64sh reports the error a real C64 would (`?SYNTAX  ERROR` and its siblings) rather than inventing clearer messages such as "not yet supported."
 
 ## System Design
@@ -156,7 +156,7 @@ README.md
 
 - Every example in the user guide produces exactly the documented output when run through `c64sh`. Falsified by any documented example that does not.
 - Every language feature is shown in at least one script in `examples/`, and every script's output matches its snapshot. Falsified by a feature with no example, or a failing snapshot test.
-- Every `PRINT` and `REM` form listed under Goals produces the same text a C64 would, with a tab in place of the C64's print zones. Falsified by any difference in functional tests.
+- Every `PRINT` and `REM` form listed under Goals produces the same text a C64 would, with spaces in place of the C64's cursor-right moves. Falsified by any difference in functional tests.
 - Adding a new statement touches only the lexer, parser, interpreter, their tests, and `examples/`, not the shell. Falsified if a language feature requires shell changes.
 
 ## References

@@ -38,6 +38,9 @@ type Semicolon struct{}           // ;
 type Comma struct{}               // ,
 type BadItem struct{ Err error }  // where parsing failed; always the last item
 
+// RemStmt is REM and its comment, exactly as written after REM.
+type RemStmt struct{ Text string }
+
 // Expressions.
 type StringLit struct{ Value string }     // "…", contents without quotes
 type Concat struct{ Left, Right Expr }    // Left + Right
@@ -52,7 +55,8 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
 | `Expression = string { "+" string } .` | `parseExpression` | `ast.Expr` |
@@ -74,6 +78,8 @@ Parsing stops at the first error. There is no error recovery: a C64 abandons the
 ### Errors inside PRINT
 
 A C64 executes `PRINT` one item at a time, so the items before a syntax error are printed before the error is reported: `PRINT "HELLO"@` prints `HELLO`, then `?SYNTAX  ERROR`. To reproduce this, when the error occurs inside a `PRINT` statement's items, the parser keeps that statement: its `Items` are the items completed before the error, followed by an `*ast.BadItem` holding the SYNTAX error. The interpreter prints the earlier items, reaches the `BadItem`, and fails with its error, writing no final newline.
+
+A `Rem` token where a print item is expected is a syntax error like any other: `PRINT "A" REM NOTE` has items `ExprItem("A")`, `BadItem`, so `A` is printed and then `?SYNTAX  ERROR` is reported, as on a C64, where `PRINT` ends only at `:` or the end of the line. `PRINT "A":REM NOTE` is two statements and is valid.
 
 An item that is itself malformed is replaced entirely by the `BadItem`. In `PRINT "A";"B"+@`, the items are `ExprItem("A")`, `Semicolon`, `BadItem`, so `A` is printed and `B` is not, matching a C64, which fails while evaluating `"B"+@` before printing it.
 
@@ -108,6 +114,7 @@ Examples:
 | Syntax error inside a string-too-long expression | SYNTAX is reported; the concatenation is never evaluated | Evaluate operands up to the syntax error, as a C64 does | In `PRINT <long>+<long>+`, a C64 reports `STRING TOO LONG` before reaching the dangling `+`. Reproducing this needs expression evaluation interleaved with parsing, and the case needs an input line longer than a C64 can accept. |
 | Sealed interfaces | Unexported marker methods | Exported marker methods; a single node struct with a kind field | Only `internal/ast` can add node types, so type switches elsewhere can be exhaustive and a panicking `default` reliably signals a missed case. |
 | Empty statements | Dropped during parsing | `EmptyStmt` node | They have no effect, and dropping them keeps the interpreter free of a no-op case. |
+| Comments | `RemStmt` node holding the comment text | Drop comments during parsing, like empty statements | Program mode will store and `LIST` lines with their comments, so the text has to survive into the AST even though executing it does nothing. |
 | `+` representation | Binary `Concat` node, left-associative | Flat list of strings | A binary node generalizes to arithmetic operators when numbers are added. |
 
 ## Open Questions & Future Decisions

@@ -7,7 +7,8 @@ Design: `grammar-design.md`
 - [x] **GRAMMAR-001**: The C64 BASIC V2 grammar shall be stored in `grammar/c64basic.ebnf`, written in the notation of `golang.org/x/exp/ebnf`.
 - [x] **GRAMMAR-002**: `grammar/c64basic.ebnf` shall begin with a comment block that explains each notation symbol (`=`, `.`, `|`, `[ ]`, `{ }`, `( )`, quoted literals, `…` ranges) and that uppercase rule names are parser rules and lowercase rule names are lexer rules.
 - [x] **GRAMMAR-003**: Every rule in `grammar/c64basic.ebnf` shall be immediately preceded by a comment line.
-- [x] **GRAMMAR-004**: `grammar/c64basic.ebnf` shall define exactly the rules `Line`, `Statement`, `PrintStatement`, `PrintItem`, `Expression`, `print`, `string`, and `character`.
+- [x] **GRAMMAR-004**: `grammar/c64basic.ebnf` shall define exactly the rules `Line`, `Statement`, `PrintStatement`, `PrintItem`, `Expression`, `RemStatement`, `print`, `string`, `rem`, and `character`.
+- [x] **GRAMMAR-010**: The `character` rule in `grammar/c64basic.ebnf` shall match every character except a double quote (`"`) and a line feed (`\n`), including a carriage return (`\r`), NUL, and every non-ASCII code point.
 - [x] **GRAMMAR-005**: `grammar/c64basic.ebnf` shall be valid for `ebnf.Verify` with start rule `Line`: every referenced rule is defined, every rule is reachable from `Line`, and lexical (lowercase) rules use only characters and character ranges.
 
 ## Loader package

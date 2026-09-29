@@ -27,6 +27,7 @@ var (
 
 func str(v string) token.Token { return token.Token{Kind: token.String, Value: v} }
 func ill(v string) token.Token { return token.Token{Kind: token.Illegal, Value: v} }
+func rem(v string) token.Token { return token.Token{Kind: token.Rem, Value: v} }
 
 // toks returns ts followed by EOL.
 func toks(ts ...token.Token) []token.Token { return append(ts, eol) }
@@ -38,7 +39,8 @@ func isSyntax(err error) bool {
 }
 
 // dump renders a Line compactly: statements joined by " : ", PRINT items in
-// brackets, string literals quoted, Concat as (l+r), BadItem as BAD(SYNTAX).
+// brackets, string literals quoted, Concat as (l+r), BadItem as BAD(SYNTAX),
+// RemStmt as REM(text).
 func dump(l *ast.Line) string {
 	var stmts []string
 	for _, s := range l.Statements {
@@ -55,6 +57,8 @@ func dumpStmt(s ast.Stmt) string {
 			items = append(items, dumpItem(it))
 		}
 		return "PRINT[" + strings.Join(items, " ") + "]"
+	case *ast.RemStmt:
+		return "REM(" + strconv.Quote(s.Text) + ")"
 	default:
 		return fmt.Sprintf("<stmt %T>", s)
 	}
@@ -169,6 +173,16 @@ func TestConcatIsLeftAssociative(t *testing.T) {
 	})
 }
 
+// @spec PARSER-012
+func TestRemStatement(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"comment alone", toks(rem(" HELLO")), `REM(" HELLO")`, false},
+		{"empty comment", toks(rem("")), `REM("")`, false},
+		{"comment after a statement", toks(pr, str("A"), colon, rem(" X")), `PRINT["A"] : REM(" X")`, false},
+		{"comment text kept exactly", toks(rem(` A:PRINT "X"`)), `REM(" A:PRINT \"X\"")`, false},
+	})
+}
+
 // @spec PARSER-007, PARSER-011
 func TestStatementStartingWithWrongTokenIsSyntaxError(t *testing.T) {
 	runParseCases(t, []parseCase{
@@ -191,6 +205,9 @@ func TestSyntaxErrorInsidePrintEndsWithBadItem(t *testing.T) {
 		{"plus then illegal", toks(pr, str("A"), semi, str("B"), plus, ill("@")), `PRINT["A" ; BAD(SYNTAX)]`, true},
 		{"illegal after items", toks(pr, str("HELLO"), ill("@")), `PRINT["HELLO" BAD(SYNTAX)]`, true},
 		{"plus after separator", toks(pr, str("A"), semi, plus), `PRINT["A" ; BAD(SYNTAX)]`, true},
+		{"REM as an item", toks(pr, str("A"), rem(" NOTE")), `PRINT["A" BAD(SYNTAX)]`, true},
+		{"REM as first item", toks(pr, rem("")), `PRINT[BAD(SYNTAX)]`, true},
+		{"PRINT as an item", toks(pr, pr), `PRINT[BAD(SYNTAX)]`, true},
 	})
 }
 

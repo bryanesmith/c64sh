@@ -26,6 +26,7 @@ const (
     EOL       Kind = iota // end of line; always the last token
     Illegal               // a character no rule accepts
     Print                 // PRINT or ?
+    Rem                   // REM and the rest of the line
     String                // "…"
     Colon                 // :
     Semicolon             // ;
@@ -51,7 +52,8 @@ At each position the lexer applies the first matching rule:
 | End of line | `EOL` token; scanning stops. |
 | Space or tab | Skipped. |
 | `"` | `String` token. Its value is every character up to the next `"`, or to the end of the line if there is none. The closing quote, if present, is consumed. |
-| Keyword text (see *Keywords*) | Keyword token (`Print`). |
+| `REM` (see *Keywords*) | `Rem` token whose value is every byte after `REM` to the end of the line, exactly as written (including a leading space, quotes, colons, and keywords). Scanning stops; the next token is `EOL`. |
+| Other keyword text (see *Keywords*) | Keyword token (`Print`). |
 | `?` | `Print` token (the C64 abbreviation for `PRINT`). |
 | `:` `;` `,` `+` | `Colon`, `Semicolon`, `Comma`, `Plus`. |
 | Any other character | `Illegal` token holding that one character (a full UTF-8 character, not a single byte). |
@@ -63,9 +65,9 @@ Inside a string literal, the bytes of the line are kept exactly as they are, inc
 
 ## Keywords
 
-The only keyword is `PRINT`.
+The keywords are `PRINT` and `REM`.
 
-- **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`.
+- **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`; `REMARK` is a `Rem` token with the comment `ARK`.
 - **Spaces inside a keyword break it.** `PR INT` is not `PRINT`; it scans as `Illegal(P) Illegal(R) Illegal(I) Illegal(N) Illegal(T)`.
 - **Case-sensitive.** Keywords are recognized only in uppercase, exactly as written in the grammar. `print` and `Print` are not keywords; their letters scan as `Illegal` tokens, so `print "HI"` is a syntax error, as it is on a C64, where lowercase letters are different characters from uppercase ones.
 
@@ -78,6 +80,7 @@ The lexer package keeps a table from each lexical rule name and each literal tok
 | Grammar item | Token kind |
 |---|---|
 | `print` | `Print` |
+| `rem` | `Rem` |
 | `string` | `String` |
 | `":"` | `Colon` |
 | `";"` | `Semicolon` |
@@ -104,6 +107,7 @@ Scanning a whole line up front is sufficient: lines are short, and the parser be
 | Unknown characters | `Illegal` token; parser reports the error | Lexer returns an error | One place decides syntax errors, and statements before the bad character still run, matching the C64 order of events. |
 | Keyword boundaries | Prefix match, no word boundary | Require a non-letter after a keyword | Matches C64 tokenization, which is what makes `PRINT"X"` valid. Needed for fidelity once variables exist (`PRINTA` is `PRINT A` on a C64). |
 | Keyword case | Uppercase only | Case-insensitive | Matches C64 BASIC V2, where keywords are uppercase and lowercase letters are distinct characters. Keeps the grammar literal: the keyword text in `c64basic.ebnf` is exactly what the lexer accepts. |
+| Comment text | One `Rem` token carrying the rest of the line | Discard the comment in the lexer; tokenize the comment's contents | A C64 ignores everything after `REM`, so its contents must not be tokenized. Keeping the text in the token lets the parser place a node in the AST, which program mode needs for `LIST`, and keeps `PRINT "A" REM` an error as on a C64. |
 | `?` abbreviation | Scanned as `Print` | Not supported until later | It is how the C64 itself tokenizes `?`, and it costs one table entry. |
 | Output shape | Slice of all tokens for the line | Streaming `Next()` iterator | Lines are short; a slice is simpler to test and gives the parser unlimited lookahead. |
 | Whitespace | Space and tab skipped between tokens | Space only | A tab outside a string has no meaning in BASIC V2; treating it like a space avoids surprising errors from pasted or indented scripts. |

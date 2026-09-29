@@ -1,11 +1,13 @@
 package grammar
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"golang.org/x/exp/ebnf"
 )
@@ -85,7 +87,7 @@ func TestGrammarDefinesExactlyTheExpectedRules(t *testing.T) {
 		got = append(got, name)
 	}
 	slices.Sort(got)
-	want := []string{"Expression", "Line", "PrintItem", "PrintStatement", "Statement", "character", "print", "string"}
+	want := []string{"Expression", "Line", "PrintItem", "PrintStatement", "RemStatement", "Statement", "character", "print", "rem", "string"}
 	slices.Sort(want)
 	if !slices.Equal(got, want) {
 		t.Errorf("grammar rules = %v, want %v", got, want)
@@ -114,6 +116,51 @@ func TestLoadReportsParseAndVerifyErrors(t *testing.T) {
 		Source = src
 		if _, err := Load(); err == nil {
 			t.Errorf("%s: Load() returned no error for %q", name, src)
+		}
+	}
+}
+
+// matchesChar reports whether the single-character lexical expression e
+// matches r. It handles the forms single-character rules use: alternatives,
+// groups, character ranges, and one-character tokens.
+func matchesChar(e ebnf.Expression, r rune) bool {
+	switch e := e.(type) {
+	case ebnf.Alternative:
+		for _, x := range e {
+			if matchesChar(x, r) {
+				return true
+			}
+		}
+		return false
+	case *ebnf.Group:
+		return matchesChar(e.Body, r)
+	case *ebnf.Range:
+		lo, _ := utf8.DecodeRuneInString(e.Begin.String)
+		hi, _ := utf8.DecodeRuneInString(e.End.String)
+		return lo <= r && r <= hi
+	case *ebnf.Token:
+		return e.String == string(r)
+	default:
+		panic(fmt.Sprintf("matchesChar: unsupported expression %T", e))
+	}
+}
+
+// @spec GRAMMAR-010
+func TestCharacterIsAnythingButQuoteAndLineFeed(t *testing.T) {
+	g := mustLoad(t)
+	prod := g["character"]
+	if prod == nil {
+		t.Fatal("grammar has no character rule")
+	}
+	accepted := []rune{0, '\t', '\r', ' ', '!', '#', ':', 'A', 'z', '~', 0x7f, 'é', '\u00a0', 0x10FFFF}
+	for _, r := range accepted {
+		if !matchesChar(prod.Expr, r) {
+			t.Errorf("character does not match %U", r)
+		}
+	}
+	for _, r := range []rune{'"', '\n'} {
+		if matchesChar(prod.Expr, r) {
+			t.Errorf("character matches %U, want no match", r)
 		}
 	}
 }

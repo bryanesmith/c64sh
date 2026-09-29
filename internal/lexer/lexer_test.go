@@ -133,6 +133,9 @@ func TestKeywordsAreUppercaseOnly(t *testing.T) {
 			tok(token.Illegal, "P", 0), tok(token.Illegal, "r", 1), tok(token.Illegal, "i", 2),
 			tok(token.Illegal, "n", 3), tok(token.Illegal, "t", 4), eol(5),
 		}},
+		{"lowercase rem", `rem`, []token.Token{
+			tok(token.Illegal, "r", 0), tok(token.Illegal, "e", 1), tok(token.Illegal, "m", 2), eol(3),
+		}},
 	})
 }
 
@@ -174,6 +177,31 @@ func TestInvalidUTF8BytesAreIllegal(t *testing.T) {
 	runLexCases(t, []lexCase{
 		{"invalid bytes", "\xff\xfe", []token.Token{
 			tok(token.Illegal, "\xff", 0), tok(token.Illegal, "\xfe", 1), eol(2),
+		}},
+	})
+}
+
+// @spec LEXER-014
+func TestRemTakesRestOfLine(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"comment", `REM HELLO`, []token.Token{tok(token.Rem, " HELLO", 0), eol(9)}},
+		{"bare REM", `REM`, []token.Token{tok(token.Rem, "", 0), eol(3)}},
+		{"no space after REM", `REMARK`, []token.Token{tok(token.Rem, "ARK", 0), eol(6)}},
+		{"colon, quote, and keyword in comment", `REM A:PRINT "X"`, []token.Token{
+			tok(token.Rem, ` A:PRINT "X"`, 0), eol(15),
+		}},
+		{"after a statement", `PRINT "A":REM X`, []token.Token{
+			tok(token.Print, "PRINT", 0), tok(token.String, "A", 6), tok(token.Colon, ":", 9),
+			tok(token.Rem, " X", 10), eol(15),
+		}},
+		{"after print items", `PRINT "A" REM X`, []token.Token{
+			tok(token.Print, "PRINT", 0), tok(token.String, "A", 6), tok(token.Rem, " X", 10), eol(15),
+		}},
+		{"trailing spaces, tab, CR, invalid bytes", "REM \t\r\xffé  ", []token.Token{
+			tok(token.Rem, " \t\r\xffé  ", 0), eol(11),
+		}},
+		{"REM inside a string is text", `PRINT "REM"`, []token.Token{
+			tok(token.Print, "PRINT", 0), tok(token.String, "REM", 6), eol(11),
 		}},
 	})
 }

@@ -14,6 +14,7 @@ var grammarRules = map[string]any{
 	"Statement":      (*parser).parseStatement,
 	"PrintStatement": (*parser).parsePrintStatement,
 	"PrintItem":      (*parser).parsePrintItem,
+	"RemStatement":   (*parser).parseRemStatement,
 	"Expression":     (*parser).parseExpression,
 }
 
@@ -23,7 +24,7 @@ var grammarRules = map[string]any{
 // inside a PRINT statement's items, by that statement ending in a BadItem.
 //
 // @spec PARSER-001, PARSER-002, PARSER-003, PARSER-004, PARSER-005, PARSER-006
-// @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011
+// @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011, PARSER-012
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -84,14 +85,23 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement ] .
+// Statement = [ PrintStatement | RemStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
-	if p.peek() != token.Print {
+	switch p.peek() {
+	case token.Print:
+		return p.parsePrintStatement()
+	case token.Rem:
+		return p.parseRemStatement()
+	default:
 		return nil, nil
 	}
-	return p.parsePrintStatement()
+}
+
+// RemStatement = rem .
+func (p *parser) parseRemStatement() (*ast.RemStmt, error) {
+	return &ast.RemStmt{Text: p.next().Value}, nil
 }
 
 // PrintStatement = print { PrintItem } .

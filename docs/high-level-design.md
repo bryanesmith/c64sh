@@ -12,7 +12,7 @@ c64sh is a shell that speaks C64 BASIC V2 in an ordinary terminal. It can be run
 
 Each input line passes through three independent stages:
 
-1. **Lexer** — turns characters into tokens (`PRINT`, string literal, `;`, `,`, `+`, `:`, end of line).
+1. **Lexer** — turns characters into tokens (`PRINT`, `REM` with its comment text, string literal, `;`, `,`, `+`, `:`, end of line).
 2. **Parser** — turns tokens into a typed abstract syntax tree (AST).
 3. **Interpreter** — walks the AST and performs its effects (writing output).
 
@@ -37,7 +37,7 @@ Program mode is a planned feature. It adds a stored program to the shell's state
 
 ### Incremental language growth
 
-The language grows one feature at a time. The first release supports only `PRINT` with string arguments in direct mode. Each new feature (numbers and math, functions such as `CHR$`, variables, program mode with line numbers, `LOAD`/`SAVE`) extends the grammar, then the lexer and parser, then the interpreter, and gets its own tests at every layer.
+The language grows one feature at a time. The language currently supports `PRINT` with string arguments and `REM` comments, in direct mode. Each new feature (numbers and math, functions such as `CHR$`, variables, program mode with line numbers, `LOAD`/`SAVE`) extends the grammar, then the lexer and parser, then the interpreter, and gets its own tests at every layer.
 
 ## Target Users
 
@@ -50,6 +50,7 @@ The language grows one feature at a time. The first release supports only `PRINT
 - `c64sh` started from a terminal gives an interactive prompt; each line entered is executed immediately (direct mode).
 - `c64sh FILE` and executable files beginning with `#!/usr/bin/env c64sh` execute each line of the file in direct mode, as if typed. Input piped on stdin is executed the same way.
 - `PRINT` with string literals behaves as it does on a C64: optional space after the keyword (`PRINT"X"`), `;` and `+` join strings, and `:` separates statements on one line. `,` separates items with a tab character.
+- `REM` comments behave as they do on a C64: everything after `REM` to the end of the line is ignored, including colons, so comments can document scripts and follow other statements (`PRINT "A":REM SHOW A`).
 - Input the shell does not accept produces the error a C64 would print for it (for example `?SYNTAX  ERROR`).
 - The lexer, parser, and interpreter each have unit tests; functional tests run the whole shell on given input and assert on captured stdout and stderr.
 - `make build`, `make run`, and `make install` build the binary, build and start the shell, and install `c64sh` into `~/bin`.
@@ -155,7 +156,7 @@ README.md
 ## Success Metrics
 
 - Every example in the user guide produces exactly the documented output when run through `c64sh`. Falsified by any documented example that does not.
-- Every `PRINT` form listed under Goals produces the same text a C64 would, with a tab in place of the C64's print zones. Falsified by any difference in functional tests.
+- Every `PRINT` and `REM` form listed under Goals produces the same text a C64 would, with a tab in place of the C64's print zones. Falsified by any difference in functional tests.
 - Every syntactic rule in `grammar/c64basic.ebnf` has a parse function. Falsified by a failing grammar conformance test.
 - Adding a new statement touches only the grammar, lexer, parser, interpreter, and their tests, not the shell. Falsified if a language feature requires shell changes.
 

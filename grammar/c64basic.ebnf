@@ -22,7 +22,7 @@
 Line = Statement { ":" Statement } .
 
 // A statement may be empty, so "::" and a line of only ":" are valid.
-Statement = [ PrintStatement ] .
+Statement = [ PrintStatement | RemStatement ] .
 
 
 // ---- PRINT ---------------------------------------------------------
@@ -38,6 +38,16 @@ PrintStatement = print { PrintItem } .
 
 // A value to print, or a separator: ";" prints nothing, "," prints a tab.
 PrintItem = Expression | ";" | "," .
+
+
+// ---- REM -----------------------------------------------------------
+
+// A comment. Everything after REM, to the end of the line, is ignored,
+// including colons, so REM is always the last statement on its line.
+//   REM GREET THE USER
+//   PRINT "HI":REM SAYS HI     -> HI
+//   REM A:PRINT "X"            -> (nothing)
+RemStatement = rem .
 
 
 // ---- Expressions (strings only, for now) ---------------------------
@@ -57,5 +67,10 @@ print = "PRINT" | "?" .
 //   PRINT "HI   -> HI
 string = `"` { character } [ `"` ] .
 
-// Any character except a double quote or a line break.
-character = "\x00" … "\t" | "\x0b" … "\x0c" | "\x0e" … "!" | "#" … "\U0010FFFF" .
+// The REM keyword and its comment: any characters, quotes included, to the
+// end of the line. No space is needed after it:  REMARK  is a comment.
+rem = "REM" { character | `"` } .
+
+// Any character except a double quote or a line feed. (Input is split into
+// lines at line feeds, so a line never contains one.)
+character = "\x00" … "\t" | "\x0b" … "!" | "#" … "\U0010FFFF" .

@@ -12,6 +12,7 @@ import (
 // in a syntactic grammar rule (written with its quotes), to its token kind.
 var grammarTokens = map[string]token.Kind{
 	"print":  token.Print,
+	"rem":    token.Rem,
 	"string": token.String,
 	`":"`:    token.Colon,
 	`";"`:    token.Semicolon,
@@ -32,6 +33,7 @@ var keywords = []struct {
 	kind token.Kind
 }{
 	{"PRINT", token.Print},
+	{"REM", token.Rem},
 }
 
 // symbols maps single-character tokens to their kinds.
@@ -46,7 +48,7 @@ var symbols = map[byte]token.Kind{
 // Lex returns the tokens of line. The last token is always EOL.
 //
 // @spec LEXER-001, LEXER-002, LEXER-003, LEXER-004, LEXER-005, LEXER-006, LEXER-007
-// @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013
+// @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013, LEXER-014
 func Lex(line string) []token.Token {
 	var toks []token.Token
 	emit := func(k token.Kind, value string, pos int) {
@@ -71,6 +73,12 @@ func Lex(line string) []token.Token {
 			continue
 		}
 		if text, kind, ok := matchKeyword(line[i:]); ok {
+			if kind == token.Rem {
+				// A comment runs to the end of the line, untokenized.
+				emit(kind, line[i+len(text):], i)
+				i = len(line)
+				continue
+			}
 			emit(kind, text, i)
 			i += len(text)
 			continue

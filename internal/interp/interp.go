@@ -15,9 +15,13 @@ import (
 // produce at run time.
 const maxStringLen = 255
 
+// zoneWidth is the width of a C64 print zone, the columns "," moves between.
+const zoneWidth = 10
+
 // Interp executes lines, writing program output to its writer.
 type Interp struct {
-	out io.Writer
+	out    io.Writer
+	column int // cursor column: characters written since the last newline
 }
 
 // New returns an interpreter that writes program output to out.
@@ -42,6 +46,24 @@ func (in *Interp) Exec(line *ast.Line) error {
 	return nil
 }
 
+// Column returns the cursor column: the number of characters written since
+// the last newline. It is 0 at the start of a line.
+//
+// @spec INTERP-016
+func (in *Interp) Column() int {
+	return in.column
+}
+
+// FreshLine ends the current output line if it is unfinished.
+//
+// @spec INTERP-017
+func (in *Interp) FreshLine() error {
+	if in.column == 0 {
+		return nil
+	}
+	return in.write("\n")
+}
+
 // @spec INTERP-003, INTERP-014
 func (in *Interp) execStmt(s ast.Stmt) error {
 	switch s := s.(type) {
@@ -58,9 +80,10 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 // fails, it writes the output of the items before it and returns the
 // item's error, as a C64 prints each item as it goes.
 //
-// @spec INTERP-004, INTERP-005, INTERP-006, INTERP-007, INTERP-008
+// @spec INTERP-004, INTERP-005, INTERP-006, INTERP-007, INTERP-008, INTERP-015
 func (in *Interp) execPrint(s *ast.PrintStmt) error {
 	var buf strings.Builder
+	column := in.column // where the cursor will be once buf is written
 	newline := true
 	for _, item := range s.Items {
 		switch item := item.(type) {
@@ -70,11 +93,15 @@ func (in *Interp) execPrint(s *ast.PrintStmt) error {
 				return in.fail(buf.String(), err)
 			}
 			buf.WriteString(v)
+			column += utf8.RuneCountInString(v)
 			newline = true
 		case *ast.Semicolon:
 			newline = false
 		case *ast.Comma:
-			buf.WriteByte('\t')
+			// Move to the next print zone; never 0 spaces, as in the C64 ROM.
+			n := zoneWidth - column%zoneWidth
+			buf.WriteString(strings.Repeat(" ", n))
+			column += n
 			newline = false
 		case *ast.BadItem:
 			return in.fail(buf.String(), item.Err)
@@ -97,11 +124,21 @@ func (in *Interp) fail(partial string, err error) error {
 	return err
 }
 
+// write writes s and advances the cursor column by what was written.
+//
+// @spec INTERP-016, INTERP-018
 func (in *Interp) write(s string) error {
 	if s == "" {
 		return nil
 	}
-	_, err := io.WriteString(in.out, s)
+	n, err := io.WriteString(in.out, s)
+	written := s[:n]
+	// RuneCountInString counts each invalid UTF-8 byte as one character.
+	if i := strings.LastIndexByte(written, '\n'); i >= 0 {
+		in.column = utf8.RuneCountInString(written[i+1:])
+	} else {
+		in.column += utf8.RuneCountInString(written)
+	}
 	return err
 }
 

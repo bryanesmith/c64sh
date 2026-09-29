@@ -22,6 +22,8 @@ var (
 	comma = &ast.Comma{}
 )
 
+func spaces(n int) string { return strings.Repeat(" ", n) }
+
 func syntaxErr() error { return &basicerr.Error{Kind: basicerr.Syntax} }
 
 func isKind(err error, k basicerr.Kind) bool {
@@ -134,10 +136,10 @@ func TestRemDoesNothing(t *testing.T) {
 func TestPrintItems(t *testing.T) {
 	runPrintCases(t, []printCase{
 		{"semicolon joins", line(printStmt(item(str("A")), semi, item(str("B")))), "AB\n"},
-		{"comma is a tab", line(printStmt(item(str("A")), comma, item(str("B")))), "A\tB\n"},
+		{"comma moves to the next zone", line(printStmt(item(str("A")), comma, item(str("B")))), "A" + spaces(9) + "B\n"},
 		{"adjacent items", line(printStmt(item(str("A")), item(str("B")))), "AB\n"},
-		{"leading comma", line(printStmt(comma, item(str("A")))), "\tA\n"},
-		{"mixed", line(printStmt(item(str("A")), semi, item(str("B")), comma, item(str("C")))), "AB\tC\n"},
+		{"leading comma", line(printStmt(comma, item(str("A")))), spaces(10) + "A\n"},
+		{"mixed", line(printStmt(item(str("A")), semi, item(str("B")), comma, item(str("C")))), "AB" + spaces(8) + "C\n"},
 	})
 }
 
@@ -154,7 +156,7 @@ func TestPrintEndsWithNewline(t *testing.T) {
 func TestTrailingSeparatorSuppressesNewline(t *testing.T) {
 	runPrintCases(t, []printCase{
 		{"trailing semicolon", line(printStmt(item(str("A")), semi)), "A"},
-		{"trailing comma", line(printStmt(item(str("A")), comma)), "A\t"},
+		{"trailing comma", line(printStmt(item(str("A")), comma)), "A" + spaces(9)},
 		{"only a semicolon", line(printStmt(semi)), ""},
 	})
 }
@@ -277,5 +279,115 @@ func TestWriteErrorIsReturnedUnchanged(t *testing.T) {
 	}
 	if w.calls != 1 {
 		t.Errorf("writer called %d times, want 1 (no statements after the failure)", w.calls)
+	}
+}
+
+// @spec INTERP-015
+func TestCommaMovesToNextPrintZone(t *testing.T) {
+	runPrintCases(t, []printCase{
+		{"from column 0, a full zone", line(printStmt(comma, item(str("X")))), spaces(10) + "X\n"},
+		{"from column 1", line(printStmt(item(str("A")), comma, item(str("X")))), "A" + spaces(9) + "X\n"},
+		{"from column 9", line(printStmt(item(str("123456789")), comma, item(str("X")))), "123456789 X\n"},
+		{"from a zone start, a full zone", line(printStmt(item(str("0123456789")), comma, item(str("X")))), "0123456789" + spaces(10) + "X\n"},
+		{"from column 11", line(printStmt(item(str("01234567890")), comma, item(str("X")))), "01234567890" + spaces(9) + "X\n"},
+		{"columns 0, 10, 20", line(printStmt(item(str("A")), comma, item(str("B")), comma, item(str("C")))), "A" + spaces(9) + "B" + spaces(9) + "C\n"},
+		{"two commas", line(printStmt(item(str("A")), comma, comma, item(str("C")))), "A" + spaces(19) + "C\n"},
+		{"past column 40", line(printStmt(item(str(strings.Repeat("x", 45))), comma, item(str("X")))), strings.Repeat("x", 45) + spaces(5) + "X\n"},
+		{"multi-byte characters count once", line(printStmt(item(str("éé")), comma, item(str("X")))), "éé" + spaces(8) + "X\n"},
+	})
+}
+
+// @spec INTERP-016
+func TestColumnCarriesAcrossStatementsAndLines(t *testing.T) {
+	rec := &recorder{}
+	in := New(rec)
+	if got := in.Column(); got != 0 {
+		t.Errorf("initial column %d, want 0", got)
+	}
+	steps := []struct {
+		line *ast.Line
+		want int
+	}{
+		{line(printStmt(item(str("AB")), semi)), 2},
+		{line(printStmt(item(str("é\xff")), semi)), 4},
+		{line(printStmt(item(str("C")))), 0},
+		{line(printStmt(item(str("XY")), semi), printStmt(item(str("Z")), comma)), 10},
+	}
+	for i, s := range steps {
+		if err := in.Exec(s.line); err != nil {
+			t.Fatal(err)
+		}
+		if got := in.Column(); got != s.want {
+			t.Errorf("after step %d: column %d, want %d", i+1, got, s.want)
+		}
+	}
+
+	// A comma on a later line uses the column left by an earlier line.
+	rec2 := &recorder{}
+	in2 := New(rec2)
+	in2.Exec(line(printStmt(item(str("AB")), semi)))
+	in2.Exec(line(printStmt(comma, item(str("X")))))
+	if got, want := rec2.String(), "AB"+spaces(8)+"X\n"; got != want {
+		t.Errorf("output %q, want %q", got, want)
+	}
+}
+
+// @spec INTERP-017
+func TestFreshLine(t *testing.T) {
+	rec := &recorder{}
+	in := New(rec)
+	if err := in.FreshLine(); err != nil || rec.String() != "" {
+		t.Errorf("at column 0: wrote %q (err %v), want nothing", rec.String(), err)
+	}
+	in.Exec(line(printStmt(item(str("A")), semi)))
+	if err := in.FreshLine(); err != nil {
+		t.Fatal(err)
+	}
+	if got := rec.String(); got != "A\n" {
+		t.Errorf("mid-line: output %q, want %q", got, "A\n")
+	}
+	if got := in.Column(); got != 0 {
+		t.Errorf("column after FreshLine %d, want 0", got)
+	}
+	if err := New(&failWriter{}).FreshLine(); err != nil {
+		t.Errorf("FreshLine at column 0 with a failing writer returned %v, want nil (nothing written)", err)
+	}
+	failing := New(&failWriter{})
+	failing.column = 3
+	if err := failing.FreshLine(); err != errBoom {
+		t.Errorf("FreshLine write error = %v, want the writer's error", err)
+	}
+}
+
+// shortWriter writes at most n bytes, then fails.
+type shortWriter struct {
+	n   int
+	got string
+}
+
+func (w *shortWriter) Write(p []byte) (int, error) {
+	if len(p) <= w.n {
+		w.n -= len(p)
+		w.got += string(p)
+		return len(p), nil
+	}
+	written := w.n
+	w.got += string(p[:written])
+	w.n = 0
+	return written, errBoom
+}
+
+// @spec INTERP-018
+func TestColumnAdvancesOnlyByWrittenCharacters(t *testing.T) {
+	failing := New(&failWriter{})
+	failing.Exec(line(printStmt(item(str("ABC")), semi)))
+	if got := failing.Column(); got != 0 {
+		t.Errorf("after a failed write: column %d, want 0", got)
+	}
+	w := &shortWriter{n: 2}
+	short := New(w)
+	short.Exec(line(printStmt(item(str("ABCD")), semi)))
+	if got := short.Column(); got != 2 {
+		t.Errorf("after a 2-byte partial write: column %d, want 2", got)
 	}
 }

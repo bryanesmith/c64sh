@@ -93,12 +93,10 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 		input, name = f, cfg.File
 	}
 
-	out := &lineTracker{w: stdout, atLineStart: true}
 	s := &session{
 		interactive: cfg.Interactive,
-		out:         out,
 		stderr:      stderr,
-		interp:      interp.New(out),
+		interp:      interp.New(stdout),
 	}
 	return s.run(bufio.NewReader(input), name)
 }
@@ -115,7 +113,6 @@ func inputError(stderr io.Writer, name string, err error) int {
 // session is one run of the shell over one input.
 type session struct {
 	interactive bool
-	out         *lineTracker
 	stderr      io.Writer
 	interp      *interp.Interp
 }
@@ -213,23 +210,8 @@ func (s *session) ready() {
 }
 
 // freshLine ends stdout's current line if program output left it mid-line.
+// A write error is ignored: the next program output hits the same failure
+// and stops the session.
 func (s *session) freshLine() {
-	if !s.out.atLineStart {
-		io.WriteString(s.out, "\n")
-	}
-}
-
-// lineTracker passes writes through unchanged and records whether the
-// last byte written was a newline.
-type lineTracker struct {
-	w           io.Writer
-	atLineStart bool
-}
-
-func (t *lineTracker) Write(p []byte) (int, error) {
-	n, err := t.w.Write(p)
-	if n > 0 {
-		t.atLineStart = p[n-1] == '\n'
-	}
-	return n, err
+	s.interp.FreshLine()
 }

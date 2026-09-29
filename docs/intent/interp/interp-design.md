@@ -9,7 +9,9 @@ prefix: INTERP
 
 The interpreter executes an `*ast.Line` by walking it with type switches. It writes program output to an `io.Writer` it is given and knows nothing about terminals, files, prompts, or how errors are displayed. Those belong to the shell.
 
-Its output follows C64 BASIC V2 semantics, adjusted for a terminal as the HLD's *C64 language, Unix I/O* tenet requires: the C64's 10-column print zones become a tab character.
+Its output follows C64 BASIC V2 semantics, including the C64's 10-column print zones, adjusted for a terminal as the HLD's *C64 language, Unix I/O* tenet requires: where a C64 moves its cursor right to reach a print zone, the interpreter writes spaces.
+
+Like the C64, the interpreter keeps track of the cursor column: the position on the current output line where the next character will appear. It is the only component that knows the column, and it is the only writer of program output, so the column is always accurate.
 
 ## API
 
@@ -28,9 +30,26 @@ func New(out io.Writer) *Interp
 // not run. Output from statements before the failure has already been
 // written.
 func (in *Interp) Exec(line *ast.Line) error
+
+// Column returns the cursor column: the number of characters written
+// since the last newline. It is 0 at the start of a line.
+func (in *Interp) Column() int
+
+// FreshLine ends the current output line if it is unfinished: when the
+// column is not 0, it writes a newline. It returns any write error.
+func (in *Interp) FreshLine() error
 ```
 
-An `Interp` carries no state between lines yet. When variables and program mode are added, their state lives in `Interp`, which is why it is a value created once per shell session rather than a free function.
+The cursor column is the state an `Interp` carries between lines; it starts at 0. When variables and program mode are added, their state also lives in `Interp`, which is why it is a value created once per shell session rather than a free function.
+
+## Cursor Column
+
+The column counts the characters written since the last newline, across statements and lines: after `PRINT "AB";`, the next `PRINT` starts at column 2, whether it is on the same input line or a later one. Writing a newline sets it to 0.
+
+- A character is a Unicode code point; each byte that is not valid UTF-8 counts as one, as in the 255-character string limit.
+- Every character counts as one column, including characters a terminal displays differently, such as a tab or carriage return inside a string, or a double-width East Asian character. A C64 has none of these, so there is no C64 behavior to follow; the count stays simple and predictable, and alignment after such characters may look uneven in a terminal.
+- The column is unbounded. A C64 wraps at 40 columns, but because 40 is a multiple of 10, print zones fall in the same places whether or not a line wraps, so no screen width needs to be modeled.
+- The column is updated from what was actually written; if a write fails, the column is not advanced for it.
 
 ## Dispatch
 
@@ -59,7 +78,7 @@ A panic here means a node type was added to `internal/ast` without interpreter s
 |---|---|
 | `ExprItem` | The expression's string value. |
 | `Semicolon` | Nothing. It only separates items. |
-| `Comma` | A tab character (`\t`). |
+| `Comma` | Spaces up to the start of the next print zone: `10 - (column % 10)` spaces, where `column` is the cursor column at that point. This is never 0: at the start of a zone (column 0, 10, 20, …), a comma moves a full 10 columns, as the C64 ROM does. |
 | `BadItem` | Nothing; execution of the `PRINT` fails with the item's error (see below). The parser produces a `BadItem` where a syntax error occurred inside a `PRINT`. |
 
 After the last item, a newline (`\n`) is written **unless the last item is `;` or `,`**. This is the C64 rule, and it is how a BASIC program prints several things on one line:
@@ -70,10 +89,12 @@ After the last item, a newline (`\n`) is written **unless the last item is `;` o
 | `PRINT "A"` | `A\n` |
 | `PRINT "A";"B"` | `AB\n` |
 | `PRINT "A""B"` | `AB\n` |
-| `PRINT "A","B"` | `A\tB\n` |
+| `PRINT "A","B"` | `A` + 9 spaces + `B\n` (`B` at column 10) |
 | `PRINT "A";` | `A` |
-| `PRINT "A",` | `A\t` |
-| `PRINT ,"A"` | `\tA\n` |
+| `PRINT "A",` | `A` + 9 spaces (no newline; the column is 10) |
+| `PRINT ,"A"` | 10 spaces + `A\n` (from column 0, a full zone) |
+| `PRINT "0123456789","X"` | `0123456789` + 10 spaces + `X\n` (`X` at column 20) |
+| `PRINT "A","B","C"` | `A` + 9 spaces + `B` + 9 spaces + `C\n` (columns 0, 10, 20) |
 
 The output for one `PRINT` is collected and written in a single call to the writer. If an item fails, either because evaluating its expression fails or because it is a `BadItem`, the output of the items before it is written (a C64 prints each item as it is evaluated), and then the error is returned. For `PRINT "A";X` where `X` fails, `A` is written, with no newline.
 
@@ -108,7 +129,8 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
 | Dispatch | Type switch with panicking `default` | Visitor pattern | See HLD *Key Design Decisions*. One pass over the tree; no `Accept`/`Visit` boilerplate. |
-| Comma | Tab character | C64 10-column print zones (pad with spaces to the next multiple of 10) | Tenet *C64 language, Unix I/O*. A tab is the terminal-native column separator and survives piping into tools like `cut` and `column`. |
+| Comma | Spaces to the next 10-column print zone, a full zone when already at a zone start | Tab character; cursor-right control codes | Print zones are C64 language behavior, and programs lay out columns with them. The count `10 - (column % 10)`, never 0, is what the C64 ROM's PRINT computes (`$AAE8`). Spaces are the terminal equivalent of the C64's on-screen cursor-right moves, and the characters the C64 itself sends to files and printers. |
+| Cursor column owner | The interpreter, which writes all program output | The shell's output wrapper, queried by the interpreter; separate counts in both, kept in step by the shell | One owner means one count that cannot drift, and the interpreter is where a C64 program's cursor lives. `FreshLine` lets the shell start errors and `READY.` on a new line without tracking output itself. The C64's `POS()` function will read the same column. |
 | Trailing `;` or `,` | Suppresses the newline | Always end with a newline | C64 BASIC V2 behavior. Scripts rely on it to build one line of output from several statements. |
 | 255-character limit | Enforced on concatenation results | No limit | Tenet *C64 language, Unix I/O*: string semantics are language behavior. Enforcing it now avoids a behavior change when string functions arrive. |
 | Output writes | One write per `PRINT`; on failure, one write of the items before the failing one | One write per item; write nothing on failure | Keeps output of a single statement together and reduces system calls when output is unbuffered, while still showing exactly what a C64 would have printed before the error. |

@@ -1,5 +1,7 @@
 // Package parser turns the tokens of a line into an AST, with one parse
-// function per syntactic rule of grammar/c64basic.ebnf.
+// function per grammar rule. Each function carries its rule in EBNF, in the
+// notation of the Go language specification; lowercase names are token
+// rules, documented in package lexer.
 package parser
 
 import (
@@ -7,18 +9,6 @@ import (
 	"github.com/bryanesmith/c64sh/internal/basicerr"
 	"github.com/bryanesmith/c64sh/internal/token"
 )
-
-// grammarRules maps each syntactic grammar rule name to its parse function.
-//
-// @spec GRAMMAR-008
-var grammarRules = map[string]any{
-	"Line":           (*parser).parseLine,
-	"Statement":      (*parser).parseStatement,
-	"PrintStatement": (*parser).parsePrintStatement,
-	"PrintItem":      (*parser).parsePrintItem,
-	"RemStatement":   (*parser).parseRemStatement,
-	"Expression":     (*parser).parseExpression,
-}
 
 // Parse parses the tokens of one line. It always returns a non-nil Line.
 // If err is non-nil, it is a SYNTAX error, and the Line holds the

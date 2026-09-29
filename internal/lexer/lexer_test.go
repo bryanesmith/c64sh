@@ -2,13 +2,9 @@ package lexer
 
 import (
 	"reflect"
-	"slices"
 	"testing"
-	"unicode"
 
-	"github.com/bryanesmith/c64sh/grammar"
 	"github.com/bryanesmith/c64sh/internal/token"
-	"golang.org/x/exp/ebnf"
 )
 
 func tok(k token.Kind, value string, pos int) token.Token {
@@ -204,65 +200,4 @@ func TestRemTakesRestOfLine(t *testing.T) {
 			tok(token.Print, "PRINT", 0), tok(token.String, "REM", 6), eol(11),
 		}},
 	})
-}
-
-// literalTokens adds to out every literal token in e, written with quotes.
-func literalTokens(e ebnf.Expression, out map[string]bool) {
-	switch e := e.(type) {
-	case nil:
-	case ebnf.Alternative:
-		for _, x := range e {
-			literalTokens(x, out)
-		}
-	case ebnf.Sequence:
-		for _, x := range e {
-			literalTokens(x, out)
-		}
-	case *ebnf.Group:
-		literalTokens(e.Body, out)
-	case *ebnf.Option:
-		literalTokens(e.Body, out)
-	case *ebnf.Repetition:
-		literalTokens(e.Body, out)
-	case *ebnf.Token:
-		out[`"`+e.String+`"`] = true
-	}
-}
-
-// @spec GRAMMAR-009
-func TestTokenTableMatchesGrammar(t *testing.T) {
-	g, err := grammar.Load()
-	if err != nil {
-		t.Fatalf("grammar.Load() error: %v", err)
-	}
-	items := map[string]bool{}
-	for name, prod := range g {
-		if unicode.IsLower(rune(name[0])) {
-			items[name] = true
-		} else {
-			literalTokens(prod.Expr, items)
-		}
-	}
-	for item := range items {
-		_, isToken := grammarTokens[item]
-		if !isToken && !grammarHelpers[item] {
-			t.Errorf("grammar item %s has no entry in the lexer's token table", item)
-		}
-	}
-	var tableItems []string
-	for item := range grammarTokens {
-		tableItems = append(tableItems, item)
-	}
-	for item := range grammarHelpers {
-		tableItems = append(tableItems, item)
-	}
-	slices.Sort(tableItems)
-	for _, item := range tableItems {
-		if !items[item] {
-			t.Errorf("lexer token table entry %s names no lexical rule or literal token in the grammar", item)
-		}
-	}
-	if len(tableItems) == 0 {
-		t.Errorf("lexer token table is empty")
-	}
 }

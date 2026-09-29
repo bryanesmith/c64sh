@@ -196,4 +196,4 @@ These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 - Program mode: lines with line numbers (`10 PRINT "HELLO"`), `RUN`, `LIST`, `GOTO`
 - All other commands
 
-The full syntax c64sh accepts is written down in [`grammar/c64basic.ebnf`](../grammar/c64basic.ebnf).
+Every form c64sh accepts is described in this guide, and shown in use in [`examples/`](../examples/).

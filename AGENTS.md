@@ -56,7 +56,7 @@ Stop after each phase for user review. **Docs carry current intent, written to b
 Annotate code and tests with `@spec` comments citing EARS IDs:
 
 ```
-// @spec LEX-001, LEX-002
+// @spec LEXER-007, LEXER-008
 ```
 
 Place the annotation at the *entry point of the behavior's implementation graph* — the topmost function or module owning the specified behavior, not every helper. When a behavior spans multiple subsystems, annotate at the entry point in each subsystem. Tests follow the same rule: annotate the test that directly exercises the spec, not every inner assertion.

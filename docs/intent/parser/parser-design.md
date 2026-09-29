@@ -43,10 +43,24 @@ type RemStmt struct{ Text string }
 
 // Expressions.
 type StringLit struct{ Value string }     // "…", contents without quotes
-type Concat struct{ Left, Right Expr }    // Left + Right
+type NumberLit struct{ Value float64 }    // 12, 3.5, .5, 1E3
+
+// BinaryExpr is Left Op Right.
+type BinaryExpr struct {
+    Op          Op
+    Left, Right Expr
+}
+
+type Op int
+
+const (
+    Add Op = iota // +: adds numbers, joins strings
+)
 ```
 
-`Concat` is left-associative: `"A"+"B"+"C"` is `Concat(Concat("A","B"),"C")`.
+`+` is left-associative: `"A"+"B"+"C"` is `BinaryExpr(Add, BinaryExpr(Add, "A", "B"), "C")`. The parser does not check operand types: whether `+` joins strings, adds numbers, or is a type mismatch is decided by the interpreter from the values, as on a C64.
+
+A `NumberLit`'s value is the token text converted with `strconv.ParseFloat`, after normalizing the forms the C64 accepts and `ParseFloat` does not: a leading `.` gets a `0` before it (`.` is 0, `.5` is 0.5), and an `E` with no exponent digits gets a `0` exponent (`1E` and `1E+` are 1). A literal too large for `float64` becomes infinity; the interpreter reports it as `OVERFLOW` when evaluated, so statements before it still run.
 
 Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Statements` holds only statements that do something. A blank line parses to a `Line` with no statements.
 
@@ -59,9 +73,10 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
-| `Expression = string { "+" string } .` | `parseExpression` | `ast.Expr` |
+| `Expression = Operand { "+" Operand } .` | `parseExpression` | `ast.Expr` |
+| `Operand = string \| number .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `string`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 
@@ -115,12 +130,13 @@ Examples:
 | Sealed interfaces | Unexported marker methods | Exported marker methods; a single node struct with a kind field | Only `internal/ast` can add node types, so type switches elsewhere can be exhaustive and a panicking `default` reliably signals a missed case. |
 | Empty statements | Dropped during parsing | `EmptyStmt` node | They have no effect, and dropping them keeps the interpreter free of a no-op case. |
 | Comments | `RemStmt` node holding the comment text | Drop comments during parsing, like empty statements | Program mode will store and `LIST` lines with their comments, so the text has to survive into the AST even though executing it does nothing. |
-| `+` representation | Binary `Concat` node, left-associative | Flat list of strings | A binary node generalizes to arithmetic operators when numbers are added. |
+| `+` representation | `BinaryExpr` with an `Op`, left-associative | A separate node per operator; a flat list of operands | One node type covers every binary operator, so `-`, `*`, `/`, and `^` add `Op` values rather than node types. |
+| Type checking of `+` | In the interpreter, from the operand values | In the parser, from the operand kinds | BASIC V2 types are known at run time (variables will hold either kind), and a C64 reports `?TYPE MISMATCH  ERROR` when the statement runs, after earlier statements have run. |
 
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. When numbers are added, `Expression` grows operators with C64 precedence, and `Concat` is generalized into a binary-operator node with an operator field. Type checking (`"A"+1` is `?TYPE MISMATCH  ERROR` on a C64) happens in the interpreter, since BASIC V2 types are determined at run time.
+1. When arithmetic is added, `Expression` grows `-`, `*`, `/`, and `^` with C64 precedence, unary `-` and `+`, and parentheses, parsed by precedence climbing within `parseExpression`.
 
 ## References
 

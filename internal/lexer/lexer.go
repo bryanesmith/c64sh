@@ -35,6 +35,7 @@ var symbols = map[byte]token.Kind{
 //
 // @spec LEXER-001, LEXER-002, LEXER-003, LEXER-004, LEXER-005, LEXER-006, LEXER-007
 // @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013, LEXER-014
+// @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018
 func Lex(line string) []token.Token {
 	var toks []token.Token
 	emit := func(k token.Kind, value string, pos int) {
@@ -58,6 +59,15 @@ func Lex(line string) []token.Token {
 				emit(token.String, body[:end], i)
 				i += end + 2
 			}
+			continue
+		}
+		// number = ( digit { digit } [ "." { digit } ] | "." { digit } )
+		//          [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
+		// digit  = "0" … "9" .
+		if isDigit(c) || c == '.' {
+			text, end := scanNumber(line, i)
+			emit(token.Number, text, i)
+			i = end
 			continue
 		}
 		// print = "PRINT" | "?" .   ("?" is scanned with the symbols below)
@@ -85,6 +95,59 @@ func Lex(line string) []token.Token {
 	}
 	emit(token.EOL, "", len(line))
 	return toks
+}
+
+func isDigit(c byte) bool {
+	return '0' <= c && c <= '9'
+}
+
+// scanNumber reads the number literal starting at line[start], which is a
+// digit or ".". It returns the literal with its spaces and tabs removed, and
+// the index just after its last character. As on a C64, spaces and tabs
+// inside the literal are skipped, a second "." ends it, and an "E" that
+// begins a keyword is left for the keyword.
+func scanNumber(line string, start int) (string, int) {
+	var text strings.Builder
+	end := start
+	// next returns the index of the next non-blank character from end.
+	next := func() int {
+		j := end
+		for j < len(line) && (line[j] == ' ' || line[j] == '\t') {
+			j++
+		}
+		return j
+	}
+	take := func(j int) {
+		text.WriteByte(line[j])
+		end = j + 1
+	}
+
+	take(start)
+	seenPoint := line[start] == '.'
+	for {
+		j := next()
+		if j < len(line) && isDigit(line[j]) {
+			take(j)
+		} else if j < len(line) && line[j] == '.' && !seenPoint {
+			seenPoint = true
+			take(j)
+		} else {
+			break
+		}
+	}
+
+	if j := next(); j < len(line) && line[j] == 'E' {
+		if _, _, isKeyword := matchKeyword(line[j:]); !isKeyword {
+			take(j)
+			if k := next(); k < len(line) && (line[k] == '+' || line[k] == '-') {
+				take(k)
+			}
+			for k := next(); k < len(line) && isDigit(line[k]); k = next() {
+				take(k)
+			}
+		}
+	}
+	return text.String(), end
 }
 
 // matchKeyword returns the longest keyword that s begins with.

@@ -158,8 +158,8 @@ func TestPunctuation(t *testing.T) {
 // @spec LEXER-012
 func TestUnrecognizedCharactersAreIllegal(t *testing.T) {
 	runLexCases(t, []lexCase{
-		{"digit, accented letter, non-breaking space", "1é ", []token.Token{
-			tok(token.Illegal, "1", 0), tok(token.Illegal, "é", 1), tok(token.Illegal, " ", 3), eol(5),
+		{"letter, accented letter, non-breaking space", "Xé\u00a0", []token.Token{
+			tok(token.Illegal, "X", 0), tok(token.Illegal, "é", 1), tok(token.Illegal, "\u00a0", 3), eol(5),
 		}},
 		{"symbols", `@#`, []token.Token{
 			tok(token.Illegal, "@", 0), tok(token.Illegal, "#", 1), eol(2),
@@ -199,5 +199,51 @@ func TestRemTakesRestOfLine(t *testing.T) {
 		{"REM inside a string is text", `PRINT "REM"`, []token.Token{
 			tok(token.Print, "PRINT", 0), tok(token.String, "REM", 6), eol(11),
 		}},
+	})
+}
+
+func num(v string, pos int) token.Token { return tok(token.Number, v, pos) }
+
+// @spec LEXER-015
+func TestNumberLiterals(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"integer", `45`, []token.Token{num("45", 0), eol(2)}},
+		{"decimal", `3.14`, []token.Token{num("3.14", 0), eol(4)}},
+		{"leading point", `.5`, []token.Token{num(".5", 0), eol(2)}},
+		{"trailing point", `5.`, []token.Token{num("5.", 0), eol(2)}},
+		{"lone point", `.`, []token.Token{num(".", 0), eol(1)}},
+		{"exponent", `1E3`, []token.Token{num("1E3", 0), eol(3)}},
+		{"signed exponents", `1.5E-3:2E+4`, []token.Token{num("1.5E-3", 0), tok(token.Colon, ":", 6), num("2E+4", 7), eol(11)}},
+		{"exponent without digits", `1E`, []token.Token{num("1E", 0), eol(2)}},
+		{"exponent sign without digits", `1E+`, []token.Token{num("1E+", 0), eol(3)}},
+		{"leading zeros", `007`, []token.Token{num("007", 0), eol(3)}},
+		{"in PRINT", `PRINT 5;"A"`, []token.Token{
+			tok(token.Print, "PRINT", 0), num("5", 6), tok(token.Semicolon, ";", 7), tok(token.String, "A", 8), eol(11),
+		}},
+		{"after a string", `"A"1`, []token.Token{tok(token.String, "A", 0), num("1", 3), eol(4)}},
+		{"followed by a letter", `1A`, []token.Token{num("1", 0), tok(token.Illegal, "A", 1), eol(2)}},
+		{"second E ends the number", `1E5E5`, []token.Token{
+			num("1E5", 0), tok(token.Illegal, "E", 3), num("5", 4), eol(5),
+		}},
+	})
+}
+
+// @spec LEXER-016
+func TestSpacesInsideNumbersAreSkipped(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"digits", `1 2`, []token.Token{num("12", 0), eol(3)}},
+		{"every part", "1 . 5\tE - 3", []token.Token{num("1.5E-3", 0), eol(11)}},
+		{"trailing whitespace excluded", `PRINT 1  ;`, []token.Token{
+			tok(token.Print, "PRINT", 0), num("1", 6), tok(token.Semicolon, ";", 9), eol(10),
+		}},
+		{"space then keyword", `1 REM X`, []token.Token{num("1", 0), tok(token.Rem, " X", 2), eol(7)}},
+	})
+}
+
+// @spec LEXER-017
+func TestSecondPointStartsANewNumber(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"two numbers", `1.2.3`, []token.Token{num("1.2", 0), num(".3", 3), eol(5)}},
+		{"three numbers", `...`, []token.Token{num(".", 0), num(".", 1), num(".", 2), eol(3)}},
 	})
 }

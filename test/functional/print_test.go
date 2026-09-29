@@ -36,7 +36,7 @@ func TestUnsupportedInputIsSyntaxError(t *testing.T) {
 		{`print "hi"`, result{"", "?SYNTAX  ERROR\n", 1}},
 		{`10 PRINT "FOO"`, result{"", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT CHR$(34)`, result{"", "?SYNTAX  ERROR\n", 1}},
-		{`PRINT 1+2`, result{"", "?SYNTAX  ERROR\n", 1}},
+		{`PRINT 2*3`, result{" 2 \n", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT "HELLO"@`, result{"HELLO\n", "?SYNTAX  ERROR\n", 1}},
 	}
 	for _, c := range cases {
@@ -63,4 +63,36 @@ func TestPrintZones(t *testing.T) {
 	}
 	check(t, "READY resets the column", runInteractive(t, "PRINT \"AB\";\nPRINT ,\"X\"\n"),
 		result{"AB\n" + "          X\n", banner + "READY.\nREADY.\n\n", 0})
+}
+
+// TestNumbers checks number literals and number printing end to end, as
+// listed in the HLD's Goals.
+func TestNumbers(t *testing.T) {
+	cases := []struct {
+		input string
+		want  result
+	}{
+		{`PRINT 5`, result{" 5 \n", "", 0}},
+		{`? "5*9=";45`, result{"5*9= 45 \n", "", 0}},
+		{`? 2,3,4,5,6`, result{" 2 " + "       " + " 3 " + "       " + " 4 " + "       " + " 5 " + "       " + " 6 \n", "", 0}},
+		{`PRINT 3.14;.5;1E3;1.5E-3`, result{" 3.14  .5  1000  1.5E-03 \n", "", 0}},
+		{`PRINT 1/3`, result{" 1 \n", "?SYNTAX  ERROR\n", 1}},
+		{`PRINT 1;2`, result{" 1  2 \n", "", 0}},
+		{`PRINT 1 2`, result{" 12 \n", "", 0}},
+		{`PRINT "A"1`, result{"A 1 \n", "", 0}},
+		{`PRINT 1+1`, result{" 2 \n", "", 0}},
+		{`PRINT 1.5+2.25+3`, result{" 6.75 \n", "", 0}},
+		{`PRINT .`, result{" 0 \n", "", 0}},
+		{`PRINT 1.2.3`, result{" 1.2  .3 \n", "", 0}},
+		{`PRINT 1E9;999999999;.01;.001`, result{" 1E+09  999999999  .01  1E-03 \n", "", 0}},
+		{`PRINT "A"+1`, result{"", "?TYPE MISMATCH  ERROR\n", 1}},
+		{`PRINT "SUM:";1+"A"`, result{"SUM:\n", "?TYPE MISMATCH  ERROR\n", 1}},
+		{`PRINT 1E39`, result{"", "?OVERFLOW  ERROR\n", 1}},
+		{`PRINT 1E39+"A"`, result{"", "?OVERFLOW  ERROR\n", 1}},
+		{`PRINT -5`, result{"", "?SYNTAX  ERROR\n", 1}},
+		{`10 PRINT "HI"`, result{"", "?SYNTAX  ERROR\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.input, runMain(t, c.input+"\n"), c.want)
+	}
 }

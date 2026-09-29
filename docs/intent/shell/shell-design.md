@@ -121,6 +121,8 @@ type Kind int
 const (
     Syntax        Kind = iota // SYNTAX
     StringTooLong             // STRING TOO LONG
+    TypeMismatch              // TYPE MISMATCH
+    Overflow                  // OVERFLOW
 )
 
 type Error struct{ Kind Kind }

@@ -92,8 +92,12 @@ func (in *Interp) execPrint(s *ast.PrintStmt) error {
 			if err != nil {
 				return in.fail(buf.String(), err)
 			}
-			buf.WriteString(v)
-			column += utf8.RuneCountInString(v)
+			text := v.str
+			if v.isNum {
+				text = formatNumber(v.num) + " "
+			}
+			buf.WriteString(text)
+			column += utf8.RuneCountInString(text)
 			newline = true
 		case *ast.Semicolon:
 			newline = false
@@ -143,25 +147,46 @@ func (in *Interp) write(s string) error {
 }
 
 // @spec INTERP-003, INTERP-009, INTERP-010, INTERP-011, INTERP-012
-func (in *Interp) eval(e ast.Expr) (string, error) {
+// @spec INTERP-020, INTERP-021, INTERP-022, INTERP-025
+func (in *Interp) eval(e ast.Expr) (value, error) {
 	switch e := e.(type) {
 	case *ast.StringLit:
-		return e.Value, nil
-	case *ast.Concat:
+		return stringValue(e.Value), nil
+	case *ast.NumberLit:
+		return inRange(e.Value)
+	case *ast.BinaryExpr:
+		// Left operand, then right, then the operator: the first error wins.
 		l, err := in.eval(e.Left)
 		if err != nil {
-			return "", err
+			return value{}, err
 		}
 		r, err := in.eval(e.Right)
 		if err != nil {
-			return "", err
+			return value{}, err
 		}
-		// RuneCountInString counts each invalid UTF-8 byte as one character.
-		if utf8.RuneCountInString(l)+utf8.RuneCountInString(r) > maxStringLen {
-			return "", &basicerr.Error{Kind: basicerr.StringTooLong}
-		}
-		return l + r, nil
+		return binary(e.Op, l, r)
 	default:
 		panic(fmt.Sprintf("interp: unhandled expression %T", e))
+	}
+}
+
+// binary applies op to two evaluated operands.
+func binary(op ast.Op, l, r value) (value, error) {
+	switch op {
+	case ast.Add:
+		switch {
+		case l.isNum && r.isNum:
+			return inRange(l.num + r.num)
+		case !l.isNum && !r.isNum:
+			// RuneCountInString counts each invalid UTF-8 byte as one character.
+			if utf8.RuneCountInString(l.str)+utf8.RuneCountInString(r.str) > maxStringLen {
+				return value{}, &basicerr.Error{Kind: basicerr.StringTooLong}
+			}
+			return stringValue(l.str + r.str), nil
+		default:
+			return value{}, &basicerr.Error{Kind: basicerr.TypeMismatch}
+		}
+	default:
+		panic(fmt.Sprintf("interp: unhandled operator %d", op))
 	}
 }

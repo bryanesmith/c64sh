@@ -22,9 +22,10 @@ var (
 	eol   = token.Token{Kind: token.EOL}
 )
 
-func str(v string) token.Token { return token.Token{Kind: token.String, Value: v} }
-func ill(v string) token.Token { return token.Token{Kind: token.Illegal, Value: v} }
-func rem(v string) token.Token { return token.Token{Kind: token.Rem, Value: v} }
+func str(v string) token.Token    { return token.Token{Kind: token.String, Value: v} }
+func ill(v string) token.Token    { return token.Token{Kind: token.Illegal, Value: v} }
+func rem(v string) token.Token    { return token.Token{Kind: token.Rem, Value: v} }
+func number(v string) token.Token { return token.Token{Kind: token.Number, Value: v} }
 
 // toks returns ts followed by EOL.
 func toks(ts ...token.Token) []token.Token { return append(ts, eol) }
@@ -36,7 +37,8 @@ func isSyntax(err error) bool {
 }
 
 // dump renders a Line compactly: statements joined by " : ", PRINT items in
-// brackets, string literals quoted, Concat as (l+r), BadItem as BAD(SYNTAX),
+// brackets, string literals quoted, numbers as #value, BinaryExpr Add as
+// (l+r), BadItem as BAD(SYNTAX),
 // RemStmt as REM(text).
 func dump(l *ast.Line) string {
 	var stmts []string
@@ -83,7 +85,12 @@ func dumpExpr(e ast.Expr) string {
 	switch e := e.(type) {
 	case *ast.StringLit:
 		return strconv.Quote(e.Value)
-	case *ast.Concat:
+	case *ast.NumberLit:
+		return "#" + strconv.FormatFloat(e.Value, 'g', -1, 64)
+	case *ast.BinaryExpr:
+		if e.Op != ast.Add {
+			return fmt.Sprintf("<op %d>", e.Op)
+		}
 		return "(" + dumpExpr(e.Left) + "+" + dumpExpr(e.Right) + ")"
 	default:
 		return fmt.Sprintf("<expr %T>", e)
@@ -167,6 +174,8 @@ func TestConcatIsLeftAssociative(t *testing.T) {
 		{"two strings", toks(pr, str("A"), plus, str("B")), `PRINT[("A"+"B")]`, false},
 		{"three strings", toks(pr, str("A"), plus, str("B"), plus, str("C")), `PRINT[(("A"+"B")+"C")]`, false},
 		{"concat then separator", toks(pr, str("A"), plus, str("B"), semi, str("C")), `PRINT[("A"+"B") ; "C"]`, false},
+		{"numbers", toks(pr, number("1"), plus, number("2"), plus, number("3")), `PRINT[((#1+#2)+#3)]`, false},
+		{"mixed kinds", toks(pr, str("A"), plus, number("1")), `PRINT[("A"+#1)]`, false},
 	})
 }
 
@@ -205,6 +214,7 @@ func TestSyntaxErrorInsidePrintEndsWithBadItem(t *testing.T) {
 		{"REM as an item", toks(pr, str("A"), rem(" NOTE")), `PRINT["A" BAD(SYNTAX)]`, true},
 		{"REM as first item", toks(pr, rem("")), `PRINT[BAD(SYNTAX)]`, true},
 		{"PRINT as an item", toks(pr, pr), `PRINT[BAD(SYNTAX)]`, true},
+		{"plus then separator after a number", toks(pr, number("1"), plus, semi), `PRINT[BAD(SYNTAX)]`, true},
 	})
 }
 
@@ -217,5 +227,23 @@ func TestParsingStopsAtFirstError(t *testing.T) {
 		{"later statement start error not parsed",
 			toks(pr, str("A"), colon, ill("@"), colon, pr, str("C")),
 			`PRINT["A"]`, true},
+	})
+}
+
+// @spec PARSER-013
+func TestNumberLiteral(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"integer", toks(pr, number("45")), `PRINT[#45]`, false},
+		{"decimal", toks(pr, number("3.14")), `PRINT[#3.14]`, false},
+		{"lone point is zero", toks(pr, number(".")), `PRINT[#0]`, false},
+		{"leading point", toks(pr, number(".5")), `PRINT[#0.5]`, false},
+		{"trailing point", toks(pr, number("5.")), `PRINT[#5]`, false},
+		{"exponent", toks(pr, number("1.5E3")), `PRINT[#1500]`, false},
+		{"negative exponent", toks(pr, number("1E-3")), `PRINT[#0.001]`, false},
+		{"exponent without digits", toks(pr, number("1E")), `PRINT[#1]`, false},
+		{"exponent sign without digits", toks(pr, number("1E+")), `PRINT[#1]`, false},
+		{"point then exponent", toks(pr, number(".E5")), `PRINT[#0]`, false},
+		{"too large for float64", toks(pr, number("1E999")), `PRINT[#+Inf]`, false},
+		{"number items", toks(pr, number("1"), semi, number("2"), comma, str("A"), number("3")), `PRINT[#1 ; #2 , "A" #3]`, false},
 	})
 }

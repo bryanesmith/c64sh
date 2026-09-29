@@ -3,6 +3,7 @@ package interp
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -12,7 +13,8 @@ import (
 
 // AST helpers.
 func str(v string) *ast.StringLit                     { return &ast.StringLit{Value: v} }
-func cat(l, r ast.Expr) *ast.Concat                   { return &ast.Concat{Left: l, Right: r} }
+func cat(l, r ast.Expr) *ast.BinaryExpr               { return &ast.BinaryExpr{Op: ast.Add, Left: l, Right: r} }
+func num(v float64) *ast.NumberLit                    { return &ast.NumberLit{Value: v} }
 func item(e ast.Expr) *ast.ExprItem                   { return &ast.ExprItem{Expr: e} }
 func printStmt(items ...ast.PrintItem) *ast.PrintStmt { return &ast.PrintStmt{Items: items} }
 func line(stmts ...ast.Stmt) *ast.Line                { return &ast.Line{Statements: stmts} }
@@ -389,5 +391,133 @@ func TestColumnAdvancesOnlyByWrittenCharacters(t *testing.T) {
 	short.Exec(line(printStmt(item(str("ABCD")), semi)))
 	if got := short.Column(); got != 2 {
 		t.Errorf("after a 2-byte partial write: column %d, want 2", got)
+	}
+}
+
+// @spec INTERP-004, INTERP-019
+func TestNumberFormat(t *testing.T) {
+	cases := []struct {
+		value float64
+		want  string
+	}{
+		{0, " 0 "},
+		{45, " 45 "},
+		{100, " 100 "},
+		{3.14, " 3.14 "},
+		{0.5, " .5 "},
+		{1.0 / 3, " .333333333 "},
+		{2.0 / 3, " .666666667 "},
+		{0.01, " .01 "},
+		{0.0123, " .0123 "},
+		{0.001, " 1E-03 "},
+		{1.5e-10, " 1.5E-10 "},
+		{123.456789123, " 123.456789 "},
+		{1e8, " 100000000 "},
+		{123456789, " 123456789 "},
+		{999999999, " 999999999 "},
+		{999999999.6, " 1E+09 "},
+		{1e9, " 1E+09 "},
+		{1234567890, " 1.23456789E+09 "},
+		{1e38, " 1E+38 "},
+		{1.70141183e38, " 1.70141183E+38 "},
+		{2.93873588e-39, " 2.93873588E-39 "},
+		{-2.5, "-2.5 "},
+		{-0.001, "-1E-03 "},
+		{-45, "-45 "},
+	}
+	for _, c := range cases {
+		rec, err := exec(line(printStmt(item(num(c.value)), semi)))
+		if err != nil {
+			t.Errorf("%v: unexpected error %v", c.value, err)
+			continue
+		}
+		if got := rec.String(); got != c.want {
+			t.Errorf("PRINT %v; wrote %q, want %q", c.value, got, c.want)
+		}
+	}
+}
+
+// @spec INTERP-020
+func TestNumberLiteralsPrint(t *testing.T) {
+	runPrintCases(t, []printCase{
+		{"number", line(printStmt(item(num(5)))), " 5 \n"},
+		{"string then number", line(printStmt(item(str("5*9=")), semi, item(num(45)))), "5*9= 45 \n"},
+		{"numbers side by side", line(printStmt(item(num(1)), semi, item(num(2)))), " 1  2 \n"},
+		{"numbers in zones", line(printStmt(item(num(2)), comma, item(num(3)))), " 2 " + spaces(7) + " 3 \n"},
+	})
+}
+
+// @spec INTERP-021
+func TestAddNumbers(t *testing.T) {
+	runPrintCases(t, []printCase{
+		{"integers", line(printStmt(item(cat(num(1), num(2))))), " 3 \n"},
+		{"decimals", line(printStmt(item(cat(num(0.1), num(0.2))))), " .3 \n"},
+		{"chain", line(printStmt(item(cat(cat(num(1), num(2)), num(3))))), " 6 \n"},
+	})
+}
+
+// @spec INTERP-022
+func TestAddStringAndNumberIsTypeMismatch(t *testing.T) {
+	cases := map[string]*ast.Line{
+		"string + number": line(printStmt(item(str("A")), semi, item(cat(str("B"), num(1))))),
+		"number + string": line(printStmt(item(str("A")), semi, item(cat(num(1), str("B"))))),
+	}
+	for name, l := range cases {
+		rec, err := exec(l)
+		if !isKind(err, basicerr.TypeMismatch) {
+			t.Errorf("%s: error = %v, want TYPE MISMATCH", name, err)
+		}
+		if got := rec.String(); got != "A" {
+			t.Errorf("%s: output %q, want %q (items before the failure)", name, got, "A")
+		}
+	}
+}
+
+// @spec INTERP-023
+func TestOverflow(t *testing.T) {
+	cases := map[string]ast.Expr{
+		"literal above the maximum": num(1.8e38),
+		"infinite literal":          num(math.Inf(1)),
+		"sum above the maximum":     cat(num(1e38), num(1e38)),
+	}
+	for name, e := range cases {
+		if _, err := exec(line(printStmt(item(e)))); !isKind(err, basicerr.Overflow) {
+			t.Errorf("%s: error = %v, want OVERFLOW", name, err)
+		}
+	}
+	runPrintCases(t, []printCase{
+		{"maximum is fine", line(printStmt(item(num(1.70141183e38)))), " 1.70141183E+38 \n"},
+	})
+}
+
+// @spec INTERP-024
+func TestUnderflowBecomesZero(t *testing.T) {
+	runPrintCases(t, []printCase{
+		{"tiny literal", line(printStmt(item(num(1e-40)))), " 0 \n"},
+		{"tiny sum", line(printStmt(item(cat(num(1e-40), num(1e-41))))), " 0 \n"},
+		{"smallest is kept", line(printStmt(item(num(2.93873588e-39)))), " 2.93873588E-39 \n"},
+	})
+}
+
+// @spec INTERP-025
+func TestLeftOperandErrorWins(t *testing.T) {
+	cases := map[string]ast.Expr{
+		"overflow left of a string":  cat(num(1e39), str("A")),
+		"overflow right of a string": cat(str("A"), num(1e39)),
+	}
+	for name, e := range cases {
+		if _, err := exec(line(printStmt(item(e)))); !isKind(err, basicerr.Overflow) {
+			t.Errorf("%s: error = %v, want OVERFLOW", name, err)
+		}
+	}
+}
+
+// @spec INTERP-016
+func TestNumberOutputCountsColumns(t *testing.T) {
+	rec := &recorder{}
+	in := New(rec)
+	in.Exec(line(printStmt(item(num(5)), semi)))
+	if got := in.Column(); got != 3 {
+		t.Errorf("after PRINT 5; column %d, want 3", got)
 	}
 }

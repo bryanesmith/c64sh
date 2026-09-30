@@ -59,6 +59,23 @@ Each line you type runs as soon as you press Return; this is the C64's *direct m
 
 End the session with **Ctrl-D** at the start of a line.
 
+### Editing and history
+
+While typing a line you can edit it and recall earlier lines:
+
+| Key | Does |
+|---|---|
+| Up / Down (or Ctrl-P / Ctrl-N) | Recall earlier / later lines from this session |
+| Left / Right | Move within the line |
+| Home / End (or Ctrl-A / Ctrl-E) | Jump to the start / end of the line |
+| Backspace / Delete | Delete a character |
+| Ctrl-U / Ctrl-K / Ctrl-W | Delete to the start of the line / to its end / the previous word |
+| Ctrl-L | Clear the screen |
+| Ctrl-C | Discard the line you are typing |
+| Ctrl-D | On an empty line, end the session |
+
+History holds the last 100 lines you ran in the session (blank lines are skipped) and is not saved when c64sh exits. Editing is available when c64sh runs in a terminal; scripts and piped input are read as plain lines.
+
 The banner and `READY.` are written to stderr, and program output to stdout, so `c64sh > out.txt` saves only what your BASIC lines print.
 
 ## Scripts

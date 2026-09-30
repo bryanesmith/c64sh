@@ -27,6 +27,18 @@ Design: `shell-design.md`
 - [x] **SHELL-INT-005**: In interactive mode, when a line reports a BASIC error, the shell shall continue reading the next line.
 - [x] **SHELL-INT-006**: In interactive mode, when the end of input is reached, the shell shall write a newline to stderr and exit with status 0.
 
+## Line editing
+
+- [x] **SHELL-EDIT-001**: When interactive mode runs with both stdin and stderr connected to terminals, the shell shall read each line with the `golang.org/x/term` line editor, echoing keystrokes to stderr.
+- [x] **SHELL-EDIT-002**: If stdin or stderr is not a terminal, or the shell is in script mode, then the shell shall read lines without the line editor, as SHELL-LINE-001 to SHELL-LINE-003 specify.
+- [x] **SHELL-EDIT-003**: While a line is read with the line editor, the up arrow (or Ctrl-P) shall replace the line with the previous entry of the session's history, and the down arrow (or Ctrl-N) with the next, more recent entry, returning to the line being typed after the most recent entry.
+- [x] **SHELL-EDIT-004**: The shell shall add each line read with the line editor to the session's history, except blank lines and lines discarded with Ctrl-C, keeping the most recent 100 entries.
+- [x] **SHELL-EDIT-005**: When Ctrl-C is pressed while a line is read with the line editor, the shell shall discard that line without running it or adding it to history, and read a new line.
+- [x] **SHELL-EDIT-006**: When Ctrl-D is pressed on an empty line read with the line editor, the shell shall treat it as the end of input (SHELL-INT-006).
+- [x] **SHELL-EDIT-007**: The shell shall switch stdin to raw mode immediately before reading each line with the line editor and restore stdin's previous mode after the line is read, whether or not reading succeeded, so that each line runs with the terminal in its previous mode.
+- [x] **SHELL-EDIT-008**: When the line editor reports a line as pasted (`term.ErrPasteIndicator`), the shell shall run it as an ordinary line.
+- [x] **SHELL-EDIT-009**: While a line is read with the line editor, the left and right arrows, Home, End, Backspace, and Delete shall move the cursor and edit the line, so that the line returned is the edited text.
+
 ## Script mode
 
 - [x] **SHELL-SCRIPT-001**: In script mode, the shell shall write no banner and no `READY.`.

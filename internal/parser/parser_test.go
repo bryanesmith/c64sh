@@ -25,6 +25,8 @@ var (
 	lp    = token.Token{Kind: token.LParen, Value: "("}
 	rp    = token.Token{Kind: token.RParen, Value: ")"}
 	caret = token.Token{Kind: token.Caret, Value: "^"}
+	let   = token.Token{Kind: token.Let, Value: "LET"}
+	eq    = token.Token{Kind: token.Equal, Value: "="}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -32,6 +34,7 @@ func str(v string) token.Token    { return token.Token{Kind: token.String, Value
 func ill(v string) token.Token    { return token.Token{Kind: token.Illegal, Value: v} }
 func rem(v string) token.Token    { return token.Token{Kind: token.Rem, Value: v} }
 func number(v string) token.Token { return token.Token{Kind: token.Number, Value: v} }
+func name(v string) token.Token   { return token.Token{Kind: token.Name, Value: v} }
 
 // toks returns ts followed by EOL.
 func toks(ts ...token.Token) []token.Token { return append(ts, eol) }
@@ -64,6 +67,8 @@ func dumpStmt(s ast.Stmt) string {
 		return "PRINT[" + strings.Join(items, " ") + "]"
 	case *ast.RemStmt:
 		return "REM(" + strconv.Quote(s.Text) + ")"
+	case *ast.LetStmt:
+		return "LET " + dumpExpr(s.Var) + "=" + dumpExpr(s.Value)
 	default:
 		return fmt.Sprintf("<stmt %T>", s)
 	}
@@ -101,6 +106,8 @@ func dumpExpr(e ast.Expr) string {
 		return "(" + dumpExpr(e.Left) + op + dumpExpr(e.Right) + ")"
 	case *ast.NegExpr:
 		return "(-" + dumpExpr(e.X) + ")"
+	case *ast.VarRef:
+		return "$" + e.Name + "[" + e.Text + "]"
 	default:
 		return fmt.Sprintf("<expr %T>", e)
 	}
@@ -347,5 +354,66 @@ func TestSignedExponent(t *testing.T) {
 		{"sign takes in a following power", toks(pr, number("2"), caret, minus, number("1"), caret, number("2")), `PRINT[(#2^(-(#1^#2)))]`, false},
 		{"sign stops before *", toks(pr, number("2"), caret, minus, number("3"), star, number("4")), `PRINT[((#2^(-#3))*#4)]`, false},
 		{"plus sign dropped", toks(pr, number("2"), caret, plus, number("3")), `PRINT[(#2^#3)]`, false},
+	})
+}
+
+// @spec PARSER-021
+func TestAssignment(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"without LET", toks(name("A"), eq, number("5")), `LET $A[A]=#5`, false},
+		{"with LET", toks(let, name("A"), eq, number("5")), `LET $A[A]=#5`, false},
+		{"string", toks(name("N$"), eq, str("HI")), `LET $N$[N$]="HI"`, false},
+		{"expression", toks(name("B"), eq, name("A"), star, number("2"), plus, number("1")), `LET $B[B]=(($A[A]*#2)+#1)`, false},
+		{"then PRINT", toks(name("A"), eq, number("1"), colon, pr, name("A")), `LET $A[A]=#1 : PRINT[$A[A]]`, false},
+	})
+}
+
+// @spec PARSER-022
+func TestVariableIdentity(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"long name", toks(pr, name("SCORE")), `PRINT[$SC[SCORE]]`, false},
+		{"long string name", toks(pr, name("NAME$")), `PRINT[$NA$[NAME$]]`, false},
+		{"one-letter string name", toks(pr, name("N$")), `PRINT[$N$[N$]]`, false},
+		{"digit second", toks(pr, name("A1B")), `PRINT[$A1[A1B]]`, false},
+		{"one letter", toks(pr, name("X")), `PRINT[$X[X]]`, false},
+	})
+}
+
+// @spec PARSER-023
+func TestVariableOperands(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"in an expression", toks(pr, name("A"), plus, number("1")), `PRINT[($A[A]+#1)]`, false},
+		{"negated", toks(pr, minus, name("A")), `PRINT[(-$A[A])]`, false},
+		{"in parentheses", toks(pr, lp, name("A"), rp), `PRINT[$A[A]]`, false},
+		{"side by side", toks(pr, number("1"), name("A")), `PRINT[#1 $A[A]]`, false},
+		{"string then variable", toks(pr, str("X"), name("A")), `PRINT["X" $A[A]]`, false},
+	})
+}
+
+// @spec PARSER-024
+func TestUnsupportedNames(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"TI used", toks(pr, name("TI")), `PRINT[BAD(SYNTAX)]`, true},
+		{"TIME used", toks(pr, name("TIME")), `PRINT[BAD(SYNTAX)]`, true},
+		{"TI$ used", toks(pr, name("TI$")), `PRINT[BAD(SYNTAX)]`, true},
+		{"ST used", toks(pr, name("STATUS")), `PRINT[BAD(SYNTAX)]`, true},
+		{"TI assigned", toks(name("TI"), eq, number("1")), ``, true},
+		{"array element", toks(pr, name("A"), lp, number("1"), rp), `PRINT[BAD(SYNTAX)]`, true},
+		{"function call", toks(pr, name("CHR$"), lp, number("65"), rp), `PRINT[BAD(SYNTAX)]`, true},
+		{"array assigned", toks(name("A"), lp, number("1"), rp, eq, number("2")), ``, true},
+		{"T and I separately are fine", toks(pr, name("T"), semi, name("IT")), `PRINT[$T[T] ; $IT[IT]]`, false},
+	})
+}
+
+// @spec PARSER-025, PARSER-011
+func TestAssignmentSyntaxErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"LET alone", toks(let), ``, true},
+		{"LET a number", toks(let, number("5"), eq, number("1")), ``, true},
+		{"name alone", toks(name("A")), ``, true},
+		{"no value", toks(name("A"), eq), ``, true},
+		{"missing =", toks(name("A"), number("5")), ``, true},
+		{"after a good statement", toks(pr, number("1"), colon, name("A"), eq), `PRINT[#1]`, true},
+		{"bad value", toks(name("A"), eq, number("1"), plus), ``, true},
 	})
 }

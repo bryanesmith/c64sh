@@ -40,7 +40,7 @@ func (in *Interp) Column() int
 func (in *Interp) FreshLine() error
 ```
 
-The cursor column is the state an `Interp` carries between lines; it starts at 0. When variables and program mode are added, their state also lives in `Interp`, which is why it is a value created once per shell session rather than a free function.
+An `Interp` carries state between lines: the cursor column, which starts at 0, and the variables, which start empty. It is created once per shell session, so both persist from line to line for the whole session or script. When program mode is added, the stored program also lives in `Interp`.
 
 ## Cursor Column
 
@@ -62,6 +62,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
         return in.execPrint(s)
     case *ast.RemStmt:
         return nil
+    case *ast.LetStmt:
+        return in.execLet(s)
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
     }
@@ -104,6 +106,13 @@ The output for one `PRINT` is collected and written in a single call to the writ
 ## REM
 
 Executing a `RemStmt` does nothing: it writes no output and returns no error, so execution continues with the next statement. A `RemStmt` is always the last statement of a line, because its comment runs to the end of the line.
+
+## Variables
+
+Variables are kept in a map from a `VarRef`'s `Name` (its identity, such as `SC` or `N$`) to a value.
+
+- **Assignment** (`LetStmt`) evaluates the value, checks its type against the variable's, and stores it. A string variable (a name ending in `$`) takes only strings and a number variable only numbers; the wrong kind is `TYPE MISMATCH`. A string longer than 255 characters is `STRING TOO LONG`, the limit on any string a C64 stores. On any error the variable keeps its old value.
+- **A reference** (`VarRef`) evaluates to the stored value, or, for a variable never assigned, to 0 or the empty string, as on a C64.
 
 ## Values
 
@@ -152,6 +161,7 @@ A `BinaryExpr` evaluates its left operand, then its right operand, then applies 
 | `BinaryExpr` `Div` | Two numbers: the quotient, or `DIVISION BY ZERO` if the right operand is 0. Any string operand: `TYPE MISMATCH`, checked before the divisor. |
 | `BinaryExpr` `Pow` | Two numbers: the left raised to the power of the right, following the C64 ROM's power routine (`$BF7B`): anything to the power 0 is 1 (including `0^0`); 0 to any other power is 0 (including a negative power, so `0^-1` is 0, not a division by zero); a negative number to a whole-number power is computed from its size, then negated if the power is odd (`(-2)^3` is -8); a negative number to a fractional power is `ILLEGAL QUANTITY`. Any string operand: `TYPE MISMATCH`. |
 | `NegExpr` | A number: its negation. A string: `TYPE MISMATCH`. |
+| `VarRef` | The variable's value; 0 or `""` if never assigned. |
 
 Every numeric result is limited to the C64's range: `OVERFLOW` if its size exceeds `maxNumber`, and 0 if it is nonzero and its size is below `minNumber`. A negative zero prints as `0`.
 
@@ -165,8 +175,8 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 
 | Kind | Cause |
 |---|---|
-| `STRING TOO LONG` | Joining strings with `+` produces more than 255 characters. |
-| `TYPE MISMATCH` | `+` with a string on one side and a number on the other; `-`, `*`, `/`, `^`, or negation with any string operand. |
+| `STRING TOO LONG` | Joining strings with `+` produces more than 255 characters, or a string longer than 255 characters is assigned to a variable. |
+| `TYPE MISMATCH` | Assigning a string to a number variable or a number to a string variable; `+` with a string on one side and a number on the other; `-`, `*`, `/`, `^`, or negation with any string operand. |
 | `OVERFLOW` | A number literal or arithmetic result larger in size than `maxNumber`. |
 | `DIVISION BY ZERO` | `/` with a right operand of 0. |
 | `ILLEGAL QUANTITY` | `^` with a negative left operand and a right operand that is not a whole number. |

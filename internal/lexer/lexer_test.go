@@ -101,7 +101,7 @@ func TestPrintKeywordNeedsNoFollowingSpace(t *testing.T) {
 			tok(token.Print, "PRINT", 0), tok(token.String, "X", 5), eol(8),
 		}},
 		{"PRINT then letter", `PRINTX`, []token.Token{
-			tok(token.Print, "PRINT", 0), tok(token.Illegal, "X", 5), eol(6),
+			tok(token.Print, "PRINT", 0), tok(token.Name, "X", 5), eol(6),
 		}},
 		{"PRINT twice", `PRINTPRINT`, []token.Token{
 			tok(token.Print, "PRINT", 0), tok(token.Print, "PRINT", 5), eol(10),
@@ -126,7 +126,7 @@ func TestKeywordsAreUppercaseOnly(t *testing.T) {
 			tok(token.Illegal, "n", 3), tok(token.Illegal, "t", 4), eol(5),
 		}},
 		{"mixed case", `Print`, []token.Token{
-			tok(token.Illegal, "P", 0), tok(token.Illegal, "r", 1), tok(token.Illegal, "i", 2),
+			tok(token.Name, "P", 0), tok(token.Illegal, "r", 1), tok(token.Illegal, "i", 2),
 			tok(token.Illegal, "n", 3), tok(token.Illegal, "t", 4), eol(5),
 		}},
 		{"lowercase rem", `rem`, []token.Token{
@@ -139,8 +139,7 @@ func TestKeywordsAreUppercaseOnly(t *testing.T) {
 func TestWhitespaceInsideKeywordBreaksIt(t *testing.T) {
 	runLexCases(t, []lexCase{
 		{"PR INT", `PR INT`, []token.Token{
-			tok(token.Illegal, "P", 0), tok(token.Illegal, "R", 1), tok(token.Illegal, "I", 3),
-			tok(token.Illegal, "N", 4), tok(token.Illegal, "T", 5), eol(6),
+			tok(token.Name, "PRINT", 0), eol(6),
 		}},
 	})
 }
@@ -168,8 +167,8 @@ func TestPunctuation(t *testing.T) {
 // @spec LEXER-012
 func TestUnrecognizedCharactersAreIllegal(t *testing.T) {
 	runLexCases(t, []lexCase{
-		{"letter, accented letter, non-breaking space", "Xé\u00a0", []token.Token{
-			tok(token.Illegal, "X", 0), tok(token.Illegal, "é", 1), tok(token.Illegal, "\u00a0", 3), eol(5),
+		{"lowercase letter, accented letter, non-breaking space", "xé\u00a0", []token.Token{
+			tok(token.Illegal, "x", 0), tok(token.Illegal, "é", 1), tok(token.Illegal, "\u00a0", 3), eol(5),
 		}},
 		{"symbols", `@#`, []token.Token{
 			tok(token.Illegal, "@", 0), tok(token.Illegal, "#", 1), eol(2),
@@ -231,9 +230,9 @@ func TestNumberLiterals(t *testing.T) {
 			tok(token.Print, "PRINT", 0), num("5", 6), tok(token.Semicolon, ";", 7), tok(token.String, "A", 8), eol(11),
 		}},
 		{"after a string", `"A"1`, []token.Token{tok(token.String, "A", 0), num("1", 3), eol(4)}},
-		{"followed by a letter", `1A`, []token.Token{num("1", 0), tok(token.Illegal, "A", 1), eol(2)}},
+		{"followed by a letter", `1A`, []token.Token{num("1", 0), tok(token.Name, "A", 1), eol(2)}},
 		{"second E ends the number", `1E5E5`, []token.Token{
-			num("1E5", 0), tok(token.Illegal, "E", 3), num("5", 4), eol(5),
+			num("1E5", 0), tok(token.Name, "E5", 3), eol(5),
 		}},
 	})
 }
@@ -265,5 +264,51 @@ func TestCaret(t *testing.T) {
 		{"up arrow", "2\u21913", []token.Token{num("2", 0), tok(token.Caret, "\u2191", 1), num("3", 4), eol(5)}},
 		{"up arrow in a string is text", "\"\u2191\"", []token.Token{tok(token.String, "\u2191", 0), eol(5)}},
 		{"negative exponent", `2^-1`, []token.Token{num("2", 0), tok(token.Caret, "^", 1), tok(token.Minus, "-", 2), num("1", 3), eol(4)}},
+	})
+}
+
+func name(v string, pos int) token.Token { return tok(token.Name, v, pos) }
+
+// @spec LEXER-020
+func TestNames(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"single letter", `A`, []token.Token{name("A", 0), eol(1)}},
+		{"long name", `SCORE`, []token.Token{name("SCORE", 0), eol(5)}},
+		{"letters and digits", `A1B2`, []token.Token{name("A1B2", 0), eol(4)}},
+		{"string variable", `N$`, []token.Token{name("N$", 0), eol(2)}},
+		{"spaces inside are skipped", `A B`, []token.Token{name("AB", 0), eol(3)}},
+		{"space before $", `N $`, []token.Token{name("N$", 0), eol(3)}},
+		{"assignment", `A=5`, []token.Token{name("A", 0), tok(token.Equal, "=", 1), num("5", 2), eol(3)}},
+		{"in PRINT", `PRINT A;B$`, []token.Token{
+			tok(token.Print, "PRINT", 0), name("A", 6), tok(token.Semicolon, ";", 7), name("B$", 8), eol(10),
+		}},
+		{"name then string", `A"X"`, []token.Token{name("A", 0), tok(token.String, "X", 1), eol(4)}},
+		{"$ ends the name", `A$B`, []token.Token{name("A$", 0), name("B", 2), eol(3)}},
+		{"trailing spaces excluded", `A  :`, []token.Token{name("A", 0), tok(token.Colon, ":", 3), eol(4)}},
+		{"lowercase is not a name", `a`, []token.Token{tok(token.Illegal, "a", 0), eol(1)}},
+	})
+}
+
+// @spec LEXER-021
+func TestKeywordEndsName(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"LET inside a name", `OUTLET`, []token.Token{name("OUT", 0), tok(token.Let, "LET", 3), eol(6)}},
+		{"REM inside a name", `PREMIUM`, []token.Token{name("P", 0), tok(token.Rem, "IUM", 1), eol(7)}},
+		{"PRINT inside a name", `APRINT`, []token.Token{name("A", 0), tok(token.Print, "PRINT", 1), eol(6)}},
+		{"keyword after a space", `A PRINT`, []token.Token{name("A", 0), tok(token.Print, "PRINT", 2), eol(7)}},
+		{"keyword first", `PRINTER`, []token.Token{tok(token.Print, "PRINT", 0), name("ER", 5), eol(7)}},
+		{"LET first", `LETTER`, []token.Token{tok(token.Let, "LET", 0), name("TER", 3), eol(6)}},
+	})
+}
+
+// @spec LEXER-022
+func TestLetAndEqual(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"LET statement", `LET A=1`, []token.Token{
+			tok(token.Let, "LET", 0), name("A", 4), tok(token.Equal, "=", 5), num("1", 6), eol(7),
+		}},
+		{"lowercase let", `let`, []token.Token{
+			tok(token.Illegal, "l", 0), tok(token.Illegal, "e", 1), tok(token.Illegal, "t", 2), eol(3),
+		}},
 	})
 }

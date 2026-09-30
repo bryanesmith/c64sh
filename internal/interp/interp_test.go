@@ -635,3 +635,87 @@ func TestNegativeBaseFractionalPowerIsIllegalQuantity(t *testing.T) {
 		t.Errorf("output %q, want %q (items before the failure)", got, "A")
 	}
 }
+
+func vr(name string) *ast.VarRef { return &ast.VarRef{Name: name, Text: name} }
+func let(name string, e ast.Expr) *ast.LetStmt {
+	return &ast.LetStmt{Var: vr(name), Value: e}
+}
+
+// @spec INTERP-032, INTERP-033
+func TestVariablesStoreAndPersist(t *testing.T) {
+	rec := &recorder{}
+	in := New(rec)
+	steps := []*ast.Line{
+		line(let("A", num(5)), printStmt(item(vr("A")))),
+		line(printStmt(item(bin(ast.Mul, vr("A"), num(2))))),
+		line(let("A", bin(ast.Add, vr("A"), num(1))), printStmt(item(vr("A")))),
+		line(let("N$", str("HI")), printStmt(item(vr("N$")), semi, item(str("!")))),
+		line(printStmt(item(vr("A")), semi, item(vr("N$")))),
+	}
+	for _, l := range steps {
+		if err := in.Exec(l); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, want := rec.String(), " 5 \n 10 \n 6 \nHI!\n 6 HI\n"; got != want {
+		t.Errorf("output %q, want %q", got, want)
+	}
+}
+
+// @spec INTERP-033
+func TestUnsetVariables(t *testing.T) {
+	runPrintCases(t, []printCase{
+		{"number variable", line(printStmt(item(vr("X")))), " 0 \n"},
+		{"string variable", line(printStmt(item(vr("X$")))), "\n"},
+		{"number and string are separate", line(let("A", num(1)), printStmt(item(vr("A$")), semi, item(str("|")))), "|\n"},
+	})
+}
+
+// @spec INTERP-034
+func TestAssignWrongTypeIsTypeMismatch(t *testing.T) {
+	for name, l := range map[string]*ast.LetStmt{
+		"string to number variable": let("A", str("HI")),
+		"number to string variable": let("A$", num(5)),
+	} {
+		rec := &recorder{}
+		in := New(rec)
+		in.Exec(line(let("A", num(1)), let("A$", str("OLD"))))
+		if err := in.Exec(line(l)); !isKind(err, basicerr.TypeMismatch) {
+			t.Errorf("%s: error = %v, want TYPE MISMATCH", name, err)
+		}
+		in.Exec(line(printStmt(item(vr("A")), semi, item(vr("A$")))))
+		if got := rec.String(); got != " 1 OLD\n" {
+			t.Errorf("%s: variables after the error printed %q, want unchanged %q", name, got, " 1 OLD\n")
+		}
+	}
+}
+
+// @spec INTERP-035
+func TestAssignLongStringIsStringTooLong(t *testing.T) {
+	rec := &recorder{}
+	in := New(rec)
+	if err := in.Exec(line(let("A$", str(strings.Repeat("x", 255))))); err != nil {
+		t.Fatalf("255 characters: unexpected error %v", err)
+	}
+	if err := in.Exec(line(let("A$", str(strings.Repeat("y", 256))))); !isKind(err, basicerr.StringTooLong) {
+		t.Errorf("256 characters: error = %v, want STRING TOO LONG", err)
+	}
+	in.Exec(line(printStmt(item(vr("A$")))))
+	if got := rec.String(); got != strings.Repeat("x", 255)+"\n" {
+		t.Errorf("variable changed after the error")
+	}
+}
+
+// @spec INTERP-036
+func TestFailedAssignmentLeavesVariable(t *testing.T) {
+	rec := &recorder{}
+	in := New(rec)
+	in.Exec(line(let("A", num(7))))
+	if err := in.Exec(line(let("A", bin(ast.Div, num(1), num(0))))); !isKind(err, basicerr.DivisionByZero) {
+		t.Errorf("error = %v, want DIVISION BY ZERO", err)
+	}
+	in.Exec(line(printStmt(item(vr("A")))))
+	if got := rec.String(); got != " 7 \n" {
+		t.Errorf("output %q, want %q", got, " 7 \n")
+	}
+}

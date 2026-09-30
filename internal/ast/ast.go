@@ -58,6 +58,18 @@ const (
 // NegExpr is -X, a leading minus sign (negation).
 type NegExpr struct{ X Expr }
 
+// VarRef is a variable, used as a value or assigned to.
+type VarRef struct {
+	Name string // identity: first two characters, plus "$" for a string
+	Text string // the name as written, without spaces
+}
+
+// LetStmt is an assignment: [LET] Var = Value.
+type LetStmt struct {
+	Var   *VarRef
+	Value Expr
+}
+
 // BinaryExpr is Left Op Right.
 type BinaryExpr struct {
 	Op          Op
@@ -66,6 +78,7 @@ type BinaryExpr struct {
 
 func (*PrintStmt) stmt() {}
 func (*RemStmt) stmt()   {}
+func (*LetStmt) stmt()   {}
 
 func (*ExprItem) printItem()  {}
 func (*Semicolon) printItem() {}
@@ -76,3 +89,5 @@ func (*StringLit) expr()  {}
 func (*NumberLit) expr()  {}
 func (*BinaryExpr) expr() {}
 func (*NegExpr) expr()    {}
+
+func (*VarRef) expr() {}

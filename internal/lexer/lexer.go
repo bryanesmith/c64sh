@@ -20,6 +20,7 @@ var keywords = []struct {
 }{
 	{"PRINT", token.Print},
 	{"REM", token.Rem},
+	{"LET", token.Let},
 }
 
 // symbols maps single-character tokens to their kinds.
@@ -35,6 +36,7 @@ var symbols = map[byte]token.Kind{
 	'(': token.LParen,
 	')': token.RParen,
 	'^': token.Caret,
+	'=': token.Equal,
 }
 
 // upArrow is the C64's exponentiation key, read as "^".
@@ -44,7 +46,8 @@ const upArrow = "\u2191"
 //
 // @spec LEXER-001, LEXER-002, LEXER-003, LEXER-004, LEXER-005, LEXER-006, LEXER-007
 // @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013, LEXER-014
-// @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018, LEXER-019
+// @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018, LEXER-019, LEXER-020, LEXER-021
+// @spec LEXER-022
 func Lex(line string) []token.Token {
 	var toks []token.Token
 	emit := func(k token.Kind, value string, pos int) {
@@ -81,6 +84,7 @@ func Lex(line string) []token.Token {
 		}
 		// print = "PRINT" | "?" .   ("?" is scanned with the symbols below)
 		// rem   = "REM" { character | `"` } .
+		// let   = "LET" .
 		if text, kind, ok := matchKeyword(line[i:]); ok {
 			if kind == token.Rem {
 				// A comment runs to the end of the line, untokenized.
@@ -90,6 +94,14 @@ func Lex(line string) []token.Token {
 			}
 			emit(kind, text, i)
 			i += len(text)
+			continue
+		}
+		// name   = letter { letter | digit } [ "$" ] .   /* spaces inside are ignored; a keyword ends it */
+		// letter = "A" … "Z" .
+		if isLetter(c) {
+			text, end := scanName(line, i)
+			emit(token.Name, text, i)
+			i = end
 			continue
 		}
 		if strings.HasPrefix(line[i:], upArrow) {
@@ -160,6 +172,54 @@ func scanNumber(line string, start int) (string, int) {
 				take(k)
 			}
 		}
+	}
+	return text.String(), end
+}
+
+func isLetter(c byte) bool {
+	return 'A' <= c && c <= 'Z'
+}
+
+// scanName reads the variable name starting at line[start], an uppercase
+// letter where no keyword begins. It returns the name with its spaces and
+// tabs removed, and the index just after its last character. As on a C64,
+// spaces and tabs inside the name are skipped, and a keyword ends the name,
+// since the C64 reads keywords before names.
+func scanName(line string, start int) (string, int) {
+	var text strings.Builder
+	end := start
+	next := func() int {
+		j := end
+		for j < len(line) && (line[j] == ' ' || line[j] == '\t') {
+			j++
+		}
+		return j
+	}
+	take := func(j int) {
+		text.WriteByte(line[j])
+		end = j + 1
+	}
+
+	take(start)
+	for {
+		j := next()
+		if j >= len(line) {
+			break
+		}
+		if isDigit(line[j]) {
+			take(j)
+			continue
+		}
+		if !isLetter(line[j]) {
+			break
+		}
+		if _, _, isKeyword := matchKeyword(line[j:]); isKeyword {
+			break
+		}
+		take(j)
+	}
+	if j := next(); j < len(line) && line[j] == '$' {
+		take(j)
 	}
 	return text.String(), end
 }

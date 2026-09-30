@@ -63,6 +63,18 @@ const (
 
 // NegExpr is -X, a leading minus sign (negation).
 type NegExpr struct{ X Expr }
+
+// VarRef is a variable, used as a value or assigned to.
+type VarRef struct {
+    Name string // identity: first two characters, plus "$" for a string ("SC", "N$")
+    Text string // the name as written, without spaces ("SCORE")
+}
+
+// LetStmt is an assignment: [LET] Var = Value.
+type LetStmt struct {
+    Var   *VarRef
+    Value Expr
+}
 ```
 
 Binary operators are left-associative within a precedence level: `"A"+"B"+"C"` is `BinaryExpr(Add, BinaryExpr(Add, "A", "B"), "C")`, and `8-2-1` is `(8-2)-1`. The parser does not check operand types: whether `+` joins strings, adds numbers, or is a type mismatch is decided by the interpreter from the values, as on a C64.
@@ -85,6 +97,17 @@ So `2+3*4` is 14, `(2+3)*4` is 20, `-2*3` is `(-2)*3`, `-2^2` is `-(2^2)` = -4, 
 
 An exponent may carry a sign: `2^-1` is .5. On a C64, a sign in an exponent is a negation with its usual precedence, just below `^`, so it takes in any `^` that follows it but nothing looser: `2^-1^2` is `2^(-(1^2))` = .5, and `2^-3*4` is `(2^-3)*4` = .5. The `Exponent` rule reproduces this: an unsigned exponent is a single operand, so `^` stays left to right, and a signed one is a `Unary`, which takes in the following `^` chain.
 
+### Variables
+
+A statement that begins with a name, or with `LET`, is an assignment: `A=5` and `LET A=5` are the same. A name anywhere a value is expected is a variable reference.
+
+A `VarRef`'s `Name` is the variable's identity, as on a C64: the first character, the second character if there is one, and `$` for a string variable. `SCORE`, `SC`, and `SCX` are all `SC`, and `NAME$` and `NA$` are both `NA$`, while `N$` is a different variable. Number and string variables never share an identity: `A` and `A$` are separate. `Text` keeps the name as written.
+
+These forms are valid C64 BASIC that c64sh does not support yet, so they are SYNTAX errors, following the tenet *Authentic errors over helpful ones*:
+
+- a name whose identity is `TI`, `TI$`, or `ST`, the C64's system variables (the clock and I/O status), whether used or assigned;
+- a name followed by `(`, which on a C64 is an array element (`A(1)`) or a function call (`CHR$(65)`).
+
 ### Items side by side
 
 An expression ends at the first token that cannot continue it, and PRINT then reads the next item. A token that can start an expression but not continue one begins a new item: `PRINT 2(3)` prints two numbers, ` 2  3 `. A `-` or `+` after an operand always continues the expression as a binary operator, as on a C64: `PRINT 1 -1` prints ` 0 `, and `PRINT "A"-1` is `TYPE MISMATCH`.
@@ -98,7 +121,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
@@ -107,9 +130,11 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Unary = "-" Unary \| "+" Unary \| Power .` | `parseUnary` | `ast.Expr` |
 | `Power = Operand { "^" Exponent } .` | `parsePower` | `ast.Expr` |
 | `Exponent = "-" Unary \| "+" Unary \| Operand .` | `parseExponent` | `ast.Expr` |
-| `Operand = string \| number \| "(" Expression ")" .` | `parseOperand` | `ast.Expr` |
+| `LetStatement = [ let ] Variable "=" Expression .` | `parseLetStatement` | `*ast.LetStmt` |
+| `Variable = name .` | `parseVariable` | `*ast.VarRef` |
+| `Operand = string \| number \| Variable \| "(" Expression ")" .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 
@@ -117,7 +142,7 @@ Lowercase names in these rules (`print`, `rem`, `string`, `number`) are token ru
 
 The parser reports one error kind, `SYNTAX` (see the shell design for the error type and how it is printed). It is returned when:
 
-- a statement begins with a token that cannot start a statement (for example `Illegal`, `String`, `;`), or
+- a statement begins with a token that cannot start a statement (for example `Illegal`, `String`, `;`), or an assignment lacks its variable, its `=`, or its value, or
 - inside a statement, the next token is not one the rule allows (for example `Illegal`, an operator with no operand after it, a `(` without its `)`, or a `)` without its `(`), or
 - after a statement, the next token is neither `:` nor `EOL`.
 
@@ -167,6 +192,8 @@ Examples:
 | Precedence parsing | One grammar rule, and function, per precedence level | Precedence climbing or a Pratt parser in a single function | Keeps one function per grammar rule, each carrying its rule as a comment, so the code still reads as the grammar. C64 BASIC has few levels, so the extra functions are few. |
 | Leading `+` | Dropped by the parser | A unary-plus node | The C64 ROM ignores a leading `+`, whatever follows, so there is no behavior for a node to carry. |
 | `^` associativity | Left to right: `2^3^2` is 64 | Right to left (512), as in mathematics and many languages | C64 BASIC V2 evaluates `^` left to right, like its other operators. |
+| Variable identity | Computed by the parser into `VarRef.Name` | Computed by the interpreter at each use | One place decides identity; the interpreter only stores and looks up. |
+| Unsupported names (`TI`, `ST`, arrays, functions) | SYNTAX error | Treat as ordinary variables | On a C64 these read the clock, the I/O status, an array element, or a function result; silently treating them as plain variables would print wrong answers. |
 | Parenthesized expressions | No node; `( … )` returns its inner expression | A `ParenExpr` node | Parentheses only group; the tree's shape already records the grouping. |
 | Type checking of `+` | In the interpreter, from the operand values | In the parser, from the operand kinds | BASIC V2 types are known at run time (variables will hold either kind), and a C64 reports `?TYPE MISMATCH  ERROR` when the statement runs, after earlier statements have run. |
 

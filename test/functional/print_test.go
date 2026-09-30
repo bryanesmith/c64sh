@@ -165,3 +165,37 @@ func TestExponentiation(t *testing.T) {
 		check(t, c.input, runMain(t, c.input+"\n"), c.want)
 	}
 }
+
+// TestVariables checks variables end to end, as listed in the HLD's Goals.
+func TestVariables(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  result
+	}{
+		{"assign and print", "A=5\nPRINT A\n", result{" 5 \n", "", 0}},
+		{"LET", "LET A=5:PRINT A\n", result{" 5 \n", "", 0}},
+		{"string", "N$=\"ALICE\":PRINT \"HELLO, \";N$\n", result{"HELLO, ALICE\n", "", 0}},
+		{"expression", "A=5:B=A*2+1:PRINT \"B IS\";B\n", result{"B IS 11 \n", "", 0}},
+		{"increment", "A=1\nA=A+1\nPRINT A\n", result{" 2 \n", "", 0}},
+		{"unset number", "PRINT X\n", result{" 0 \n", "", 0}},
+		{"unset string", "PRINT X$;\"|\"\n", result{"|\n", "", 0}},
+		{"two characters count", "SCORE=10:PRINT SC\n", result{" 10 \n", "", 0}},
+		{"spaces inside names", "A B=3:PRINT AB\n", result{" 3 \n", "", 0}},
+		{"number and string separate", "A=1:A$=\"X\":PRINT A;A$\n", result{" 1 X\n", "", 0}},
+		{"PRINTER prints ER", "ER=4:PRINTER\n", result{" 4 \n", "", 0}},
+		{"LETTER assigns TE", "LETTER=9:PRINT TE\n", result{" 9 \n", "", 0}},
+		{"keyword in a name", "PREMIUM=1\n", result{"", "?SYNTAX  ERROR\n", 1}},
+		{"wrong type", "A=\"HI\"\n", result{"", "?TYPE MISMATCH  ERROR\n", 1}},
+		{"wrong type for string", "A$=5\n", result{"", "?TYPE MISMATCH  ERROR\n", 1}},
+		{"number then variable", "A=2:PRINT 1A\n", result{" 1  2 \n", "", 0}},
+		{"TI not supported", "PRINT TI\n", result{"", "?SYNTAX  ERROR\n", 1}},
+		{"arrays not supported", "PRINT A(1)\n", result{"", "?SYNTAX  ERROR\n", 1}},
+		{"lowercase", "a=1\n", result{"", "?SYNTAX  ERROR\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.name, runMain(t, c.input), c.want)
+	}
+	check(t, "interactive persistence", runInteractive(t, "A=5\nPRINT A*2\n"),
+		result{" 10 \n", banner + "READY.\nREADY.\n\n", 0})
+}

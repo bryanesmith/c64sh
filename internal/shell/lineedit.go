@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/term"
@@ -89,19 +92,42 @@ type editorReader struct {
 	in   *cancelFilter
 	raw  rawModeFunc
 	size sizeFunc
+	hist *history
 }
 
 // newEditorReader returns a line editor reading keystrokes from in and
 // echoing to echo. raw switches the terminal to raw mode around each line;
 // size reports the terminal's size.
-func newEditorReader(in io.Reader, echo io.Writer, raw rawModeFunc, size sizeFunc) *editorReader {
+func newEditorReader(in io.Reader, echo io.Writer, raw rawModeFunc, size sizeFunc, historyFile string, warn io.Writer) *editorReader {
 	filter := &cancelFilter{r: in}
 	t := term.NewTerminal(struct {
 		io.Reader
 		io.Writer
 	}{filter, echo}, "")
-	t.History = &history{skip: func() bool { return filter.cancelled }}
-	return &editorReader{term: t, in: filter, raw: raw, size: size}
+	h := &history{
+		skip: func() bool { return filter.cancelled },
+		file: historyFile,
+		warn: warn,
+	}
+	h.load()
+	t.History = h
+	return &editorReader{term: t, in: filter, raw: raw, size: size, hist: h}
+}
+
+// defaultHistoryFile returns the history file Main uses: $C64SH_HISTORY if
+// set (empty turns the file off), otherwise ~/.c64sh_history, or none if
+// the home directory is unknown.
+//
+// @spec SHELL-HIST-001
+func defaultHistoryFile(lookupEnv func(string) (string, bool), homeDir func() (string, error)) string {
+	if path, ok := lookupEnv("C64SH_HISTORY"); ok {
+		return path
+	}
+	home, err := homeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".c64sh_history")
 }
 
 // ReadLine returns the next line entered, skipping lines discarded with
@@ -188,12 +214,16 @@ func (f *cancelFilter) Read(p []byte) (int, error) {
 
 // history is the line editor's history of lines entered in the session. It
 // keeps the most recent historySize lines and ignores blank lines and lines
-// being discarded with Ctrl-C.
+// being discarded with Ctrl-C. With a history file, it starts from the
+// file's lines and saves itself to the file after each line is added.
 //
 // @spec SHELL-EDIT-004
 type history struct {
 	entries []string // oldest first
 	skip    func() bool
+	file    string    // history file; empty: none
+	warn    io.Writer // where a history-file problem is reported
+	warned  bool      // whether it has been reported this session
 }
 
 func (h *history) Add(entry string) {
@@ -204,6 +234,73 @@ func (h *history) Add(entry string) {
 	if len(h.entries) > historySize {
 		h.entries = h.entries[len(h.entries)-historySize:]
 	}
+	h.save()
+}
+
+// load starts the history with the most recent non-blank lines of the
+// history file. A missing file is an empty history.
+//
+// @spec SHELL-HIST-002, SHELL-HIST-004
+func (h *history) load() {
+	if h.file == "" {
+		return
+	}
+	data, err := os.ReadFile(h.file)
+	if errors.Is(err, fs.ErrNotExist) {
+		return
+	}
+	if err != nil {
+		h.report(err)
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		if !isBlank(line) {
+			h.entries = append(h.entries, line)
+		}
+	}
+	if len(h.entries) > historySize {
+		h.entries = h.entries[len(h.entries)-historySize:]
+	}
+}
+
+// save writes the history to a temporary file beside the history file and
+// renames it into place, so the file is never left half-written.
+//
+// @spec SHELL-HIST-003, SHELL-HIST-004
+func (h *history) save() {
+	if h.file == "" {
+		return
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(h.file), ".c64sh_history-*")
+	if err != nil {
+		h.report(err)
+		return
+	}
+	_, err = io.WriteString(tmp, strings.Join(h.entries, "\n")+"\n")
+	if closeErr := tmp.Close(); err == nil {
+		err = closeErr
+	}
+	if err == nil {
+		err = os.Chmod(tmp.Name(), 0o600)
+	}
+	if err == nil {
+		err = os.Rename(tmp.Name(), h.file)
+	}
+	if err != nil {
+		os.Remove(tmp.Name())
+		h.report(err)
+	}
+}
+
+// report writes a history-file problem to the warning writer, once per
+// session.
+func (h *history) report(err error) {
+	if h.warned || h.warn == nil {
+		return
+	}
+	h.warned = true
+	fmt.Fprintf(h.warn, "c64sh: history: %v\n", err)
 }
 
 // Len returns the number of entries.

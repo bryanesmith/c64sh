@@ -668,14 +668,17 @@ func TestUnsetVariables(t *testing.T) {
 		{"number variable", line(printStmt(item(vr("X")))), " 0 \n"},
 		{"string variable", line(printStmt(item(vr("X$")))), "\n"},
 		{"number and string are separate", line(let("A", num(1)), printStmt(item(vr("A$")), semi, item(str("|")))), "|\n"},
+		{"integer variable", line(printStmt(item(vr("X%")))), " 0 \n"},
+		{"number and integer are separate", line(let("A", num(1)), printStmt(item(vr("A%")))), " 0 \n"},
 	})
 }
 
 // @spec INTERP-034
 func TestAssignWrongTypeIsTypeMismatch(t *testing.T) {
 	for name, l := range map[string]*ast.LetStmt{
-		"string to number variable": let("A", str("HI")),
-		"number to string variable": let("A$", num(5)),
+		"string to number variable":  let("A", str("HI")),
+		"number to string variable":  let("A$", num(5)),
+		"string to integer variable": let("A%", str("HI")),
 	} {
 		rec := &recorder{}
 		in := New(rec)
@@ -717,5 +720,52 @@ func TestFailedAssignmentLeavesVariable(t *testing.T) {
 	in.Exec(line(printStmt(item(vr("A")))))
 	if got := rec.String(); got != " 7 \n" {
 		t.Errorf("output %q, want %q", got, " 7 \n")
+	}
+}
+
+// @spec INTERP-037
+func TestIntegerVariablesRoundDown(t *testing.T) {
+	cases := []struct {
+		value float64
+		want  string
+	}{
+		{3.7, " 3 \n"},
+		{-3.7, "-4 \n"},
+		{5, " 5 \n"},
+		{-5, "-5 \n"},
+		{0.5, " 0 \n"},
+		{-0.5, "-1 \n"},
+		{32767.9, " 32767 \n"},
+		{-32767.5, "-32768 \n"},
+		{-32768, "-32768 \n"},
+	}
+	for _, c := range cases {
+		rec, err := exec(line(let("C%", num(c.value)), printStmt(item(vr("C%")))))
+		if err != nil {
+			t.Errorf("C%%=%v: unexpected error %v", c.value, err)
+			continue
+		}
+		if got := rec.String(); got != c.want {
+			t.Errorf("C%%=%v: printed %q, want %q", c.value, got, c.want)
+		}
+	}
+	runPrintCases(t, []printCase{
+		{"used in arithmetic", line(let("C%", num(7)), printStmt(item(bin(ast.Div, vr("C%"), num(2))))), " 3.5 \n"},
+	})
+}
+
+// @spec INTERP-038
+func TestIntegerVariableRange(t *testing.T) {
+	for _, v := range []float64{32768, 40000, -32768.5, -32769, 1e10} {
+		rec := &recorder{}
+		in := New(rec)
+		in.Exec(line(let("C%", num(1))))
+		if err := in.Exec(line(let("C%", num(v)))); !isKind(err, basicerr.IllegalQuantity) {
+			t.Errorf("C%%=%v: error = %v, want ILLEGAL QUANTITY", v, err)
+		}
+		in.Exec(line(printStmt(item(vr("C%")))))
+		if got := rec.String(); got != " 1 \n" {
+			t.Errorf("C%%=%v: variable changed to %q after the error", v, got)
+		}
 	}
 }

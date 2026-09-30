@@ -140,17 +140,18 @@ func (p *parser) parseVariable() (*ast.VarRef, error) {
 
 // variableIdentity returns the part of a variable name that identifies the
 // variable on a C64: its first character, its second character if it has
-// one, and "$" for a string variable ("SCORE" is "SC", "NAME$" is "NA$").
+// one, and "$" or "%" for a string or integer variable ("SCORE" is "SC",
+// "NAME$" is "NA$", "COUNT%" is "CO%").
 func variableIdentity(text string) string {
-	isString := strings.HasSuffix(text, "$")
-	letters := strings.TrimSuffix(text, "$")
+	suffix := ""
+	if strings.HasSuffix(text, "$") || strings.HasSuffix(text, "%") {
+		suffix = text[len(text)-1:]
+	}
+	letters := strings.TrimSuffix(text, suffix)
 	if len(letters) > 2 {
 		letters = letters[:2]
 	}
-	if isString {
-		return letters + "$"
-	}
-	return letters
+	return letters + suffix
 }
 
 // RemStatement = rem .

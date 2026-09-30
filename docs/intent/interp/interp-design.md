@@ -111,7 +111,8 @@ Executing a `RemStmt` does nothing: it writes no output and returns no error, so
 
 Variables are kept in a map from a `VarRef`'s `Name` (its identity, such as `SC` or `N$`) to a value.
 
-- **Assignment** (`LetStmt`) evaluates the value, checks its type against the variable's, and stores it. A string variable (a name ending in `$`) takes only strings and a number variable only numbers; the wrong kind is `TYPE MISMATCH`. A string longer than 255 characters is `STRING TOO LONG`, the limit on any string a C64 stores. On any error the variable keeps its old value.
+- **Assignment** (`LetStmt`) evaluates the value, checks its type against the variable's, and stores it. A string variable (a name ending in `$`) takes only strings, and number and integer variables only numbers; the wrong kind is `TYPE MISMATCH`.
+- **An integer variable** (a name ending in `%`) stores the value rounded down to a whole number, as the C64 ROM's conversion does (`$BC9B`): `C%=3.7` stores 3 and `C%=-3.7` stores -4. A value whose size is 32768 or more, other than exactly -32768, is `ILLEGAL QUANTITY` (`$B1BF`); the range is checked before rounding, so -32768.5 is out of range while -32767.5 stores -32768. Integer variables are otherwise ordinary numbers in expressions. A string longer than 255 characters is `STRING TOO LONG`, the limit on any string a C64 stores. On any error the variable keeps its old value.
 - **A reference** (`VarRef`) evaluates to the stored value, or, for a variable never assigned, to 0 or the empty string, as on a C64.
 
 ## Values
@@ -179,7 +180,7 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `TYPE MISMATCH` | Assigning a string to a number variable or a number to a string variable; `+` with a string on one side and a number on the other; `-`, `*`, `/`, `^`, or negation with any string operand. |
 | `OVERFLOW` | A number literal or arithmetic result larger in size than `maxNumber`. |
 | `DIVISION BY ZERO` | `/` with a right operand of 0. |
-| `ILLEGAL QUANTITY` | `^` with a negative left operand and a right operand that is not a whole number. |
+| `ILLEGAL QUANTITY` | `^` with a negative left operand and a right operand that is not a whole number; a value whose size is 32768 or more (other than -32768) assigned to an integer variable. |
 | `SYNTAX` | A `BadItem` reached while executing `PRINT`; the error is the one the parser stored in it. |
 
 If writing to the output fails (for example, stdout is a closed pipe), `Exec` returns that write error unchanged. It is not a BASIC error.
@@ -189,6 +190,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
 | Number type | `float64` with C64 range checks and C64 output format | Emulating the C64's 5-byte float | See HLD *Number representation*. The range constants make overflow and underflow match the C64's limits, and formatting reproduces its output. |
+| Integer variable conversion | Round down (toward minus infinity) | Truncate toward zero; round to nearest | The C64 ROM converts by shifting the two's-complement mantissa, which rounds down, so `-3.7` becomes -4. |
 | Rounding for output | Round to 9 significant digits in decimal, then choose notation | Scale by 10 in binary as the ROM does | Decimal rounding gives the same 9 digits for all but rare boundary cases, and is simple and exact with `strconv`. |
 | Dispatch | Type switch with panicking `default` | Visitor pattern | See HLD *Key Design Decisions*. One pass over the tree; no `Accept`/`Visit` boilerplate. |
 | Comma | Spaces to the next 10-column print zone, a full zone when already at a zone start | Tab character; cursor-right control codes | Print zones are C64 language behavior, and programs lay out columns with them. The count `10 - (column % 10)`, never 0, is what the C64 ROM's PRINT computes (`$AAE8`). Spaces are the terminal equivalent of the C64's on-screen cursor-right moves, and the characters the C64 itself sends to files and printers. |

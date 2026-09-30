@@ -4,6 +4,7 @@ package interp
 import (
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"unicode/utf8"
 
@@ -66,10 +67,12 @@ func (in *Interp) FreshLine() error {
 }
 
 // execLet assigns a value to a variable. A string variable (a name ending
-// in "$") takes only strings, up to 255 characters, and a number variable
-// only numbers. On any error the variable keeps its old value.
+// in "$") takes only strings, up to 255 characters; number and integer
+// variables take only numbers, and an integer variable (a name ending in
+// "%") stores the number rounded down, within -32768..32767. On any error
+// the variable keeps its old value.
 //
-// @spec INTERP-032, INTERP-034, INTERP-035, INTERP-036
+// @spec INTERP-032, INTERP-034, INTERP-035, INTERP-036, INTERP-037, INTERP-038
 func (in *Interp) execLet(s *ast.LetStmt) error {
 	v, err := in.eval(s.Value)
 	if err != nil {
@@ -81,6 +84,13 @@ func (in *Interp) execLet(s *ast.LetStmt) error {
 	}
 	if isString && utf8.RuneCountInString(v.str) > maxStringLen {
 		return &basicerr.Error{Kind: basicerr.StringTooLong}
+	}
+	if strings.HasSuffix(s.Var.Name, "%") {
+		// As the C64 ROM does: range check ($B1BF), then round down ($BC9B).
+		if !(math.Abs(v.num) < 32768 || v.num == -32768) {
+			return &basicerr.Error{Kind: basicerr.IllegalQuantity}
+		}
+		v = numberValue(math.Floor(v.num))
 	}
 	in.vars[s.Var.Name] = v
 	return nil

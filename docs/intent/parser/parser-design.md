@@ -66,7 +66,7 @@ type NegExpr struct{ X Expr }
 
 // VarRef is a variable, used as a value or assigned to.
 type VarRef struct {
-    Name string // identity: first two characters, plus "$" for a string ("SC", "N$")
+    Name string // identity: first two characters, plus "$" or "%" for a string or integer ("SC", "N$", "C%")
     Text string // the name as written, without spaces ("SCORE")
 }
 
@@ -101,11 +101,11 @@ An exponent may carry a sign: `2^-1` is .5. On a C64, a sign in an exponent is a
 
 A statement that begins with a name, or with `LET`, is an assignment: `A=5` and `LET A=5` are the same. A name anywhere a value is expected is a variable reference.
 
-A `VarRef`'s `Name` is the variable's identity, as on a C64: the first character, the second character if there is one, and `$` for a string variable. `SCORE`, `SC`, and `SCX` are all `SC`, and `NAME$` and `NA$` are both `NA$`, while `N$` is a different variable. Number and string variables never share an identity: `A` and `A$` are separate. `Text` keeps the name as written.
+A `VarRef`'s `Name` is the variable's identity, as on a C64: the first character, the second character if there is one, and `$` for a string variable or `%` for an integer variable. `SCORE`, `SC`, and `SCX` are all `SC`, and `NAME$` and `NA$` are both `NA$`, while `N$` is a different variable. Number, integer, and string variables never share an identity: `A`, `A%`, and `A$` are three separate variables. `Text` keeps the name as written.
 
 These forms are valid C64 BASIC that c64sh does not support yet, so they are SYNTAX errors, following the tenet *Authentic errors over helpful ones*:
 
-- a name whose identity is `TI`, `TI$`, or `ST`, the C64's system variables (the clock and I/O status), whether used or assigned;
+- a name whose identity is `TI`, `TI$`, or `ST`, the C64's system variables (the clock and I/O status), whether used or assigned (`TI%` and `ST%` are ordinary integer variables, as on a C64, whose check for system variables includes the type);
 - a name followed by `(`, which on a C64 is an array element (`A(1)`) or a function call (`CHR$(65)`).
 
 ### Items side by side

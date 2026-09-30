@@ -199,3 +199,29 @@ func TestVariables(t *testing.T) {
 	check(t, "interactive persistence", runInteractive(t, "A=5\nPRINT A*2\n"),
 		result{" 10 \n", banner + "READY.\nREADY.\n\n", 0})
 }
+
+// TestIntegerVariables checks integer variables end to end, as listed in
+// the HLD's Goals.
+func TestIntegerVariables(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  result
+	}{
+		{"assign and print", "C%=5:PRINT C%\n", result{" 5 \n", "", 0}},
+		{"rounds down", "C%=3.7:PRINT C%\n", result{" 3 \n", "", 0}},
+		{"rounds down when negative", "C%=-3.7:PRINT C%\n", result{"-4 \n", "", 0}},
+		{"three separate variables", "A=1.5:A%=2:A$=\"X\":PRINT A;A%;A$\n", result{" 1.5  2 X\n", "", 0}},
+		{"two characters count", "COUNT%=7:PRINT CO%\n", result{" 7 \n", "", 0}},
+		{"counting", "C%=0\nC%=C%+1\nC%=C%+1\nPRINT C%\n", result{" 2 \n", "", 0}},
+		{"largest", "C%=32767:PRINT C%\n", result{" 32767 \n", "", 0}},
+		{"smallest", "C%=-32768:PRINT C%\n", result{"-32768 \n", "", 0}},
+		{"too large", "C%=32768\n", result{"", "?ILLEGAL QUANTITY  ERROR\n", 1}},
+		{"too small", "C%=-32769\n", result{"", "?ILLEGAL QUANTITY  ERROR\n", 1}},
+		{"string", "C%=\"X\"\n", result{"", "?TYPE MISMATCH  ERROR\n", 1}},
+		{"TI% is ordinary", "TI%=3:PRINT TI%\n", result{" 3 \n", "", 0}},
+	}
+	for _, c := range cases {
+		check(t, c.name, runMain(t, c.input), c.want)
+	}
+}

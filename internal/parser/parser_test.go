@@ -376,6 +376,8 @@ func TestVariableIdentity(t *testing.T) {
 		{"one-letter string name", toks(pr, name("N$")), `PRINT[$N$[N$]]`, false},
 		{"digit second", toks(pr, name("A1B")), `PRINT[$A1[A1B]]`, false},
 		{"one letter", toks(pr, name("X")), `PRINT[$X[X]]`, false},
+		{"integer name", toks(pr, name("COUNT%")), `PRINT[$CO%[COUNT%]]`, false},
+		{"one-letter integer name", toks(pr, name("C%")), `PRINT[$C%[C%]]`, false},
 	})
 }
 
@@ -402,6 +404,7 @@ func TestUnsupportedNames(t *testing.T) {
 		{"function call", toks(pr, name("CHR$"), lp, number("65"), rp), `PRINT[BAD(SYNTAX)]`, true},
 		{"array assigned", toks(name("A"), lp, number("1"), rp, eq, number("2")), ``, true},
 		{"T and I separately are fine", toks(pr, name("T"), semi, name("IT")), `PRINT[$T[T] ; $IT[IT]]`, false},
+		{"TI% is ordinary", toks(pr, name("TI%"), semi, name("ST%")), `PRINT[$TI%[TI%] ; $ST%[ST%]]`, false},
 	})
 }
 

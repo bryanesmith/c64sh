@@ -18,6 +18,11 @@ const (
 	Semicolon             // ;
 	Comma                 // ,
 	Plus                  // +
+	Minus                 // -
+	Star                  // *
+	Slash                 // /
+	LParen                // (
+	RParen                // )
 )
 
 var kindNames = [...]string{
@@ -31,6 +36,11 @@ var kindNames = [...]string{
 	Semicolon: "Semicolon",
 	Comma:     "Comma",
 	Plus:      "Plus",
+	Minus:     "Minus",
+	Star:      "Star",
+	Slash:     "Slash",
+	LParen:    "LParen",
+	RParen:    "RParen",
 }
 
 func (k Kind) String() string {

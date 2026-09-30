@@ -123,6 +123,7 @@ const (
     StringTooLong             // STRING TOO LONG
     TypeMismatch              // TYPE MISMATCH
     Overflow                  // OVERFLOW
+    DivisionByZero            // DIVISION BY ZERO
 )
 
 type Error struct{ Kind Kind }

@@ -148,9 +148,19 @@ func TestWhitespaceInsideKeywordBreaksIt(t *testing.T) {
 // @spec LEXER-011
 func TestPunctuation(t *testing.T) {
 	runLexCases(t, []lexCase{
-		{"all punctuation", `:;,+`, []token.Token{
+		{"all punctuation", `:;,+-*/()`, []token.Token{
 			tok(token.Colon, ":", 0), tok(token.Semicolon, ";", 1), tok(token.Comma, ",", 2),
-			tok(token.Plus, "+", 3), eol(4),
+			tok(token.Plus, "+", 3), tok(token.Minus, "-", 4), tok(token.Star, "*", 5),
+			tok(token.Slash, "/", 6), tok(token.LParen, "(", 7), tok(token.RParen, ")", 8), eol(9),
+		}},
+		{"minus between numbers", `1-2`, []token.Token{
+			tok(token.Number, "1", 0), tok(token.Minus, "-", 1), tok(token.Number, "2", 2), eol(3),
+		}},
+		{"minus in an exponent", `1E-2`, []token.Token{tok(token.Number, "1E-2", 0), eol(4)}},
+		{"expression", `(2+3)*4/-5`, []token.Token{
+			tok(token.LParen, "(", 0), tok(token.Number, "2", 1), tok(token.Plus, "+", 2), tok(token.Number, "3", 3),
+			tok(token.RParen, ")", 4), tok(token.Star, "*", 5), tok(token.Number, "4", 6), tok(token.Slash, "/", 7),
+			tok(token.Minus, "-", 8), tok(token.Number, "5", 9), eol(10),
 		}},
 	})
 }

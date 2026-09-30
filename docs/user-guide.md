@@ -11,6 +11,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Scripts](#scripts)
 - [PRINT](#print)
 - [Numbers](#numbers)
+- [Arithmetic](#arithmetic)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -159,10 +160,40 @@ A few more rules come straight from the C64:
 
 - **Spaces inside a number are ignored**: `PRINT 1 000 000` prints ` 1000000 `, and `PRINT 1 2` prints ` 12 `.
 - **A second decimal point starts a new number**: `PRINT 1.2.3` prints ` 1.2  .3 `.
-- **`+` adds numbers**: `PRINT 1.5+2.25` prints ` 3.75 `. It cannot join a number and a string: `PRINT "AGE: "+42` is a `?TYPE MISMATCH  ERROR`.
+- **`+` adds numbers** as well as joining strings, but it cannot join a number and a string: `PRINT "AGE: "+42` is a `?TYPE MISMATCH  ERROR`. See [Arithmetic](#arithmetic).
 - **Numbers range up to 1.70141183E+38.** A larger number is an `?OVERFLOW  ERROR`; a number too small for a C64 (below about 2.9E-39) becomes 0.
 
 See [`examples/006-numbers.bas`](../examples/006-numbers.bas) for every form in one script.
+
+## Arithmetic
+
+| Operator | Meaning | Example | Prints |
+|---|---|---|---|
+| `+` | add (or join strings) | `PRINT 2+3` | ` 5 ` |
+| `-` | subtract | `PRINT 10-4` | ` 6 ` |
+| `*` | multiply | `PRINT 5*9` | ` 45 ` |
+| `/` | divide | `PRINT 7/2` | ` 3.5 ` |
+| `-` in front | negate | `PRINT -5` | `-5 ` |
+| `( )` | group | `PRINT (2+3)*4` | ` 20 ` |
+
+**Order of operations**, as on a C64:
+
+1. Parentheses
+2. A minus sign in front of a number (negation)
+3. `*` and `/`, from left to right
+4. `+` and `-`, from left to right
+
+So `PRINT 2+3*4` prints ` 14 `, `PRINT 10-4-3` prints ` 3 `, and `PRINT -2*3` prints `-6 `.
+
+A few details:
+
+- **Signs can repeat**: `PRINT --5` prints ` 5 `, and `PRINT 5--5` prints ` 10 `. A `+` in front changes nothing.
+- **Division keeps 9 significant digits**: `PRINT 1/3` prints ` .333333333 `.
+- **Only `+` works on strings.** `-`, `*`, `/`, or a minus sign in front of a string is a `?TYPE MISMATCH  ERROR`.
+- **Dividing by zero** is a `?DIVISION BY ZERO  ERROR`.
+- **A `(` right after a number starts a new item**: `PRINT 2(3)` prints ` 2  3 `. But `-` and `+` always continue the calculation: `PRINT 1 -1` prints ` 0 `.
+
+See [`examples/007-arithmetic.bas`](../examples/007-arithmetic.bas) for every form in one script.
 
 ## Comments
 
@@ -195,8 +226,9 @@ Errors are reported the way a C64 reports them, on stderr:
 |---|---|
 | `?SYNTAX  ERROR` | c64sh cannot understand the line: a misspelled or lowercase keyword, a stray character, or a part of BASIC that c64sh does not support yet. |
 | `?STRING TOO LONG  ERROR` | Joining strings with `+` produced more than 255 characters. |
-| `?TYPE MISMATCH  ERROR` | `+` was given a string and a number. |
-| `?OVERFLOW  ERROR` | A number, or the result of `+`, is larger than 1.70141183E+38. |
+| `?TYPE MISMATCH  ERROR` | `+` was given a string and a number, or `-`, `*`, `/`, or a minus sign in front was given a string. |
+| `?OVERFLOW  ERROR` | A number, or the result of a calculation, is larger than 1.70141183E+38. |
+| `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
 
 An error stops the rest of its line. Anything printed before the error stays printed, as on a C64:
 
@@ -230,7 +262,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
-- Arithmetic other than `+` (`PRINT 2*3`), negative numbers (`PRINT -5`), and parentheses
+- Exponents (`PRINT 2^3`)
 - Variables (`A$="HI"`)
 - Functions such as `CHR$(34)`
 - Program mode: lines with line numbers (`10 PRINT "HELLO"`), `RUN`, `LIST`, `GOTO`

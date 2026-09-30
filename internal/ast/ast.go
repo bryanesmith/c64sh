@@ -49,7 +49,13 @@ type Op int
 
 const (
 	Add Op = iota // +: adds numbers, joins strings
+	Sub           // -
+	Mul           // *
+	Div           // /
 )
+
+// NegExpr is -X, a leading minus sign (negation).
+type NegExpr struct{ X Expr }
 
 // BinaryExpr is Left Op Right.
 type BinaryExpr struct {
@@ -68,3 +74,4 @@ func (*BadItem) printItem()   {}
 func (*StringLit) expr()  {}
 func (*NumberLit) expr()  {}
 func (*BinaryExpr) expr() {}
+func (*NegExpr) expr()    {}

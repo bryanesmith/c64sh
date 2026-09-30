@@ -55,10 +55,33 @@ type Op int
 
 const (
     Add Op = iota // +: adds numbers, joins strings
+    Sub           // -
+    Mul           // *
+    Div           // /
 )
+
+// NegExpr is -X, a leading minus sign (negation).
+type NegExpr struct{ X Expr }
 ```
 
-`+` is left-associative: `"A"+"B"+"C"` is `BinaryExpr(Add, BinaryExpr(Add, "A", "B"), "C")`. The parser does not check operand types: whether `+` joins strings, adds numbers, or is a type mismatch is decided by the interpreter from the values, as on a C64.
+Binary operators are left-associative within a precedence level: `"A"+"B"+"C"` is `BinaryExpr(Add, BinaryExpr(Add, "A", "B"), "C")`, and `8-2-1` is `(8-2)-1`. The parser does not check operand types: whether `+` joins strings, adds numbers, or is a type mismatch is decided by the interpreter from the values, as on a C64.
+
+### Precedence
+
+Each precedence level is its own grammar rule, so a lower rule's operands are built by the rule below it. From loosest to tightest:
+
+| Level | Rule | Operators |
+|---|---|---|
+| 1 | `Expression` | `+` `-` (binary), left to right |
+| 2 | `Term` | `*` `/`, left to right |
+| 3 | `Unary` | a leading `-` (negation) or `+` |
+| 4 | `Operand` | literals and `( … )` |
+
+So `2+3*4` is 14, `(2+3)*4` is 20, and `-2*3` is `(-2)*3`. A leading `+` is dropped (the C64 ROM skips it: `+5` is 5 and `+"A"` is `"A"`); a leading `-` becomes a `NegExpr`. Leading signs can repeat: `--5` is 5, and `5--5` is 10.
+
+### Items side by side
+
+An expression ends at the first token that cannot continue it, and PRINT then reads the next item. A token that can start an expression but not continue one begins a new item: `PRINT 2(3)` prints two numbers, ` 2  3 `. A `-` or `+` after an operand always continues the expression as a binary operator, as on a C64: `PRINT 1 -1` prints ` 0 `, and `PRINT "A"-1` is `TYPE MISMATCH`.
 
 A `NumberLit`'s value is the token text converted with `strconv.ParseFloat`, after normalizing the forms the C64 accepts and `ParseFloat` does not: a leading `.` gets a `0` before it (`.` is 0, `.5` is 0.5), and an `E` with no exponent digits gets a `0` exponent (`1E` and `1E+` are 1). A literal too large for `float64` becomes infinity; the interpreter reports it as `OVERFLOW` when evaluated, so statements before it still run.
 
@@ -73,8 +96,10 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
-| `Expression = Operand { "+" Operand } .` | `parseExpression` | `ast.Expr` |
-| `Operand = string \| number .` | `parseOperand` | `ast.Expr` |
+| `Expression = Term { ( "+" \| "-" ) Term } .` | `parseExpression` | `ast.Expr` |
+| `Term = Unary { ( "*" \| "/" ) Unary } .` | `parseTerm` | `ast.Expr` |
+| `Unary = "-" Unary \| "+" Unary \| Operand .` | `parseUnary` | `ast.Expr` |
+| `Operand = string \| number \| "(" Expression ")" .` | `parseOperand` | `ast.Expr` |
 
 Lowercase names in these rules (`print`, `rem`, `string`, `number`) are token rules, defined and documented in the lexer.
 
@@ -85,7 +110,7 @@ Lowercase names in these rules (`print`, `rem`, `string`, `number`) are token ru
 The parser reports one error kind, `SYNTAX` (see the shell design for the error type and how it is printed). It is returned when:
 
 - a statement begins with a token that cannot start a statement (for example `Illegal`, `String`, `;`), or
-- inside a statement, the next token is not one the rule allows (for example `Illegal`, or `+` not followed by a string), or
+- inside a statement, the next token is not one the rule allows (for example `Illegal`, an operator with no operand after it, a `(` without its `)`, or a `)` without its `(`), or
 - after a statement, the next token is neither `:` nor `EOL`.
 
 Parsing stops at the first error. There is no error recovery: a C64 abandons the rest of a line at the first error, so nothing after it would ever run.
@@ -131,12 +156,16 @@ Examples:
 | Empty statements | Dropped during parsing | `EmptyStmt` node | They have no effect, and dropping them keeps the interpreter free of a no-op case. |
 | Comments | `RemStmt` node holding the comment text | Drop comments during parsing, like empty statements | Program mode will store and `LIST` lines with their comments, so the text has to survive into the AST even though executing it does nothing. |
 | `+` representation | `BinaryExpr` with an `Op`, left-associative | A separate node per operator; a flat list of operands | One node type covers every binary operator, so `-`, `*`, `/`, and `^` add `Op` values rather than node types. |
+| Precedence parsing | One grammar rule, and function, per precedence level | Precedence climbing or a Pratt parser in a single function | Keeps one function per grammar rule, each carrying its rule as a comment, so the code still reads as the grammar. C64 BASIC has few levels, so the extra functions are few. |
+| Leading `+` | Dropped by the parser | A unary-plus node | The C64 ROM ignores a leading `+`, whatever follows, so there is no behavior for a node to carry. |
+| Parenthesized expressions | No node; `( … )` returns its inner expression | A `ParenExpr` node | Parentheses only group; the tree's shape already records the grouping. |
 | Type checking of `+` | In the interpreter, from the operand values | In the parser, from the operand kinds | BASIC V2 types are known at run time (variables will hold either kind), and a C64 reports `?TYPE MISMATCH  ERROR` when the statement runs, after earlier statements have run. |
 
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. When arithmetic is added, `Expression` grows `-`, `*`, `/`, and `^` with C64 precedence, unary `-` and `+`, and parentheses, parsed by precedence climbing within `parseExpression`.
+1. Exponentiation (`^`, also typed `↑`) adds a level between `Unary` and `Operand`, binding tighter than negation, so `-2^2` is `-4`, and evaluated left to right.
+2. Parentheses nest without a limit; very deep nesting uses Go's stack, which grows as needed. A real C64 reports `?OUT OF MEMORY  ERROR` when nesting exhausts its stack; that limit is decided if it ever matters.
 
 ## References
 

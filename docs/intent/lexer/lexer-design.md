@@ -33,6 +33,11 @@ const (
     Semicolon             // ;
     Comma                 // ,
     Plus                  // +
+    Minus                 // -
+    Star                  // *
+    Slash                 // /
+    LParen                // (
+    RParen                // )
 )
 
 type Token struct {
@@ -56,7 +61,7 @@ At each position the lexer applies the first matching rule:
 | `REM` (see *Keywords*) | `Rem` token whose value is every byte after `REM` to the end of the line, exactly as written (including a leading space, quotes, colons, and keywords). Scanning stops; the next token is `EOL`. |
 | Other keyword text (see *Keywords*) | Keyword token (`Print`). |
 | `?` | `Print` token (the C64 abbreviation for `PRINT`). |
-| `:` `;` `,` `+` | `Colon`, `Semicolon`, `Comma`, `Plus`. |
+| `:` `;` `,` `+` `-` `*` `/` `(` `)` | `Colon`, `Semicolon`, `Comma`, `Plus`, `Minus`, `Star`, `Slash`, `LParen`, `RParen`. |
 | A digit, or `.` | `Number` token (see *Numbers*). |
 | Any other character | `Illegal` token holding that one character (a full UTF-8 character, not a single byte). |
 | A byte that is not valid UTF-8 | `Illegal` token holding that one byte. |
@@ -100,7 +105,7 @@ digit     = "0" … "9" .
 character = /* any character except `"` and a line feed */ .
 ```
 
-A line never contains a line feed, because the shell splits input into lines at line feeds, so `character` is every character the lexer can see except the double quote; a carriage return inside a line is an ordinary character. The punctuation tokens `:`, `;`, `,`, and `+` are written as literal tokens in the parser's rules.
+A line never contains a line feed, because the shell splits input into lines at line feeds, so `character` is every character the lexer can see except the double quote; a carriage return inside a line is an ordinary character. The punctuation tokens `:`, `;`, `,`, `+`, `-`, `*`, `/`, `(`, and `)` are written as literal tokens in the parser's rules. A `-` is never part of a number token except as the sign of an exponent (`1E-3`); in `1-2` it is a `Minus` between two numbers.
 
 Uppercase rule names belong to the parser; lowercase ones are these token rules. Together, the parser's rule comments and these comments are the complete grammar of the language.
 

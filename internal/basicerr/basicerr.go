@@ -6,20 +6,22 @@ package basicerr
 type Kind int
 
 const (
-	Syntax         Kind = iota // SYNTAX
-	StringTooLong              // STRING TOO LONG
-	TypeMismatch               // TYPE MISMATCH
-	Overflow                   // OVERFLOW
-	DivisionByZero             // DIVISION BY ZERO
+	Syntax          Kind = iota // SYNTAX
+	StringTooLong               // STRING TOO LONG
+	TypeMismatch                // TYPE MISMATCH
+	Overflow                    // OVERFLOW
+	DivisionByZero              // DIVISION BY ZERO
+	IllegalQuantity             // ILLEGAL QUANTITY
 )
 
 // names holds each kind's name as the C64 prints it.
 var names = [...]string{
-	Syntax:         "SYNTAX",
-	StringTooLong:  "STRING TOO LONG",
-	TypeMismatch:   "TYPE MISMATCH",
-	Overflow:       "OVERFLOW",
-	DivisionByZero: "DIVISION BY ZERO",
+	Syntax:          "SYNTAX",
+	StringTooLong:   "STRING TOO LONG",
+	TypeMismatch:    "TYPE MISMATCH",
+	Overflow:        "OVERFLOW",
+	DivisionByZero:  "DIVISION BY ZERO",
+	IllegalQuantity: "ILLEGAL QUANTITY",
 }
 
 // Error is a BASIC error.

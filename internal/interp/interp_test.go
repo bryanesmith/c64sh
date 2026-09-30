@@ -598,3 +598,40 @@ func TestArithmeticRange(t *testing.T) {
 		{"tiny quotient", line(printStmt(item(bin(ast.Div, num(1e-30), num(1e30))))), " 0 \n"},
 	})
 }
+
+// @spec INTERP-030
+func TestPowerFunction(t *testing.T) {
+	pow := func(l, r float64) ast.Expr { return bin(ast.Pow, num(l), num(r)) }
+	runPrintCases(t, []printCase{
+		{"power", line(printStmt(item(pow(2, 3)))), " 8 \n"},
+		{"square root", line(printStmt(item(pow(9, 0.5)))), " 3 \n"},
+		{"negative exponent", line(printStmt(item(pow(2, -1)))), " .5 \n"},
+		{"anything to the 0 is 1", line(printStmt(item(pow(5, 0)))), " 1 \n"},
+		{"0 to the 0 is 1", line(printStmt(item(pow(0, 0)))), " 1 \n"},
+		{"0 to a power is 0", line(printStmt(item(pow(0, 5)))), " 0 \n"},
+		{"0 to a negative power is 0", line(printStmt(item(pow(0, -1)))), " 0 \n"},
+		{"negative base, even power", line(printStmt(item(bin(ast.Pow, neg(num(2)), num(2))))), " 4 \n"},
+		{"negative base, odd power", line(printStmt(item(bin(ast.Pow, neg(num(2)), num(3))))), "-8 \n"},
+		{"negative base, negative odd power", line(printStmt(item(bin(ast.Pow, neg(num(2)), neg(num(1)))))), "-.5 \n"},
+		{"negative base, zero power", line(printStmt(item(bin(ast.Pow, neg(num(2)), num(0))))), " 1 \n"},
+		{"fractional result", line(printStmt(item(pow(2, 0.5)))), " 1.41421356 \n"},
+		{"tiny result becomes 0", line(printStmt(item(pow(10, -50)))), " 0 \n"},
+	})
+	if _, err := exec(line(printStmt(item(pow(10, 39))))); !isKind(err, basicerr.Overflow) {
+		t.Errorf("10^39: error = %v, want OVERFLOW", err)
+	}
+	if _, err := exec(line(printStmt(item(bin(ast.Pow, str("A"), num(2)))))); !isKind(err, basicerr.TypeMismatch) {
+		t.Errorf(`"A"^2: error = %v, want TYPE MISMATCH`, err)
+	}
+}
+
+// @spec INTERP-031
+func TestNegativeBaseFractionalPowerIsIllegalQuantity(t *testing.T) {
+	rec, err := exec(line(printStmt(item(str("A")), semi, item(bin(ast.Pow, neg(num(8)), num(1.0/3))))))
+	if !isKind(err, basicerr.IllegalQuantity) {
+		t.Errorf("error = %v, want ILLEGAL QUANTITY", err)
+	}
+	if got := rec.String(); got != "A" {
+		t.Errorf("output %q, want %q (items before the failure)", got, "A")
+	}
+}

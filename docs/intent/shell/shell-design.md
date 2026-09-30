@@ -124,6 +124,7 @@ const (
     TypeMismatch              // TYPE MISMATCH
     Overflow                  // OVERFLOW
     DivisionByZero            // DIVISION BY ZERO
+    IllegalQuantity           // ILLEGAL QUANTITY
 )
 
 type Error struct{ Kind Kind }

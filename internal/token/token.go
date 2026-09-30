@@ -23,6 +23,7 @@ const (
 	Slash                 // /
 	LParen                // (
 	RParen                // )
+	Caret                 // ^ or ↑ (exponentiation)
 )
 
 var kindNames = [...]string{
@@ -41,6 +42,7 @@ var kindNames = [...]string{
 	Slash:     "Slash",
 	LParen:    "LParen",
 	RParen:    "RParen",
+	Caret:     "Caret",
 }
 
 func (k Kind) String() string {

@@ -148,7 +148,7 @@ func (in *Interp) write(s string) error {
 
 // @spec INTERP-003, INTERP-009, INTERP-010, INTERP-011, INTERP-012
 // @spec INTERP-020, INTERP-021, INTERP-022, INTERP-025, INTERP-026, INTERP-027, INTERP-028
-// @spec INTERP-029
+// @spec INTERP-029, INTERP-030, INTERP-031
 func (in *Interp) eval(e ast.Expr) (value, error) {
 	switch e := e.(type) {
 	case *ast.StringLit:
@@ -196,7 +196,7 @@ func binary(op ast.Op, l, r value) (value, error) {
 		default:
 			return value{}, &basicerr.Error{Kind: basicerr.TypeMismatch}
 		}
-	case ast.Sub, ast.Mul, ast.Div:
+	case ast.Sub, ast.Mul, ast.Div, ast.Pow:
 		// Only "+" accepts strings; types are checked before the divisor.
 		if !l.isNum || !r.isNum {
 			return value{}, &basicerr.Error{Kind: basicerr.TypeMismatch}
@@ -206,6 +206,8 @@ func binary(op ast.Op, l, r value) (value, error) {
 			return inRange(l.num - r.num)
 		case ast.Mul:
 			return inRange(l.num * r.num)
+		case ast.Pow:
+			return power(l.num, r.num)
 		default:
 			if r.num == 0 {
 				return value{}, &basicerr.Error{Kind: basicerr.DivisionByZero}

@@ -134,3 +134,34 @@ func TestArithmetic(t *testing.T) {
 		check(t, c.input, runMain(t, c.input+"\n"), c.want)
 	}
 }
+
+// TestExponentiation checks "^" end to end, as listed in the HLD's Goals.
+func TestExponentiation(t *testing.T) {
+	cases := []struct {
+		input string
+		want  result
+	}{
+		{`PRINT 2^3`, result{" 8 \n", "", 0}},
+		{"PRINT 2\u21913", result{" 8 \n", "", 0}},
+		{`PRINT 2^3^2`, result{" 64 \n", "", 0}},
+		{`PRINT -2^2`, result{"-4 \n", "", 0}},
+		{`PRINT (-2)^2`, result{" 4 \n", "", 0}},
+		{`PRINT 2*3^2`, result{" 18 \n", "", 0}},
+		{`PRINT 2^-1`, result{" .5 \n", "", 0}},
+		{`PRINT 2^-1^2`, result{" .5 \n", "", 0}},
+		{`PRINT 2^-3*4`, result{" .5 \n", "", 0}},
+		{`PRINT 9^.5`, result{" 3 \n", "", 0}},
+		{`PRINT 0^0`, result{" 1 \n", "", 0}},
+		{`PRINT 0^-1`, result{" 0 \n", "", 0}},
+		{`PRINT (-2)^3`, result{"-8 \n", "", 0}},
+		{`PRINT -8^(1/3)`, result{"-2 \n", "", 0}},
+		{`PRINT (-8)^(1/3)`, result{"", "?ILLEGAL QUANTITY  ERROR\n", 1}},
+		{`PRINT 10^39`, result{"", "?OVERFLOW  ERROR\n", 1}},
+		{`PRINT "A"^2`, result{"", "?TYPE MISMATCH  ERROR\n", 1}},
+		{`PRINT 2^`, result{"", "?SYNTAX  ERROR\n", 1}},
+		{`PRINT "2^3"`, result{"2^3\n", "", 0}},
+	}
+	for _, c := range cases {
+		check(t, c.input, runMain(t, c.input+"\n"), c.want)
+	}
+}

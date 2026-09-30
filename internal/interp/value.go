@@ -82,3 +82,29 @@ func formatNumber(n float64) string {
 		return sign + digits[:exp+1] + "." + digits[exp+1:]
 	}
 }
+
+// power returns x^y the way the C64 ROM's power routine ($BF7B) does:
+// anything to the power 0 is 1; 0 to any other power is 0, even a
+// negative one; a negative number needs a whole-number power, and the
+// result is negated when that power is odd.
+//
+// @spec INTERP-030, INTERP-031
+func power(x, y float64) (value, error) {
+	switch {
+	case y == 0:
+		return numberValue(1), nil
+	case x == 0:
+		return numberValue(0), nil
+	case x < 0:
+		if y != math.Trunc(y) {
+			return value{}, &basicerr.Error{Kind: basicerr.IllegalQuantity}
+		}
+		p := math.Pow(-x, y)
+		if math.Mod(y, 2) != 0 {
+			p = -p
+		}
+		return inRange(p)
+	default:
+		return inRange(math.Pow(x, y))
+	}
+}

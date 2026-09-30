@@ -58,6 +58,7 @@ const (
     Sub           // -
     Mul           // *
     Div           // /
+    Pow           // ^ (exponentiation)
 )
 
 // NegExpr is -X, a leading minus sign (negation).
@@ -75,9 +76,14 @@ Each precedence level is its own grammar rule, so a lower rule's operands are bu
 | 1 | `Expression` | `+` `-` (binary), left to right |
 | 2 | `Term` | `*` `/`, left to right |
 | 3 | `Unary` | a leading `-` (negation) or `+` |
-| 4 | `Operand` | literals and `( … )` |
+| 4 | `Power` | `^`, left to right |
+| 5 | `Operand` | literals and `( … )` |
 
-So `2+3*4` is 14, `(2+3)*4` is 20, and `-2*3` is `(-2)*3`. A leading `+` is dropped (the C64 ROM skips it: `+5` is 5 and `+"A"` is `"A"`); a leading `-` becomes a `NegExpr`. Leading signs can repeat: `--5` is 5, and `5--5` is 10.
+So `2+3*4` is 14, `(2+3)*4` is 20, `-2*3` is `(-2)*3`, `-2^2` is `-(2^2)` = -4, and `2^3^2` is `(2^3)^2` = 64, as on a C64. A leading `+` is dropped (the C64 ROM skips it: `+5` is 5 and `+"A"` is `"A"`); a leading `-` becomes a `NegExpr`. Leading signs can repeat: `--5` is 5, and `5--5` is 10.
+
+### Signs in an exponent
+
+An exponent may carry a sign: `2^-1` is .5. On a C64, a sign in an exponent is a negation with its usual precedence, just below `^`, so it takes in any `^` that follows it but nothing looser: `2^-1^2` is `2^(-(1^2))` = .5, and `2^-3*4` is `(2^-3)*4` = .5. The `Exponent` rule reproduces this: an unsigned exponent is a single operand, so `^` stays left to right, and a signed one is a `Unary`, which takes in the following `^` chain.
 
 ### Items side by side
 
@@ -98,7 +104,9 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
 | `Expression = Term { ( "+" \| "-" ) Term } .` | `parseExpression` | `ast.Expr` |
 | `Term = Unary { ( "*" \| "/" ) Unary } .` | `parseTerm` | `ast.Expr` |
-| `Unary = "-" Unary \| "+" Unary \| Operand .` | `parseUnary` | `ast.Expr` |
+| `Unary = "-" Unary \| "+" Unary \| Power .` | `parseUnary` | `ast.Expr` |
+| `Power = Operand { "^" Exponent } .` | `parsePower` | `ast.Expr` |
+| `Exponent = "-" Unary \| "+" Unary \| Operand .` | `parseExponent` | `ast.Expr` |
 | `Operand = string \| number \| "(" Expression ")" .` | `parseOperand` | `ast.Expr` |
 
 Lowercase names in these rules (`print`, `rem`, `string`, `number`) are token rules, defined and documented in the lexer.
@@ -158,14 +166,14 @@ Examples:
 | `+` representation | `BinaryExpr` with an `Op`, left-associative | A separate node per operator; a flat list of operands | One node type covers every binary operator, so `-`, `*`, `/`, and `^` add `Op` values rather than node types. |
 | Precedence parsing | One grammar rule, and function, per precedence level | Precedence climbing or a Pratt parser in a single function | Keeps one function per grammar rule, each carrying its rule as a comment, so the code still reads as the grammar. C64 BASIC has few levels, so the extra functions are few. |
 | Leading `+` | Dropped by the parser | A unary-plus node | The C64 ROM ignores a leading `+`, whatever follows, so there is no behavior for a node to carry. |
+| `^` associativity | Left to right: `2^3^2` is 64 | Right to left (512), as in mathematics and many languages | C64 BASIC V2 evaluates `^` left to right, like its other operators. |
 | Parenthesized expressions | No node; `( … )` returns its inner expression | A `ParenExpr` node | Parentheses only group; the tree's shape already records the grouping. |
 | Type checking of `+` | In the interpreter, from the operand values | In the parser, from the operand kinds | BASIC V2 types are known at run time (variables will hold either kind), and a C64 reports `?TYPE MISMATCH  ERROR` when the statement runs, after earlier statements have run. |
 
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. Exponentiation (`^`, also typed `↑`) adds a level between `Unary` and `Operand`, binding tighter than negation, so `-2^2` is `-4`, and evaluated left to right.
-2. Parentheses nest without a limit; very deep nesting uses Go's stack, which grows as needed. A real C64 reports `?OUT OF MEMORY  ERROR` when nesting exhausts its stack; that limit is decided if it ever matters.
+1. Parentheses nest without a limit; very deep nesting uses Go's stack, which grows as needed. A real C64 reports `?OUT OF MEMORY  ERROR` when nesting exhausts its stack; that limit is decided if it ever matters.
 
 ## References
 

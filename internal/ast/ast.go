@@ -52,6 +52,7 @@ const (
 	Sub           // -
 	Mul           // *
 	Div           // /
+	Pow           // ^ (exponentiation)
 )
 
 // NegExpr is -X, a leading minus sign (negation).

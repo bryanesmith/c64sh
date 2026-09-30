@@ -20,7 +20,7 @@ import (
 //
 // @spec PARSER-001, PARSER-002, PARSER-003, PARSER-004, PARSER-005, PARSER-006
 // @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011, PARSER-012, PARSER-013
-// @spec PARSER-014, PARSER-015, PARSER-016, PARSER-017, PARSER-018
+// @spec PARSER-014, PARSER-015, PARSER-016, PARSER-017, PARSER-018, PARSER-019, PARSER-020
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -186,7 +186,7 @@ func (p *parser) parseTerm() (ast.Expr, error) {
 	}
 }
 
-// Unary = "-" Unary | "+" Unary | Operand .
+// Unary = "-" Unary | "+" Unary | Power .
 //
 // A leading "+" produces no node: the C64 ROM skips it.
 func (p *parser) parseUnary() (ast.Expr, error) {
@@ -200,8 +200,36 @@ func (p *parser) parseUnary() (ast.Expr, error) {
 	case p.accept(token.Plus):
 		return p.parseUnary()
 	default:
-		return p.parseOperand()
+		return p.parsePower()
 	}
+}
+
+// Power = Operand { "^" Exponent } .
+func (p *parser) parsePower() (ast.Expr, error) {
+	left, err := p.parseOperand()
+	if err != nil {
+		return nil, err
+	}
+	for p.accept(token.Caret) {
+		right, err := p.parseExponent()
+		if err != nil {
+			return nil, err
+		}
+		left = &ast.BinaryExpr{Op: ast.Pow, Left: left, Right: right}
+	}
+	return left, nil
+}
+
+// Exponent = "-" Unary | "+" Unary | Operand .
+//
+// A signed exponent is a Unary, so the sign takes in any "^" that follows
+// (2^-1^2 is 2^(-(1^2)), as on a C64); an unsigned one is a single operand,
+// so "^" stays left to right.
+func (p *parser) parseExponent() (ast.Expr, error) {
+	if p.peek() == token.Minus || p.peek() == token.Plus {
+		return p.parseUnary()
+	}
+	return p.parseOperand()
 }
 
 // Operand = string | number | "(" Expression ")" .

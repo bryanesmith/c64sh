@@ -257,3 +257,13 @@ func TestSecondPointStartsANewNumber(t *testing.T) {
 		{"three numbers", `...`, []token.Token{num(".", 0), num(".", 1), num(".", 2), eol(3)}},
 	})
 }
+
+// @spec LEXER-019
+func TestCaret(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"caret", `2^3`, []token.Token{num("2", 0), tok(token.Caret, "^", 1), num("3", 2), eol(3)}},
+		{"up arrow", "2\u21913", []token.Token{num("2", 0), tok(token.Caret, "\u2191", 1), num("3", 4), eol(5)}},
+		{"up arrow in a string is text", "\"\u2191\"", []token.Token{tok(token.String, "\u2191", 0), eol(5)}},
+		{"negative exponent", `2^-1`, []token.Token{num("2", 0), tok(token.Caret, "^", 1), tok(token.Minus, "-", 2), num("1", 3), eol(4)}},
+	})
+}

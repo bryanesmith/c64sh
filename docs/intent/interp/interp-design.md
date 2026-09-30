@@ -150,6 +150,7 @@ A `BinaryExpr` evaluates its left operand, then its right operand, then applies 
 | `BinaryExpr` `Add` | Two strings: the left followed by the right (see *String length*). Two numbers: their sum. A string and a number, in either order: `TYPE MISMATCH`. |
 | `BinaryExpr` `Sub`, `Mul` | Two numbers: the difference or product. Any string operand: `TYPE MISMATCH`. |
 | `BinaryExpr` `Div` | Two numbers: the quotient, or `DIVISION BY ZERO` if the right operand is 0. Any string operand: `TYPE MISMATCH`, checked before the divisor. |
+| `BinaryExpr` `Pow` | Two numbers: the left raised to the power of the right, following the C64 ROM's power routine (`$BF7B`): anything to the power 0 is 1 (including `0^0`); 0 to any other power is 0 (including a negative power, so `0^-1` is 0, not a division by zero); a negative number to a whole-number power is computed from its size, then negated if the power is odd (`(-2)^3` is -8); a negative number to a fractional power is `ILLEGAL QUANTITY`. Any string operand: `TYPE MISMATCH`. |
 | `NegExpr` | A number: its negation. A string: `TYPE MISMATCH`. |
 
 Every numeric result is limited to the C64's range: `OVERFLOW` if its size exceeds `maxNumber`, and 0 if it is nonzero and its size is below `minNumber`. A negative zero prints as `0`.
@@ -165,9 +166,10 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | Kind | Cause |
 |---|---|
 | `STRING TOO LONG` | Joining strings with `+` produces more than 255 characters. |
-| `TYPE MISMATCH` | `+` with a string on one side and a number on the other; `-`, `*`, `/`, or negation with any string operand. |
+| `TYPE MISMATCH` | `+` with a string on one side and a number on the other; `-`, `*`, `/`, `^`, or negation with any string operand. |
 | `OVERFLOW` | A number literal or arithmetic result larger in size than `maxNumber`. |
 | `DIVISION BY ZERO` | `/` with a right operand of 0. |
+| `ILLEGAL QUANTITY` | `^` with a negative left operand and a right operand that is not a whole number. |
 | `SYNTAX` | A `BadItem` reached while executing `PRINT`; the error is the one the parser stored in it. |
 
 If writing to the output fails (for example, stdout is a closed pipe), `Exec` returns that write error unchanged. It is not a BASIC error.
@@ -189,7 +191,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. Exponentiation (`^`) adds an operator with `ILLEGAL QUANTITY` for a negative base with a fractional exponent, and reuses the range checks above.
+1. Powers are computed with Go's `math.Pow`. The C64 computes them as `EXP(y*LOG(x))`, whose rounding makes some results differ in the last digit (see HLD *Number representation*); reproducing that is left to an exact float emulation, if one is ever built.
 
 ## References
 

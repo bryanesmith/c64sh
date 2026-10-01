@@ -39,6 +39,9 @@ const (
     LParen                // (
     RParen                // )
     Caret                 // ^ or ↑ (exponentiation)
+    Let                   // LET
+    Equal                 // =
+    Name                  // a variable name: A, SCORE, N$ (Value: the name without spaces)
 )
 
 type Token struct {
@@ -65,6 +68,8 @@ At each position the lexer applies the first matching rule:
 | `:` `;` `,` `+` `-` `*` `/` `(` `)` | `Colon`, `Semicolon`, `Comma`, `Plus`, `Minus`, `Star`, `Slash`, `LParen`, `RParen`. |
 | `^` or `↑` (U+2191) | `Caret`, whose value is the character as written. |
 | A digit, or `.` | `Number` token (see *Numbers*). |
+| An uppercase letter that does not begin a keyword | `Name` token (see *Names*). |
+| `=` | `Equal`. |
 | Any other character | `Illegal` token holding that one character (a full UTF-8 character, not a single byte). |
 | A byte that is not valid UTF-8 | `Illegal` token holding that one byte. |
 
@@ -74,7 +79,7 @@ Inside a string literal, the bytes of the line are kept exactly as they are, inc
 
 ## Keywords
 
-The keywords are `PRINT` and `REM`.
+The keywords are `PRINT`, `REM`, and `LET`.
 
 - **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`; `REMARK` is a `Rem` token with the comment `ARK`.
 - **Spaces inside a keyword break it.** `PR INT` is not `PRINT`; it scans as `Illegal(P) Illegal(R) Illegal(I) Illegal(N) Illegal(T)`.
@@ -93,6 +98,18 @@ A number literal is read the way the C64 ROM reads one:
 
 The token's value is the literal with its whitespace removed (`1 2` gives `12`), and its position is that of its first character. The lexer does not compute the number's value; the parser converts the text.
 
+## Names
+
+A variable name is read the way the C64 ROM reads one (`$B08B`), within the C64's tokenizing of keywords:
+
+- It starts with an uppercase letter `A`–`Z` at a position where no keyword begins.
+- Uppercase letters and digits follow. **Spaces and tabs inside a name are skipped**, as the C64's character reader skips them: `A B` is the name `AB`.
+- **A keyword ends the name**: at each position after the first letter, if a keyword begins there, the name ends before it and the keyword is read next. This is the C64's famous rule that a keyword cannot appear inside a name: `OUTLET` is the name `OUT` followed by `LET`, and `PREMIUM` is the name `P` followed by a `REM` comment.
+- An optional `$` follows, possibly after spaces, marking a string variable. It is part of the token's value.
+- Lowercase letters are not names; they remain `Illegal`, as on a C64.
+
+The token's value is the full name as written, without spaces (`SCORE`, `N$`). Which characters matter for identity is the parser's concern (see the parser design).
+
 ## Token Rules
 
 The lexer's half of the grammar is its token rules. Each is written in EBNF, in the notation of the Go language specification, as a comment directly above the code in `lexer.go` that scans it:
@@ -101,6 +118,9 @@ The lexer's half of the grammar is its token rules. Each is written in EBNF, in 
 print     = "PRINT" | "?" .
 rem       = "REM" { character | `"` } .
 string    = `"` { character } [ `"` ] .
+name      = letter { letter | digit } [ "$" ] .   /* spaces inside are ignored; a keyword ends it */
+letter    = "A" … "Z" .
+let       = "LET" .
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
             [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
 digit     = "0" … "9" .
@@ -135,14 +155,16 @@ Scanning a whole line up front is sufficient: lines are short, and the parser be
 | Spaces inside numbers | Ignored, so `1 2` is `12` | Spaces end a number | The C64's character reader skips spaces everywhere outside strings, so this is how BASIC V2 reads numbers; `PRINT 1 2` printing ` 12 ` is authentic. |
 | Number value | Computed by the parser from the token text | Computed by the lexer | Tokens carry text; keeping number conversion out of the lexer keeps its job to splitting characters, and one place converts literals. |
 | Exponentiation character | `^`, and `↑` as an alternative | `↑` only; `^` only; `**` | The C64's up-arrow key produces character code 94, which is `^` in ASCII, so `^` is what a C64 program's bytes contain. `↑` matches what the C64 keyboard and screen show, for users who can type it. `**` is not C64 BASIC. |
+| Keywords inside names | A keyword ends the name | Names take precedence over keywords | The C64 tokenizes keywords before it ever reads a name, so `TOTAL` is `TO` plus `TAL` and is a syntax error. Reproducing this is authentic, and it falls out of checking keywords first. |
+| Name value | The full name, without spaces | Only the first two characters | Keeping the full name leaves messages and a future `LIST` free to show it; the parser reduces it to the part that identifies the variable. |
 | Output shape | Slice of all tokens for the line | Streaming `Next()` iterator | Lines are short; a slice is simpler to test and gives the parser unlimited lookahead. |
 | Whitespace | Space and tab skipped between tokens | Space only | A tab outside a string has no meaning in BASIC V2; treating it like a space avoids surprising errors from pasted or indented scripts. |
 
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. Digits are currently `Illegal`. When numbers are added, a `number` token is introduced; when program mode is added, a leading number is read as a line number.
-2. Letters that do not begin a keyword are currently `Illegal`. When variables are added, they become identifier tokens, following the C64 rule that only the first two characters of a name are significant.
+1. When program mode is added, a number at the start of a line is read as a line number.
+2. When integer variables are added, `%` ends a name as `$` does.
 
 ## References
 

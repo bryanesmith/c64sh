@@ -21,6 +21,7 @@ import (
 // @spec PARSER-001, PARSER-002, PARSER-003, PARSER-004, PARSER-005, PARSER-006
 // @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011, PARSER-012, PARSER-013
 // @spec PARSER-014, PARSER-015, PARSER-016, PARSER-017, PARSER-018, PARSER-019, PARSER-020
+// @spec PARSER-021, PARSER-022, PARSER-023, PARSER-024, PARSER-025
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -81,7 +82,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -90,9 +91,66 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return p.parsePrintStatement()
 	case token.Rem:
 		return p.parseRemStatement()
+	case token.Let, token.Name:
+		stmt, err := p.parseLetStatement()
+		if err != nil {
+			return nil, err // no node for a statement with an error
+		}
+		return stmt, nil
 	default:
 		return nil, nil
 	}
+}
+
+// LetStatement = [ let ] Variable "=" Expression .
+func (p *parser) parseLetStatement() (*ast.LetStmt, error) {
+	p.accept(token.Let)
+	if p.peek() != token.Name {
+		return nil, syntaxError()
+	}
+	v, err := p.parseVariable()
+	if err != nil {
+		return nil, err
+	}
+	if !p.accept(token.Equal) {
+		return nil, syntaxError()
+	}
+	value, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.LetStmt{Var: v, Value: value}, nil
+}
+
+// Variable = name .
+//
+// The C64's system variables (TI, TI$, ST), and a name followed by "(" (an
+// array element or function call), are not supported and are SYNTAX errors.
+func (p *parser) parseVariable() (*ast.VarRef, error) {
+	text := p.next().Value
+	v := &ast.VarRef{Name: variableIdentity(text), Text: text}
+	switch {
+	case v.Name == "TI" || v.Name == "TI$" || v.Name == "ST":
+		return nil, syntaxError()
+	case p.peek() == token.LParen:
+		return nil, syntaxError()
+	}
+	return v, nil
+}
+
+// variableIdentity returns the part of a variable name that identifies the
+// variable on a C64: its first character, its second character if it has
+// one, and "$" for a string variable ("SCORE" is "SC", "NAME$" is "NA$").
+func variableIdentity(text string) string {
+	isString := strings.HasSuffix(text, "$")
+	letters := strings.TrimSuffix(text, "$")
+	if len(letters) > 2 {
+		letters = letters[:2]
+	}
+	if isString {
+		return letters + "$"
+	}
+	return letters
 }
 
 // RemStatement = rem .
@@ -127,7 +185,7 @@ func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	case token.Comma:
 		p.next()
 		return &ast.Comma{}, nil
-	case token.String, token.Number, token.Minus, token.Plus, token.LParen:
+	case token.String, token.Number, token.Name, token.Minus, token.Plus, token.LParen:
 		expr, err := p.parseExpression()
 		if err != nil {
 			return nil, err
@@ -232,7 +290,7 @@ func (p *parser) parseExponent() (ast.Expr, error) {
 	return p.parseOperand()
 }
 
-// Operand = string | number | "(" Expression ")" .
+// Operand = string | number | Variable | "(" Expression ")" .
 //
 // Parentheses produce no node: the tree's shape records the grouping.
 func (p *parser) parseOperand() (ast.Expr, error) {
@@ -241,6 +299,8 @@ func (p *parser) parseOperand() (ast.Expr, error) {
 		return &ast.StringLit{Value: p.next().Value}, nil
 	case token.Number:
 		return &ast.NumberLit{Value: numberValue(p.next().Value)}, nil
+	case token.Name:
+		return p.parseVariable()
 	case token.LParen:
 		p.next()
 		x, err := p.parseExpression()

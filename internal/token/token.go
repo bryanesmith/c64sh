@@ -24,6 +24,9 @@ const (
 	LParen                // (
 	RParen                // )
 	Caret                 // ^ or ↑ (exponentiation)
+	Let                   // LET
+	Equal                 // =
+	Name                  // a variable name, without spaces
 )
 
 var kindNames = [...]string{
@@ -43,6 +46,9 @@ var kindNames = [...]string{
 	LParen:    "LParen",
 	RParen:    "RParen",
 	Caret:     "Caret",
+	Let:       "Let",
+	Equal:     "Equal",
+	Name:      "Name",
 }
 
 func (k Kind) String() string {

@@ -1,0 +1,19 @@
+exit status: 1
+--- stdout ---
+ 5 
+B IS 11 
+HELLO, ALICE
+ALICEALICE
+ 6 
+ 6 SIX
+ 0 
+[]
+ 100 
+ 100 
+ 7 
+ 4 
+ 9 
+TOTAL: 601 
+ 6         11 
+--- stderr ---
+?TYPE MISMATCH  ERROR

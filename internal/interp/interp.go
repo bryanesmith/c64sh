@@ -21,14 +21,15 @@ const zoneWidth = 10
 // Interp executes lines, writing program output to its writer.
 type Interp struct {
 	out    io.Writer
-	column int // cursor column: characters written since the last newline
+	column int              // cursor column: characters written since the last newline
+	vars   map[string]value // variables, by identity (ast.VarRef.Name)
 }
 
 // New returns an interpreter that writes program output to out.
 //
 // @spec INTERP-002
 func New(out io.Writer) *Interp {
-	return &Interp{out: out}
+	return &Interp{out: out, vars: map[string]value{}}
 }
 
 // Exec runs the statements of line in order. It stops at the first
@@ -64,6 +65,27 @@ func (in *Interp) FreshLine() error {
 	return in.write("\n")
 }
 
+// execLet assigns a value to a variable. A string variable (a name ending
+// in "$") takes only strings, up to 255 characters, and a number variable
+// only numbers. On any error the variable keeps its old value.
+//
+// @spec INTERP-032, INTERP-034, INTERP-035, INTERP-036
+func (in *Interp) execLet(s *ast.LetStmt) error {
+	v, err := in.eval(s.Value)
+	if err != nil {
+		return err
+	}
+	isString := strings.HasSuffix(s.Var.Name, "$")
+	if isString == v.isNum {
+		return &basicerr.Error{Kind: basicerr.TypeMismatch}
+	}
+	if isString && utf8.RuneCountInString(v.str) > maxStringLen {
+		return &basicerr.Error{Kind: basicerr.StringTooLong}
+	}
+	in.vars[s.Var.Name] = v
+	return nil
+}
+
 // @spec INTERP-003, INTERP-014
 func (in *Interp) execStmt(s ast.Stmt) error {
 	switch s := s.(type) {
@@ -71,6 +93,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execPrint(s)
 	case *ast.RemStmt:
 		return nil // a comment does nothing
+	case *ast.LetStmt:
+		return in.execLet(s)
 	default:
 		panic(fmt.Sprintf("interp: unhandled statement %T", s))
 	}
@@ -155,6 +179,15 @@ func (in *Interp) eval(e ast.Expr) (value, error) {
 		return stringValue(e.Value), nil
 	case *ast.NumberLit:
 		return inRange(e.Value)
+	case *ast.VarRef:
+		// @spec INTERP-033
+		if v, ok := in.vars[e.Name]; ok {
+			return v, nil
+		}
+		if strings.HasSuffix(e.Name, "$") {
+			return stringValue(""), nil
+		}
+		return numberValue(0), nil
 	case *ast.NegExpr:
 		x, err := in.eval(e.X)
 		if err != nil {

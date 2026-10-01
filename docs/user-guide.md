@@ -12,6 +12,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [PRINT](#print)
 - [Numbers](#numbers)
 - [Arithmetic](#arithmetic)
+- [Variables](#variables)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -215,6 +216,29 @@ A few details:
 
 See [`examples/007-arithmetic.bas`](../examples/007-arithmetic.bas) and [`examples/008-exponents.bas`](../examples/008-exponents.bas) for every form.
 
+## Variables
+
+A variable holds a value for later. Set it with `=` (the word `LET` in front is optional), and use its name anywhere a value can go:
+
+```
+A=5
+LET B=A*2+1
+N$="ALICE"
+PRINT "B IS";B
+PRINT "HELLO, ";N$
+```
+
+prints `B IS 11 ` and `HELLO, ALICE`.
+
+- **Two kinds**: a name ending in `$` holds a string (`N$`); any other name holds a number (`A`, `SCORE`). `A` and `A$` are different variables. Putting a string in a number variable, or a number in a string variable, is a `?TYPE MISMATCH  ERROR`.
+- **Names** start with an uppercase letter, followed by letters and digits. **Only the first two characters count**, so `SCORE` and `SC` are the same variable.
+- **A name cannot contain a keyword**, because the C64 finds keywords anywhere: `PREMIUM=1` is a `?SYNTAX  ERROR` (it contains `REM`). It also means `PRINTER` prints the variable `ER`, and `LETTER=1` sets `TE`.
+- **Spaces inside a name are ignored**: `A B` is the variable `AB`.
+- **A variable never set** is 0, or the empty string.
+- **Values last** from line to line, for the whole session or script.
+
+See [`examples/009-variables.bas`](../examples/009-variables.bas) for every form in one script.
+
 ## Comments
 
 `REM` starts a comment. Everything after it, to the end of the line, is ignored:
@@ -284,7 +308,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 - Comparisons and logic (`=`, `<`, `>`, `AND`, `OR`, `NOT`)
-- Variables (`A$="HI"`)
+- Integer variables (`A%`), arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
 - Functions such as `CHR$(34)`
 - Program mode: lines with line numbers (`10 PRINT "HELLO"`), `RUN`, `LIST`, `GOTO`
 - All other commands

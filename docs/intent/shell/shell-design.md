@@ -73,9 +73,36 @@ READY.
 
 It then reads lines. After each non-blank line has run (successfully or with an error), it writes `READY.` on its own line to stderr. Before it, the shell calls the interpreter's `FreshLine`, which writes a newline to stdout if program output left the line unfinished (for example after `PRINT "A";`), so `READY.` starts on a fresh line, as on a C64. A blank line (empty or only spaces and tabs) does nothing and prints no `READY.`, as on a C64.
 
-End of input (Ctrl-D at the start of a line) writes a newline to stderr, so the user's own shell prompt starts on a fresh line, and ends the session with exit status 0. Ctrl-C terminates the process with the default signal behavior.
+End of input (Ctrl-D at the start of a line) writes a newline to stderr, so the user's own shell prompt starts on a fresh line, and ends the session with exit status 0. Ctrl-C while a line is being typed discards that line (see *Line Editing*); Ctrl-C while a line is running terminates the process with the default signal behavior.
 
 The banner and `READY.` go to stderr, as `bash` writes its prompt, so `c64sh > out.txt` captures only program output.
+
+### Line Editing
+
+When interactive mode runs with **both stdin and stderr connected to a terminal**, lines are read with the line editor of `golang.org/x/term` (`term.Terminal`). Otherwise, including every test that passes a reader to `Run`, lines are read as described in *Line Handling*, byte for byte.
+
+| Key | Effect |
+|---|---|
+| Up, Ctrl-P | Replace the line with the previous line from the session's history |
+| Down, Ctrl-N | Replace it with the next, more recent line; past the most recent, the line being typed before navigating |
+| Left, Right, Ctrl-B, Ctrl-F | Move the cursor within the line |
+| Home, End, Ctrl-A, Ctrl-E | Move to the start or end of the line |
+| Backspace, Delete | Delete the character before or under the cursor |
+| Ctrl-U, Ctrl-K, Ctrl-W | Delete to the start of the line, to its end, or the previous word |
+| Ctrl-L | Clear the screen |
+| Return | Run the line |
+| Ctrl-C | Discard the line: it is neither run nor added to history, and a new line is read |
+| Ctrl-D | On an empty line, end of input (ends the session); otherwise, delete the character under the cursor |
+
+**History** holds the most recent 100 lines entered in the session, oldest dropped first. A line is added when it is run; blank lines and discarded lines are not added. History is kept in memory only and is not saved between sessions.
+
+**Raw mode.** Arrow keys and Ctrl-C reach the editor only when the terminal is in raw mode. The shell switches stdin to raw mode just before reading each line and restores the terminal's previous mode as soon as the line is read, before it runs. Program output, errors, and `READY.` are therefore written with the terminal in its normal mode, exactly as without line editing. The previous mode is restored on every path out of line reading, including errors.
+
+**Echo** of the keystrokes goes to stderr, with the banner and `READY.`, so redirecting stdout still captures only program output. The editor is told the terminal's size before each line, so long lines wrap correctly; a size that cannot be read, or is reported as 0 (as some pseudo-terminals do), leaves the editor's default of 80 by 24.
+
+**Ctrl-C.** `term.Terminal.ReadLine` reports Ctrl-C as end of input, the same as Ctrl-D on an empty line. To discard the line instead, the shell reads the terminal through a small filter: when a Ctrl-C byte arrives, the filter replaces it with Return, holds back any bytes after it until the next read (so they begin the next line), and records that the line was cancelled. The shell then discards the line that `ReadLine` returns and reads another; the history ignores lines added while the cancelled flag is set.
+
+**Pasted text** containing several lines is run one line at a time, as if typed. The editor reports pasted lines with `term.ErrPasteIndicator`, which the shell treats as an ordinary line.
 
 ### Script mode
 
@@ -198,6 +225,11 @@ Functional tests live in `test/functional/` (package `functional_test`). Each te
 | Error type location | `internal/basicerr` | Inside `parser` or `interp` | Both parser and interpreter produce BASIC errors and the shell displays them; a neutral package avoids an import cycle and a false owner. |
 | End of script output | Left as written, even mid-line | Add a newline if output ends mid-line | Trailing `;` is how BASIC suppresses a newline; honoring it at the end of a script lets scripts write partial lines on purpose, like `printf`. |
 | Closed-pipe writes | Go's default SIGPIPE termination | Ignore SIGPIPE and exit with status 1 and a message | Silent termination is what Unix commands do when a downstream reader such as `head` exits; an error message there would be noise. |
+| Line editor | `golang.org/x/term`'s `Terminal` | `peterh/liner`, `chzyer/readline`; a hand-written editor | See HLD *Interactive line editing*. `Terminal` runs on any reader and writer, so the editor is tested by feeding it key sequences. |
+| Raw mode scope | Only while a line is read | The whole session | Program output and errors keep the terminal's normal newline handling, and a crash while a BASIC line runs cannot leave the terminal in raw mode. |
+| Ctrl-C while typing | Discard the line, as `bash` does | End the session (`term.Terminal`'s own behavior) | A cancelled line should not cost the whole session and its history. The input filter needed is a few lines. |
+| Line editing condition | stdin and stderr both terminals | stdin a terminal | The editor echoes to stderr; echoing into a redirected stderr file would put keystrokes and cursor codes in it. |
+| History persistence | In memory, per session | Saved to a file in the home directory | Writing to the user's home directory is a separate decision, left for later (HLD *Non-Goals*). |
 | Test seam | `Run(Config, …)` beside `Main` | Inject a terminal-detection function; a pseudo-terminal in tests | Keeps `Main` simple and makes interactive tests plain string-in, string-out. |
 
 ## Open Questions & Future Decisions

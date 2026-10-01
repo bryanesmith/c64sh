@@ -98,7 +98,12 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 		stderr:      stderr,
 		interp:      interp.New(stdout),
 	}
-	return s.run(bufio.NewReader(input), name)
+	var lines lineReader = &plainReader{r: bufio.NewReader(input)}
+	if editorWanted(cfg, stdin, stderr) {
+		tty := stdin.(*os.File)
+		lines = newEditorReader(tty, stderr, terminalRawMode(tty), terminalSize(tty))
+	}
+	return s.run(lines, name)
 }
 
 // inputError reports that the named input could not be read.
@@ -124,30 +129,24 @@ type session struct {
 // @spec SHELL-SCRIPT-001, SHELL-SCRIPT-002, SHELL-SCRIPT-003, SHELL-SCRIPT-004
 // @spec SHELL-SCRIPT-006, SHELL-SCRIPT-007, SHELL-SCRIPT-008
 // @spec SHELL-LINE-001, SHELL-LINE-002, SHELL-LINE-003, SHELL-LINE-004
-func (s *session) run(r *bufio.Reader, name string) int {
+func (s *session) run(lines lineReader, name string) int {
 	if s.interactive {
 		io.WriteString(s.stderr, banner)
 	}
 	for first := true; ; first = false {
-		// ReadString grows its buffer as needed, so lines have no length limit.
-		line, err := r.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return inputError(s.stderr, name, err)
-		}
-		if line == "" && err == io.EOF {
+		line, err := lines.ReadLine()
+		if err == io.EOF {
 			break
 		}
-		line = strings.TrimSuffix(line, "\n")
-		line = strings.TrimSuffix(line, "\r")
+		if err != nil {
+			return inputError(s.stderr, name, err)
+		}
 
 		skip := isBlank(line) || (first && !s.interactive && strings.HasPrefix(line, "#!"))
 		if !skip {
 			if status, stop := s.execLine(line); stop {
 				return status
 			}
-		}
-		if err == io.EOF {
-			break
 		}
 	}
 	if s.interactive {

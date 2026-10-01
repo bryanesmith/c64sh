@@ -1,0 +1,15 @@
+exit status: 1
+--- stdout ---
+ 5 
+ 3 
+-4 
+ 0 
+ 1.5  2 THREE
+ 7 
+ 2 
+ .5 
+ 32767 
+-32768 
+ 60 
+--- stderr ---
+?ILLEGAL QUANTITY  ERROR

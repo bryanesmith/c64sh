@@ -105,10 +105,10 @@ A variable name is read the way the C64 ROM reads one (`$B08B`), within the C64'
 - It starts with an uppercase letter `A`–`Z` at a position where no keyword begins.
 - Uppercase letters and digits follow. **Spaces and tabs inside a name are skipped**, as the C64's character reader skips them: `A B` is the name `AB`.
 - **A keyword ends the name**: at each position after the first letter, if a keyword begins there, the name ends before it and the keyword is read next. This is the C64's famous rule that a keyword cannot appear inside a name: `OUTLET` is the name `OUT` followed by `LET`, and `PREMIUM` is the name `P` followed by a `REM` comment.
-- An optional `$` follows, possibly after spaces, marking a string variable. It is part of the token's value.
+- An optional `$` or `%` follows, possibly after spaces, marking a string or integer variable. It is part of the token's value.
 - Lowercase letters are not names; they remain `Illegal`, as on a C64.
 
-The token's value is the full name as written, without spaces (`SCORE`, `N$`). Which characters matter for identity is the parser's concern (see the parser design).
+The token's value is the full name as written, without spaces (`SCORE`, `N$`, `C%`). Which characters matter for identity is the parser's concern (see the parser design).
 
 ## Token Rules
 
@@ -118,7 +118,7 @@ The lexer's half of the grammar is its token rules. Each is written in EBNF, in 
 print     = "PRINT" | "?" .
 rem       = "REM" { character | `"` } .
 string    = `"` { character } [ `"` ] .
-name      = letter { letter | digit } [ "$" ] .   /* spaces inside are ignored; a keyword ends it */
+name      = letter { letter | digit } [ "$" | "%" ] .   /* spaces inside are ignored; a keyword ends it */
 letter    = "A" … "Z" .
 let       = "LET" .
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
@@ -164,7 +164,6 @@ Scanning a whole line up front is sufficient: lines are short, and the parser be
 
 ### Deferred
 1. When program mode is added, a number at the start of a line is read as a line number.
-2. When integer variables are added, `%` ends a name as `$` does.
 
 ## References
 

@@ -230,14 +230,15 @@ PRINT "HELLO, ";N$
 
 prints `B IS 11 ` and `HELLO, ALICE`.
 
-- **Two kinds**: a name ending in `$` holds a string (`N$`); any other name holds a number (`A`, `SCORE`). `A` and `A$` are different variables. Putting a string in a number variable, or a number in a string variable, is a `?TYPE MISMATCH  ERROR`.
+- **Three kinds**: a name ending in `$` holds a string (`N$`); a name ending in `%` holds a whole number (`C%`); any other name holds a number (`A`, `SCORE`). `A`, `A%`, and `A$` are different variables. Putting a string in a number variable, or a number in a string variable, is a `?TYPE MISMATCH  ERROR`.
+- **Integer variables** (`%`) round down what is stored in them: `C%=3.7` stores 3, and `C%=-3.7` stores -4. They hold -32768 to 32767; storing a number outside that range is an `?ILLEGAL QUANTITY  ERROR`. In calculations they are ordinary numbers.
 - **Names** start with an uppercase letter, followed by letters and digits. **Only the first two characters count**, so `SCORE` and `SC` are the same variable.
 - **A name cannot contain a keyword**, because the C64 finds keywords anywhere: `PREMIUM=1` is a `?SYNTAX  ERROR` (it contains `REM`). It also means `PRINTER` prints the variable `ER`, and `LETTER=1` sets `TE`.
 - **Spaces inside a name are ignored**: `A B` is the variable `AB`.
 - **A variable never set** is 0, or the empty string.
 - **Values last** from line to line, for the whole session or script.
 
-See [`examples/009-variables.bas`](../examples/009-variables.bas) for every form in one script.
+See [`examples/009-variables.bas`](../examples/009-variables.bas) and [`examples/010-integer-variables.bas`](../examples/010-integer-variables.bas) for every form.
 
 ## Comments
 
@@ -273,7 +274,7 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?TYPE MISMATCH  ERROR` | `+` was given a string and a number, or `-`, `*`, `/`, `^`, or a minus sign in front was given a string. |
 | `?OVERFLOW  ERROR` | A number, or the result of a calculation, is larger than 1.70141183E+38. |
 | `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
-| `?ILLEGAL QUANTITY  ERROR` | A negative number raised to a fractional power, such as `(-8)^(1/3)`. |
+| `?ILLEGAL QUANTITY  ERROR` | A negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
 
 An error stops the rest of its line. Anything printed before the error stays printed, as on a C64:
 
@@ -308,7 +309,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 - Comparisons and logic (`=`, `<`, `>`, `AND`, `OR`, `NOT`)
-- Integer variables (`A%`), arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
+- Arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
 - Functions such as `CHR$(34)`
 - Program mode: lines with line numbers (`10 PRINT "HELLO"`), `RUN`, `LIST`, `GOTO`
 - All other commands

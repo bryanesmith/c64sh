@@ -278,6 +278,10 @@ func TestNames(t *testing.T) {
 		{"string variable", `N$`, []token.Token{name("N$", 0), eol(2)}},
 		{"spaces inside are skipped", `A B`, []token.Token{name("AB", 0), eol(3)}},
 		{"space before $", `N $`, []token.Token{name("N$", 0), eol(3)}},
+		{"integer variable", `C%`, []token.Token{name("C%", 0), eol(2)}},
+		{"space before %", `COUNT %`, []token.Token{name("COUNT%", 0), eol(7)}},
+		{"% ends the name", `A%B`, []token.Token{name("A%", 0), name("B", 2), eol(3)}},
+		{"% alone is illegal", `5%`, []token.Token{num("5", 0), tok(token.Illegal, "%", 1), eol(2)}},
 		{"assignment", `A=5`, []token.Token{name("A", 0), tok(token.Equal, "=", 1), num("5", 2), eol(3)}},
 		{"in PRINT", `PRINT A;B$`, []token.Token{
 			tok(token.Print, "PRINT", 0), name("A", 6), tok(token.Semicolon, ";", 7), name("B$", 8), eol(10),

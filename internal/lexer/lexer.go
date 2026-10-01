@@ -96,7 +96,7 @@ func Lex(line string) []token.Token {
 			i += len(text)
 			continue
 		}
-		// name   = letter { letter | digit } [ "$" ] .   /* spaces inside are ignored; a keyword ends it */
+		// name   = letter { letter | digit } [ "$" | "%" ] .   /* spaces inside are ignored; a keyword ends it */
 		// letter = "A" … "Z" .
 		if isLetter(c) {
 			text, end := scanName(line, i)
@@ -181,7 +181,8 @@ func isLetter(c byte) bool {
 }
 
 // scanName reads the variable name starting at line[start], an uppercase
-// letter where no keyword begins. It returns the name with its spaces and
+// letter where no keyword begins, with any "$" or "%" suffix. It returns
+// the name with its spaces and
 // tabs removed, and the index just after its last character. As on a C64,
 // spaces and tabs inside the name are skipped, and a keyword ends the name,
 // since the C64 reads keywords before names.
@@ -218,7 +219,7 @@ func scanName(line string, start int) (string, int) {
 		}
 		take(j)
 	}
-	if j := next(); j < len(line) && line[j] == '$' {
+	if j := next(); j < len(line) && (line[j] == '$' || line[j] == '%') {
 		take(j)
 	}
 	return text.String(), end

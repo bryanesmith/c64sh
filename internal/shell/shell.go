@@ -34,12 +34,14 @@ const banner = "\n    **** C64SH BASIC V2 ****\n\nREADY.\n"
 type Config struct {
 	Interactive bool   // banner, READY., continue after errors
 	File        string // input file; empty means stdin
+	HistoryFile string // line-editor history file; empty: none
 }
 
 // Main runs c64sh with the given command-line arguments and streams and
 // returns the process exit status.
 //
 // @spec SHELL-CLI-002, SHELL-CLI-003, SHELL-CLI-004, SHELL-MODE-001, SHELL-MODE-002
+// @spec SHELL-HIST-001, SHELL-HIST-005
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var files []string
 	for _, arg := range args {
@@ -58,6 +60,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	var cfg Config
+	cfg.HistoryFile = defaultHistoryFile(os.LookupEnv, os.UserHomeDir)
 	if len(files) == 1 {
 		cfg.File = files[0]
 	} else {
@@ -101,7 +104,7 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	var lines lineReader = &plainReader{r: bufio.NewReader(input)}
 	if editorWanted(cfg, stdin, stderr) {
 		tty := stdin.(*os.File)
-		lines = newEditorReader(tty, stderr, terminalRawMode(tty), terminalSize(tty))
+		lines = newEditorReader(tty, stderr, terminalRawMode(tty), terminalSize(tty), cfg.HistoryFile, stderr)
 	}
 	return s.run(lines, name)
 }

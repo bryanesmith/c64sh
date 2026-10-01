@@ -94,7 +94,19 @@ When interactive mode runs with **both stdin and stderr connected to a terminal*
 | Ctrl-C | Discard the line: it is neither run nor added to history, and a new line is read |
 | Ctrl-D | On an empty line, end of input (ends the session); otherwise, delete the character under the cursor |
 
-**History** holds the most recent 100 lines entered in the session, oldest dropped first. A line is added when it is run; blank lines and discarded lines are not added. History is kept in memory only and is not saved between sessions.
+**History** holds the most recent 100 lines entered in the session, oldest dropped first. A line is added when it is run; blank lines and discarded lines are not added. History is also saved to a file, so it carries over between sessions (see *History File*).
+
+### History File
+
+When the line editor is used and a history file is configured (`Config.HistoryFile`), the editor's history is kept in that file as well as in memory.
+
+- **Location.** `Main` uses the path in the environment variable `C64SH_HISTORY` if it is set; an empty value turns the history file off. Otherwise it uses `.c64sh_history` in the user's home directory. If the home directory cannot be determined, there is no history file.
+- **Format.** Plain text, one line of input per line, oldest first, each followed by `\n`. Lines never contain a line feed, since input is split at line feeds.
+- **Loading.** At the start of the session the file is read, a trailing `\r` is removed from each line (for a file edited on Windows), blank lines are skipped, and the most recent 100 lines become the history, so the up arrow recalls lines from earlier sessions. A missing file is an empty history.
+- **Saving.** Each time a line is added to history, the whole history (at most 100 lines) is written to a temporary file in the same directory, which is then renamed over the history file. The file is therefore never left half-written, and a session killed at any moment keeps every line added before that moment. The file is created with permissions `0600`, readable only by the user, since commands may contain private text.
+- **Errors.** If the file exists but cannot be read, or cannot be written, the shell writes one warning, `c64sh: history: <reason>`, to stderr for the session and continues with the history in memory, retrying later saves silently.
+- **Several sessions at once.** Each session keeps its own history in memory and rewrites the file with it, so the session that saves last determines the file's contents; lines from a concurrent session that saved earlier may be lost from the file, though not from that session's memory.
+- **Only for the line editor.** Script mode, pipes, and any input read without the editor never read or write the history file.
 
 **Raw mode.** Arrow keys and Ctrl-C reach the editor only when the terminal is in raw mode. The shell switches stdin to raw mode just before reading each line and restores the terminal's previous mode as soon as the line is read, before it runs. Program output, errors, and `READY.` are therefore written with the terminal in its normal mode, exactly as without line editing. The previous mode is restored on every path out of line reading, including errors.
 
@@ -196,6 +208,7 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int
 type Config struct {
     Interactive bool
     File        string // empty: read from stdin
+    HistoryFile string // line-editor history file; empty: none
 }
 ```
 
@@ -229,7 +242,10 @@ Functional tests live in `test/functional/` (package `functional_test`). Each te
 | Raw mode scope | Only while a line is read | The whole session | Program output and errors keep the terminal's normal newline handling, and a crash while a BASIC line runs cannot leave the terminal in raw mode. |
 | Ctrl-C while typing | Discard the line, as `bash` does | End the session (`term.Terminal`'s own behavior) | A cancelled line should not cost the whole session and its history. The input filter needed is a few lines. |
 | Line editing condition | stdin and stderr both terminals | stdin a terminal | The editor echoes to stderr; echoing into a redirected stderr file would put keystrokes and cursor codes in it. |
-| History persistence | In memory, per session | Saved to a file in the home directory | Writing to the user's home directory is a separate decision, left for later (HLD *Non-Goals*). |
+| History persistence | Saved to `~/.c64sh_history`, rewritten after each line | In memory only; saved on exit; appended line by line | See HLD *History between sessions*. |
+| History file location | `$C64SH_HISTORY`, else `~/.c64sh_history`; empty `C64SH_HISTORY` disables | A fixed path; an XDG state directory | Mirrors `bash`'s `HISTFILE`: a user can move or turn off the file, and tests can point it at a temporary directory. A single dotfile in the home directory is the long-standing shell convention. |
+| History file errors | One warning per session, then continue in memory | Silent; fail the session | History is a convenience; a read-only home directory should not stop anyone from using c64sh, but a silent failure would leave users wondering why history is missing. |
+| Concurrent sessions | Last session to save wins | File locking and merging | Simple and predictable; losing some history from overlapping sessions is a minor cost for an interactive convenience. |
 | Test seam | `Run(Config, …)` beside `Main` | Inject a terminal-detection function; a pseudo-terminal in tests | Keeps `Main` simple and makes interactive tests plain string-in, string-out. |
 
 ## Open Questions & Future Decisions

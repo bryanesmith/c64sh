@@ -75,7 +75,16 @@ While typing a line you can edit it and recall earlier lines:
 | Ctrl-C | Discard the line you are typing |
 | Ctrl-D | On an empty line, end the session |
 
-History holds the last 100 lines you ran in the session (blank lines are skipped) and is not saved when c64sh exits. Editing is available when c64sh runs in a terminal; scripts and piped input are read as plain lines.
+History holds the last 100 lines you ran (blank lines are skipped), and is **saved between sessions** in `~/.c64sh_history`, so after restarting c64sh the up arrow still recalls earlier commands. The file is plain text, one command per line, readable only by you.
+
+To keep history somewhere else, set `C64SH_HISTORY` to a file path; to turn saving off, set it to an empty value:
+
+```sh
+export C64SH_HISTORY=~/.config/c64sh/history   # a different file
+export C64SH_HISTORY=                          # don't save history
+```
+
+If the file cannot be read or written, c64sh prints one `c64sh: history: …` warning and keeps history for the current session only. Editing is available when c64sh runs in a terminal; scripts and piped input are read as plain lines.
 
 The banner and `READY.` are written to stderr, and program output to stdout, so `c64sh > out.txt` saves only what your BASIC lines print.
 

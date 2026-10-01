@@ -32,12 +32,20 @@ Design: `shell-design.md`
 - [x] **SHELL-EDIT-001**: When interactive mode runs with both stdin and stderr connected to terminals, the shell shall read each line with the `golang.org/x/term` line editor, echoing keystrokes to stderr.
 - [x] **SHELL-EDIT-002**: If stdin or stderr is not a terminal, or the shell is in script mode, then the shell shall read lines without the line editor, as SHELL-LINE-001 to SHELL-LINE-003 specify.
 - [x] **SHELL-EDIT-003**: While a line is read with the line editor, the up arrow (or Ctrl-P) shall replace the line with the previous entry of the session's history, and the down arrow (or Ctrl-N) with the next, more recent entry, returning to the line being typed after the most recent entry.
-- [x] **SHELL-EDIT-004**: The shell shall add each line read with the line editor to the session's history, except blank lines and lines discarded with Ctrl-C, keeping the most recent 100 entries.
+- [x] **SHELL-EDIT-004**: The shell shall add each line read with the line editor to the session's history, except blank lines and lines discarded with Ctrl-C, keeping the most recent 100 entries (including any loaded from the history file, SHELL-HIST-002).
 - [x] **SHELL-EDIT-005**: When Ctrl-C is pressed while a line is read with the line editor, the shell shall discard that line without running it or adding it to history, and read a new line.
 - [x] **SHELL-EDIT-006**: When Ctrl-D is pressed on an empty line read with the line editor, the shell shall treat it as the end of input (SHELL-INT-006).
 - [x] **SHELL-EDIT-007**: The shell shall switch stdin to raw mode immediately before reading each line with the line editor and restore stdin's previous mode after the line is read, whether or not reading succeeded, so that each line runs with the terminal in its previous mode.
 - [x] **SHELL-EDIT-008**: When the line editor reports a line as pasted (`term.ErrPasteIndicator`), the shell shall run it as an ordinary line.
 - [x] **SHELL-EDIT-009**: While a line is read with the line editor, the left and right arrows, Home, End, Backspace, and Delete shall move the cursor and edit the line, so that the line returned is the edited text.
+
+## History file
+
+- [x] **SHELL-HIST-001**: When `shell.Main` runs, it shall set `Config.HistoryFile` to the value of the environment variable `C64SH_HISTORY` if that variable is set (so an empty value means no history file), and otherwise to `.c64sh_history` in the user's home directory, or to empty if the home directory cannot be determined.
+- [x] **SHELL-HIST-002**: When the line editor is used and `Config.HistoryFile` is not empty, the shell shall start the session's history with the most recent 100 non-blank lines of that file (oldest first, one line per line of the file, with any trailing `\r` removed), so that the up arrow recalls lines from earlier sessions; a missing file shall give an empty history.
+- [x] **SHELL-HIST-003**: When a line is added to the history of a line editor with a history file, the shell shall write the whole history, oldest first, each line followed by `\n`, to a new temporary file in the history file's directory with permissions `0600`, and rename it over the history file.
+- [x] **SHELL-HIST-004**: If the history file exists but cannot be read, or cannot be written, then the shell shall write `c64sh: history: ` followed by the reason to stderr, at most once per session, and continue with the history in memory.
+- [x] **SHELL-HIST-005**: When lines are read without the line editor (script mode, pipes, or input that is not a terminal), the shell shall neither read nor write the history file.
 
 ## Script mode
 

@@ -13,6 +13,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Numbers](#numbers)
 - [Arithmetic](#arithmetic)
 - [Comparisons](#comparisons)
+- [Logic](#logic)
 - [Variables](#variables)
 - [Comments](#comments)
 - [Errors](#errors)
@@ -246,6 +247,22 @@ A comparison is a number: **-1 when true, 0 when false**. `PRINT 1<2` prints `-1
 
 See [`examples/011-comparisons.bas`](../examples/011-comparisons.bas) for every form.
 
+## Logic
+
+`AND`, `OR`, and `NOT` combine conditions. Because true is -1 and false is 0, they work on comparisons the way you would expect:
+
+```
+PRINT 1<2 AND 3<4     : REM -1 (both true)
+PRINT 1>2 OR 3<4      : REM -1 (one true)
+PRINT NOT 1=2         : REM -1
+```
+
+- **Order**: comparisons first, then `NOT`, then `AND`, then `OR`. So `0 OR 1 AND 0` is `0 OR (1 AND 0)`, which is 0, and `NOT 1=2` is `NOT (1=2)`.
+- **They work bit by bit** on whole numbers from -32768 to 32767, as on a C64: `PRINT 12 AND 10` prints ` 8 `, `PRINT 12 OR 10` prints ` 14 `, and `PRINT NOT 5` prints `-6 `. Fractions are rounded down first.
+- A number outside -32768 to 32767 is an `?ILLEGAL QUANTITY  ERROR`, and a string is a `?TYPE MISMATCH  ERROR`.
+
+See [`examples/012-logic.bas`](../examples/012-logic.bas) for every form.
+
 ## Variables
 
 A variable holds a value for later. Set it with `=` (the word `LET` in front is optional), and use its name anywhere a value can go:
@@ -260,10 +277,10 @@ PRINT "HELLO, ";N$
 
 prints `B IS 11 ` and `HELLO, ALICE`.
 
-- **Three kinds**: a name ending in `$` holds a string (`N$`); a name ending in `%` holds a whole number (`C%`); any other name holds a number (`A`, `SCORE`). `A`, `A%`, and `A$` are different variables. Putting a string in a number variable, or a number in a string variable, is a `?TYPE MISMATCH  ERROR`.
+- **Three kinds**: a name ending in `$` holds a string (`N$`); a name ending in `%` holds a whole number (`C%`); any other name holds a number (`A`, `HEIGHT`). `A`, `A%`, and `A$` are different variables. Putting a string in a number variable, or a number in a string variable, is a `?TYPE MISMATCH  ERROR`.
 - **Integer variables** (`%`) round down what is stored in them: `C%=3.7` stores 3, and `C%=-3.7` stores -4. They hold -32768 to 32767; storing a number outside that range is an `?ILLEGAL QUANTITY  ERROR`. In calculations they are ordinary numbers.
-- **Names** start with an uppercase letter, followed by letters and digits. **Only the first two characters count**, so `SCORE` and `SC` are the same variable.
-- **A name cannot contain a keyword**, because the C64 finds keywords anywhere: `PREMIUM=1` is a `?SYNTAX  ERROR` (it contains `REM`). It also means `PRINTER` prints the variable `ER`, and `LETTER=1` sets `TE`.
+- **Names** start with an uppercase letter, followed by letters and digits. **Only the first two characters count**, so `HEIGHT` and `HE` are the same variable.
+- **A name cannot contain a keyword**, because the C64 finds keywords anywhere: `PREMIUM=1` is a `?SYNTAX  ERROR` (it contains `REM`), and so is `SCORE=1` (it contains `OR`). It also means `PRINTER` prints the variable `ER`, and `LETTER=1` sets `TE`.
 - **Spaces inside a name are ignored**: `A B` is the variable `AB`.
 - **A variable never set** is 0, or the empty string.
 - **Values last** from line to line, for the whole session or script.
@@ -301,10 +318,10 @@ Errors are reported the way a C64 reports them, on stderr:
 |---|---|
 | `?SYNTAX  ERROR` | c64sh cannot understand the line: a misspelled or lowercase keyword, a stray character, or a part of BASIC that c64sh does not support yet. |
 | `?STRING TOO LONG  ERROR` | Joining strings with `+` produced more than 255 characters. |
-| `?TYPE MISMATCH  ERROR` | A string compared with a number, `+` given a string and a number, or `-`, `*`, `/`, `^`, or a minus sign in front was given a string. |
+| `?TYPE MISMATCH  ERROR` | A string compared with a number or used with `AND`, `OR`, or `NOT`, `+` given a string and a number, or `-`, `*`, `/`, `^`, or a minus sign in front was given a string. |
 | `?OVERFLOW  ERROR` | A number, or the result of a calculation, is larger than 1.70141183E+38. |
 | `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
-| `?ILLEGAL QUANTITY  ERROR` | A negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
+| `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
 
 An error stops the rest of its line. Anything printed before the error stays printed, as on a C64:
 
@@ -338,7 +355,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
-- Logic (`AND`, `OR`, `NOT`) and `IF`
+- `IF`
 - Arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
 - Functions such as `CHR$(34)`
 - Program mode: lines with line numbers (`10 PRINT "HELLO"`), `RUN`, `LIST`, `GOTO`

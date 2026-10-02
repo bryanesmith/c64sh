@@ -29,6 +29,9 @@ const (
 	Name                  // a variable name, without spaces
 	Less                  // <
 	Greater               // >
+	And                   // AND
+	Or                    // OR
+	Not                   // NOT
 )
 
 var kindNames = [...]string{
@@ -53,6 +56,9 @@ var kindNames = [...]string{
 	Name:      "Name",
 	Less:      "Less",
 	Greater:   "Greater",
+	And:       "And",
+	Or:        "Or",
+	Not:       "Not",
 }
 
 func (k Kind) String() string {

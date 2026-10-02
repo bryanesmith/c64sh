@@ -4,7 +4,6 @@ package interp
 import (
 	"fmt"
 	"io"
-	"math"
 	"strings"
 	"unicode/utf8"
 
@@ -86,11 +85,11 @@ func (in *Interp) execLet(s *ast.LetStmt) error {
 		return &basicerr.Error{Kind: basicerr.StringTooLong}
 	}
 	if strings.HasSuffix(s.Var.Name, "%") {
-		// As the C64 ROM does: range check ($B1BF), then round down ($BC9B).
-		if !(math.Abs(v.num) < 32768 || v.num == -32768) {
-			return &basicerr.Error{Kind: basicerr.IllegalQuantity}
+		n, err := toInt16(v)
+		if err != nil {
+			return err
 		}
-		v = numberValue(math.Floor(v.num))
+		v = numberValue(float64(n))
 	}
 	in.vars[s.Var.Name] = v
 	return nil
@@ -183,6 +182,7 @@ func (in *Interp) write(s string) error {
 // @spec INTERP-003, INTERP-009, INTERP-010, INTERP-011, INTERP-012
 // @spec INTERP-020, INTERP-021, INTERP-022, INTERP-025, INTERP-026, INTERP-027, INTERP-028
 // @spec INTERP-029, INTERP-030, INTERP-031, INTERP-039, INTERP-040, INTERP-041
+// @spec INTERP-042, INTERP-043, INTERP-044
 func (in *Interp) eval(e ast.Expr) (value, error) {
 	switch e := e.(type) {
 	case *ast.StringLit:
@@ -218,6 +218,16 @@ func (in *Interp) eval(e ast.Expr) (value, error) {
 			return value{}, err
 		}
 		return binary(e.Op, l, r)
+	case *ast.NotExpr:
+		x, err := in.eval(e.X)
+		if err != nil {
+			return value{}, err
+		}
+		n, err := toInt16(x)
+		if err != nil {
+			return value{}, err
+		}
+		return numberValue(float64(^n)), nil
 	case *ast.CompareExpr:
 		l, err := in.eval(e.Left)
 		if err != nil {
@@ -249,6 +259,19 @@ func binary(op ast.Op, l, r value) (value, error) {
 		default:
 			return value{}, &basicerr.Error{Kind: basicerr.TypeMismatch}
 		}
+	case ast.And, ast.Or:
+		a, err := toInt16(l)
+		if err != nil {
+			return value{}, err
+		}
+		b, err := toInt16(r)
+		if err != nil {
+			return value{}, err
+		}
+		if op == ast.And {
+			return numberValue(float64(a & b)), nil
+		}
+		return numberValue(float64(a | b)), nil
 	case ast.Sub, ast.Mul, ast.Div, ast.Pow:
 		// Only "+" accepts strings; types are checked before the divisor.
 		if !l.isNum || !r.isNum {

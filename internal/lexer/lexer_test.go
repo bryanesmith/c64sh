@@ -273,7 +273,7 @@ func name(v string, pos int) token.Token { return tok(token.Name, v, pos) }
 func TestNames(t *testing.T) {
 	runLexCases(t, []lexCase{
 		{"single letter", `A`, []token.Token{name("A", 0), eol(1)}},
-		{"long name", `SCORE`, []token.Token{name("SCORE", 0), eol(5)}},
+		{"long name", `HEIGHT`, []token.Token{name("HEIGHT", 0), eol(6)}},
 		{"letters and digits", `A1B2`, []token.Token{name("A1B2", 0), eol(4)}},
 		{"string variable", `N$`, []token.Token{name("N$", 0), eol(2)}},
 		{"spaces inside are skipped", `A B`, []token.Token{name("AB", 0), eol(3)}},
@@ -324,5 +324,18 @@ func TestComparisonSymbols(t *testing.T) {
 		{"not equal is two tokens", `<>`, []token.Token{tok(token.Less, "<", 0), tok(token.Greater, ">", 1), eol(2)}},
 		{"all three", `<=>`, []token.Token{tok(token.Less, "<", 0), tok(token.Equal, "=", 1), tok(token.Greater, ">", 2), eol(3)}},
 		{"inside a string", `"<>"`, []token.Token{tok(token.String, "<>", 0), eol(4)}},
+	})
+}
+
+// @spec LEXER-024
+func TestLogicKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"AND", `1AND2`, []token.Token{num("1", 0), tok(token.And, "AND", 1), num("2", 4), eol(5)}},
+		{"OR and NOT", `A OR NOT B`, []token.Token{
+			name("A", 0), tok(token.Or, "OR", 2), tok(token.Not, "NOT", 5), name("B", 9), eol(10),
+		}},
+		{"OR inside a name", `SCORE`, []token.Token{name("SC", 0), tok(token.Or, "OR", 2), name("E", 4), eol(5)}},
+		{"NOT inside a name", `NOTE`, []token.Token{tok(token.Not, "NOT", 0), name("E", 3), eol(4)}},
+		{"AND inside a name", `BAND`, []token.Token{name("B", 0), tok(token.And, "AND", 1), eol(4)}},
 	})
 }

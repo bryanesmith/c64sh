@@ -21,6 +21,9 @@ var keywords = []struct {
 	{"PRINT", token.Print},
 	{"REM", token.Rem},
 	{"LET", token.Let},
+	{"AND", token.And},
+	{"OR", token.Or},
+	{"NOT", token.Not},
 }
 
 // symbols maps single-character tokens to their kinds.
@@ -49,7 +52,7 @@ const upArrow = "\u2191"
 // @spec LEXER-001, LEXER-002, LEXER-003, LEXER-004, LEXER-005, LEXER-006, LEXER-007
 // @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013, LEXER-014
 // @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018, LEXER-019, LEXER-020, LEXER-021
-// @spec LEXER-022, LEXER-023
+// @spec LEXER-022, LEXER-023, LEXER-024
 func Lex(line string) []token.Token {
 	var toks []token.Token
 	emit := func(k token.Kind, value string, pos int) {
@@ -87,6 +90,9 @@ func Lex(line string) []token.Token {
 		// print = "PRINT" | "?" .   ("?" is scanned with the symbols below)
 		// rem   = "REM" { character | `"` } .
 		// let   = "LET" .
+		// and   = "AND" .
+		// or    = "OR" .
+		// not   = "NOT" .
 		if text, kind, ok := matchKeyword(line[i:]); ok {
 			if kind == token.Rem {
 				// A comment runs to the end of the line, untokenized.

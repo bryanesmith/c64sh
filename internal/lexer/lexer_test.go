@@ -316,3 +316,13 @@ func TestLetAndEqual(t *testing.T) {
 		}},
 	})
 }
+
+// @spec LEXER-023
+func TestComparisonSymbols(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"less", `1<2`, []token.Token{num("1", 0), tok(token.Less, "<", 1), num("2", 2), eol(3)}},
+		{"not equal is two tokens", `<>`, []token.Token{tok(token.Less, "<", 0), tok(token.Greater, ">", 1), eol(2)}},
+		{"all three", `<=>`, []token.Token{tok(token.Less, "<", 0), tok(token.Equal, "=", 1), tok(token.Greater, ">", 2), eol(3)}},
+		{"inside a string", `"<>"`, []token.Token{tok(token.String, "<>", 0), eol(4)}},
+	})
+}

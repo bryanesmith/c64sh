@@ -225,3 +225,29 @@ func TestIntegerVariables(t *testing.T) {
 		check(t, c.name, runMain(t, c.input), c.want)
 	}
 }
+
+// TestComparisons checks comparisons end to end, as listed in the HLD's
+// Goals.
+func TestComparisons(t *testing.T) {
+	cases := []struct {
+		input string
+		want  result
+	}{
+		{`PRINT 1<2`, result{"-1 \n", "", 0}},
+		{`PRINT 5=6`, result{" 0 \n", "", 0}},
+		{`PRINT 1+1=2`, result{"-1 \n", "", 0}},
+		{`PRINT 3<>4;3><4;4<=4;4=<4;5>=6;5=>6`, result{"-1 -1 -1 -1  0  0 \n", "", 0}},
+		{`PRINT 1<=>2`, result{"-1 \n", "", 0}},
+		{`PRINT 1 < > 2`, result{"-1 \n", "", 0}},
+		{`PRINT "APPLE"<"BANANA"`, result{"-1 \n", "", 0}},
+		{`PRINT "A"<"AB"`, result{"-1 \n", "", 0}},
+		{`PRINT 1<2<3`, result{"-1 \n", "", 0}},
+		{`A=5:PRINT A=5`, result{"-1 \n", "", 0}},
+		{`B=1:C=1:A=B=C:PRINT A`, result{"-1 \n", "", 0}},
+		{`PRINT 1==1`, result{"", "?SYNTAX  ERROR\n", 1}},
+		{`PRINT "1"=1`, result{"", "?TYPE MISMATCH  ERROR\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.input, runMain(t, c.input+"\n"), c.want)
+	}
+}

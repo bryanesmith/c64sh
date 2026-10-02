@@ -37,7 +37,7 @@ Program mode is a planned feature. It adds a stored program to the shell's state
 
 ### Incremental language growth
 
-The language grows one feature at a time. The language currently supports `PRINT` with string and number arguments, arithmetic, variables, and `REM` comments, in direct mode. Each new feature (numbers and math, functions such as `CHR$`, variables, program mode with line numbers, `LOAD`/`SAVE`) extends the lexer and parser, with their rule comments, then the interpreter, and gets its own tests at every layer. It also adds or extends a numbered example script in `examples/` that exercises the feature in many ways, with a snapshot test recording that script's exact output.
+The language grows one feature at a time. The language currently supports `PRINT` with string and number arguments, arithmetic, comparisons, variables, and `REM` comments, in direct mode. Each new feature (numbers and math, functions such as `CHR$`, variables, program mode with line numbers, `LOAD`/`SAVE`) extends the lexer and parser, with their rule comments, then the interpreter, and gets its own tests at every layer. It also adds or extends a numbered example script in `examples/` that exercises the feature in many ways, with a snapshot test recording that script's exact output.
 
 ## Target Users
 
@@ -52,6 +52,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 - `PRINT` with string literals behaves as it does on a C64: optional space after the keyword (`PRINT"X"`), `;` and `+` join strings, and `:` separates statements on one line. `,` moves to the next 10-column print zone, as on a C64.
 - Numbers are written and printed as on a C64: literals such as `5`, `3.14`, `.5`, and `1E3`; printed with a leading space (or `-`) and a trailing space, rounded to 9 significant digits, with no leading zero before the decimal point (`.5`), and in scientific notation below 0.01 and from 1E9 up (`1E-03`, `1E+09`). Numbers and strings mix freely in `PRINT` (`? "5*9=";45`).
 - Arithmetic follows C64 rules: `+`, `-`, `*`, `/`, and `^` (exponentiation, also typed `↑`, the same character code as the C64's up-arrow key), a leading `-` (negation) or `+`, and parentheses, with the C64's precedence (`^`, then negation, then `*` and `/`, then `+` and `-`, each left to right, so `-2^2` is -4 and `2^3^2` is 64). `+` also joins strings. Dividing by zero is `?DIVISION BY ZERO  ERROR`, a negative number to a fractional power is `?ILLEGAL QUANTITY  ERROR`, and using a string with an arithmetic operator other than joining is `?TYPE MISMATCH  ERROR`.
+- Comparisons behave as on a C64: `=`, `<>`, `<`, `>`, `<=`, and `>=` compare two numbers or two strings and give -1 for true and 0 for false, binding more loosely than arithmetic (`1+1=2` is -1). `=` assigns at the start of a statement and compares inside an expression, so `A=B=C` stores the comparison's result. Comparing a string with a number is `?TYPE MISMATCH  ERROR`.
 - Variables behave as on a C64: number variables (`A`, `SCORE`), integer variables (`C%`, holding whole numbers from -32768 to 32767, rounding down what is stored in them), and string variables (`N$`), set with `=` with or without `LET` and used anywhere a value can go. Only the first two characters of a name count (`SCORE` and `SC` are the same variable), a keyword inside a name breaks it (`TOTAL` contains `TO`), spaces inside a name are ignored, a variable never set is 0 or the empty string, and assigning the wrong type is `?TYPE MISMATCH  ERROR`. Values persist from line to line for the whole session or script.
 - `REM` comments behave as they do on a C64: everything after `REM` to the end of the line is ignored, including colons, so comments can document scripts and follow other statements (`PRINT "A":REM SHOW A`).
 - Input the shell does not accept produces the error a C64 would print for it (for example `?SYNTAX  ERROR`).
@@ -63,7 +64,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 ## Non-Goals
 
 - **Emulating the C64 machine.** No screen memory, 40-column wrapping, colors, cursor control, PETSCII graphics, `PEEK`/`POKE`, or timing.
-- **Supporting the whole language at once.** Comparison and logical operators, arrays, the system variables `TI`, `TI$`, and `ST`, functions, program mode (see *Direct mode and program mode*), and device commands are future features, added one at a time.
+- **Supporting the whole language at once.** Logical operators, arrays, the system variables `TI`, `TI$`, and `ST`, functions, program mode (see *Direct mode and program mode*), and device commands are future features, added one at a time.
 - **Advanced line editing**: tab completion and history search. The interactive prompt offers history and basic editing only.
 - **Extensions beyond BASIC V2.** No keywords from BASIC 3.5/7.0 or third-party extensions.
 - **Real device I/O.** When `LOAD`/`SAVE` are added, the storage behind them will be replaceable, so tests never touch the real filesystem.

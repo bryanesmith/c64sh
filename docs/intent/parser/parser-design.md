@@ -64,6 +64,22 @@ const (
 // NegExpr is -X, a leading minus sign (negation).
 type NegExpr struct{ X Expr }
 
+// CompareExpr is Left Rel Right: true (-1) when the actual relation of
+// Left to Right is one of the relations in Rel.
+type CompareExpr struct {
+    Rel         Relation
+    Left, Right Expr
+}
+
+// Relation is a set of relations, combined as a C64 combines them.
+type Relation uint8
+
+const (
+    RelGreater Relation = 1 // >
+    RelEqual   Relation = 2 // =
+    RelLess    Relation = 4 // <
+)
+
 // VarRef is a variable, used as a value or assigned to.
 type VarRef struct {
     Name string // identity: first two characters, plus "$" or "%" for a string or integer ("SC", "N$", "C%")
@@ -85,13 +101,20 @@ Each precedence level is its own grammar rule, so a lower rule's operands are bu
 
 | Level | Rule | Operators |
 |---|---|---|
-| 1 | `Expression` | `+` `-` (binary), left to right |
-| 2 | `Term` | `*` `/`, left to right |
-| 3 | `Unary` | a leading `-` (negation) or `+` |
-| 4 | `Power` | `^`, left to right |
-| 5 | `Operand` | literals and `( … )` |
+| 1 | `Expression` | comparisons: `=` `<>` `<` `>` `<=` `>=` and the other spellings below, left to right |
+| 2 | `Sum` | `+` `-` (binary), left to right |
+| 3 | `Term` | `*` `/`, left to right |
+| 4 | `Unary` | a leading `-` (negation) or `+` |
+| 5 | `Power` | `^`, left to right |
+| 6 | `Operand` | literals and `( … )` |
 
-So `2+3*4` is 14, `(2+3)*4` is 20, `-2*3` is `(-2)*3`, `-2^2` is `-(2^2)` = -4, and `2^3^2` is `(2^3)^2` = 64, as on a C64. A leading `+` is dropped (the C64 ROM skips it: `+5` is 5 and `+"A"` is `"A"`); a leading `-` becomes a `NegExpr`. Leading signs can repeat: `--5` is 5, and `5--5` is 10.
+So `1+1=2` is `(1+1)=2`, `1<2<3` is `(1<2)<3`, `2+3*4` is 14, `(2+3)*4` is 20, `-2*3` is `(-2)*3`, `-2^2` is `-(2^2)` = -4, and `2^3^2` is `(2^3)^2` = 64, as on a C64. A leading `+` is dropped (the C64 ROM skips it: `+5` is 5 and `+"A"` is `"A"`); a leading `-` becomes a `NegExpr`. Leading signs can repeat: `--5` is 5, and `5--5` is 10.
+
+### Comparison operators
+
+A comparison operator is a run of one or more of the tokens `<`, `=`, and `>`, as the C64 ROM reads it (`$ADB8`). Each symbol adds a relation to a `Relation` set: `>` adds greater, `=` equal, `<` less. **The symbols may come in any order, separated by spaces or not, and each may appear once**: `<>` and `><` both mean "not equal", `<=` and `=<` "less or equal", `>=` and `=>` "greater or equal", and `<=>` holds every relation, so it is always true. A symbol repeated within one operator (`==`, `<<`, `<=<`) is a SYNTAX error, as on a C64.
+
+A statement that begins with a name is an assignment, so its first `=` is the assignment; any later `=` compares. `A=B=C` stores in `A` the result of comparing `B` with `C`.
 
 ### Signs in an exponent
 
@@ -125,7 +148,9 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
-| `Expression = Term { ( "+" \| "-" ) Term } .` | `parseExpression` | `ast.Expr` |
+| `Expression = Sum { Relation Sum } .` | `parseExpression` | `ast.Expr` |
+| `Relation = ( "<" \| "=" \| ">" ) { "<" \| "=" \| ">" } .` | `parseRelation` | `ast.Relation` (each symbol at most once) |
+| `Sum = Term { ( "+" \| "-" ) Term } .` | `parseSum` | `ast.Expr` |
 | `Term = Unary { ( "*" \| "/" ) Unary } .` | `parseTerm` | `ast.Expr` |
 | `Unary = "-" Unary \| "+" Unary \| Power .` | `parseUnary` | `ast.Expr` |
 | `Power = Operand { "^" Exponent } .` | `parsePower` | `ast.Expr` |
@@ -194,6 +219,7 @@ Examples:
 | `^` associativity | Left to right: `2^3^2` is 64 | Right to left (512), as in mathematics and many languages | C64 BASIC V2 evaluates `^` left to right, like its other operators. |
 | Variable identity | Computed by the parser into `VarRef.Name` | Computed by the interpreter at each use | One place decides identity; the interpreter only stores and looks up. |
 | Unsupported names (`TI`, `ST`, arrays, functions) | SYNTAX error | Treat as ordinary variables | On a C64 these read the clock, the I/O status, an array element, or a function result; silently treating them as plain variables would print wrong answers. |
+| Comparison representation | `CompareExpr` with a `Relation` bit set | One `Op` per operator (`<`, `<=`, …) | A set of relations reproduces the C64's own rule for combining `<`, `=`, and `>` directly, including the unusual spellings, with one evaluation rule. |
 | Parenthesized expressions | No node; `( … )` returns its inner expression | A `ParenExpr` node | Parentheses only group; the tree's shape already records the grouping. |
 | Type checking of `+` | In the interpreter, from the operand values | In the parser, from the operand kinds | BASIC V2 types are known at run time (variables will hold either kind), and a C64 reports `?TYPE MISMATCH  ERROR` when the statement runs, after earlier statements have run. |
 

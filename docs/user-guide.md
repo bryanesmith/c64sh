@@ -12,6 +12,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [PRINT](#print)
 - [Numbers](#numbers)
 - [Arithmetic](#arithmetic)
+- [Comparisons](#comparisons)
 - [Variables](#variables)
 - [Comments](#comments)
 - [Errors](#errors)
@@ -225,6 +226,26 @@ A few details:
 
 See [`examples/007-arithmetic.bas`](../examples/007-arithmetic.bas) and [`examples/008-exponents.bas`](../examples/008-exponents.bas) for every form.
 
+## Comparisons
+
+| Operator | Meaning |
+|---|---|
+| `=` | equal |
+| `<>` | not equal |
+| `<` / `>` | less / greater |
+| `<=` / `>=` | less or equal / greater or equal |
+
+A comparison is a number: **-1 when true, 0 when false**. `PRINT 1<2` prints `-1 `, and `PRINT 5=6` prints ` 0 `.
+
+- **Comparisons come after arithmetic**: `PRINT 1+1=2` prints `-1 `.
+- **Strings compare letter by letter**: `PRINT "APPLE"<"BANANA"` prints `-1 `, and a shorter string that starts a longer one comes first (`"A"<"AB"`). Uppercase letters, digits, and punctuation are ordered as on a C64; lowercase and non-English characters may order differently.
+- **The symbols can come in either order**, as on a C64: `><` is the same as `<>`, `=<` as `<=`, and `=>` as `>=`, and spaces between them are allowed. All three together, `<=>`, are always true. A repeated symbol, like `==`, is a `?SYNTAX  ERROR`.
+- **`=` means two things**: at the start of a statement it assigns, and after that it compares. `A=B=C` stores in `A` the result of comparing `B` with `C`.
+- **A string cannot be compared with a number**: `PRINT "1"=1` is a `?TYPE MISMATCH  ERROR`.
+- **Testing calculated decimals for equality** can differ from a real C64 in rare cases, because c64sh stores numbers with more precision; `.1+.2=.3`, for example, depends on the last binary digits of each result.
+
+See [`examples/011-comparisons.bas`](../examples/011-comparisons.bas) for every form.
+
 ## Variables
 
 A variable holds a value for later. Set it with `=` (the word `LET` in front is optional), and use its name anywhere a value can go:
@@ -280,7 +301,7 @@ Errors are reported the way a C64 reports them, on stderr:
 |---|---|
 | `?SYNTAX  ERROR` | c64sh cannot understand the line: a misspelled or lowercase keyword, a stray character, or a part of BASIC that c64sh does not support yet. |
 | `?STRING TOO LONG  ERROR` | Joining strings with `+` produced more than 255 characters. |
-| `?TYPE MISMATCH  ERROR` | `+` was given a string and a number, or `-`, `*`, `/`, `^`, or a minus sign in front was given a string. |
+| `?TYPE MISMATCH  ERROR` | A string compared with a number, `+` given a string and a number, or `-`, `*`, `/`, `^`, or a minus sign in front was given a string. |
 | `?OVERFLOW  ERROR` | A number, or the result of a calculation, is larger than 1.70141183E+38. |
 | `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
 | `?ILLEGAL QUANTITY  ERROR` | A negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
@@ -317,7 +338,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
-- Comparisons and logic (`=`, `<`, `>`, `AND`, `OR`, `NOT`)
+- Logic (`AND`, `OR`, `NOT`) and `IF`
 - Arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
 - Functions such as `CHR$(34)`
 - Program mode: lines with line numbers (`10 PRINT "HELLO"`), `RUN`, `LIST`, `GOTO`

@@ -58,6 +58,23 @@ const (
 // NegExpr is -X, a leading minus sign (negation).
 type NegExpr struct{ X Expr }
 
+// CompareExpr is Left Rel Right: true (-1) when the actual relation of
+// Left to Right is one of the relations in Rel.
+type CompareExpr struct {
+	Rel         Relation
+	Left, Right Expr
+}
+
+// Relation is a set of relations, combined as a C64 combines "<", "=",
+// and ">".
+type Relation uint8
+
+const (
+	RelGreater Relation = 1 // >
+	RelEqual   Relation = 2 // =
+	RelLess    Relation = 4 // <
+)
+
 // VarRef is a variable, used as a value or assigned to.
 type VarRef struct {
 	Name string // identity: first two characters, plus "$" for a string
@@ -90,4 +107,5 @@ func (*NumberLit) expr()  {}
 func (*BinaryExpr) expr() {}
 func (*NegExpr) expr()    {}
 
-func (*VarRef) expr() {}
+func (*VarRef) expr()      {}
+func (*CompareExpr) expr() {}

@@ -1,11 +1,13 @@
 package interp
 
 import (
+	"cmp"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 
+	"github.com/bryanesmith/c64sh/internal/ast"
 	"github.com/bryanesmith/c64sh/internal/basicerr"
 )
 
@@ -107,4 +109,29 @@ func power(x, y float64) (value, error) {
 	default:
 		return inRange(math.Pow(x, y))
 	}
+}
+
+// compare returns -1 (true) if the relation of l to r is in rel, and 0
+// (false) otherwise. Strings compare byte by byte, a prefix being less.
+func compare(rel ast.Relation, l, r value) (value, error) {
+	if l.isNum != r.isNum {
+		return value{}, &basicerr.Error{Kind: basicerr.TypeMismatch}
+	}
+	var c int
+	if l.isNum {
+		c = cmp.Compare(l.num, r.num)
+	} else {
+		c = strings.Compare(l.str, r.str)
+	}
+	actual := ast.RelEqual
+	switch {
+	case c < 0:
+		actual = ast.RelLess
+	case c > 0:
+		actual = ast.RelGreater
+	}
+	if rel&actual != 0 {
+		return numberValue(-1), nil
+	}
+	return numberValue(0), nil
 }

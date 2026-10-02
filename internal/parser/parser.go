@@ -21,7 +21,8 @@ import (
 // @spec PARSER-001, PARSER-002, PARSER-003, PARSER-004, PARSER-005, PARSER-006
 // @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011, PARSER-012, PARSER-013
 // @spec PARSER-014, PARSER-015, PARSER-016, PARSER-017, PARSER-018, PARSER-019, PARSER-020
-// @spec PARSER-021, PARSER-022, PARSER-023, PARSER-024, PARSER-025
+// @spec PARSER-021, PARSER-022, PARSER-023, PARSER-024, PARSER-025, PARSER-026, PARSER-027
+// @spec PARSER-028
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -197,8 +198,56 @@ func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	}
 }
 
-// Expression = Term { ( "+" | "-" ) Term } .
+// Expression = Sum { Relation Sum } .
 func (p *parser) parseExpression() (ast.Expr, error) {
+	left, err := p.parseSum()
+	if err != nil {
+		return nil, err
+	}
+	for isRelationToken(p.peek()) {
+		rel, err := p.parseRelation()
+		if err != nil {
+			return nil, err
+		}
+		right, err := p.parseSum()
+		if err != nil {
+			return nil, err
+		}
+		left = &ast.CompareExpr{Rel: rel, Left: left, Right: right}
+	}
+	return left, nil
+}
+
+func isRelationToken(k token.Kind) bool {
+	return k == token.Less || k == token.Equal || k == token.Greater
+}
+
+// Relation = ( "<" | "=" | ">" ) { "<" | "=" | ">" } .
+//
+// As the C64 ROM does ($ADB8), each symbol adds its relation to the set, in
+// any order; a symbol repeated within one operator is a SYNTAX error.
+func (p *parser) parseRelation() (ast.Relation, error) {
+	var rel ast.Relation
+	for isRelationToken(p.peek()) {
+		var r ast.Relation
+		switch p.next().Kind {
+		case token.Less:
+			r = ast.RelLess
+		case token.Equal:
+			r = ast.RelEqual
+		default:
+			r = ast.RelGreater
+		}
+		if rel&r != 0 {
+			return 0, syntaxError()
+		}
+		rel |= r
+	}
+	return rel, nil
+}
+
+// Sum = Term { ( "+" | "-" ) Term } .
+func (p *parser) parseSum() (ast.Expr, error) {
 	left, err := p.parseTerm()
 	if err != nil {
 		return nil, err

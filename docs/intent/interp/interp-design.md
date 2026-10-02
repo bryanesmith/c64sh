@@ -163,6 +163,11 @@ A `BinaryExpr` evaluates its left operand, then its right operand, then applies 
 | `BinaryExpr` `Pow` | Two numbers: the left raised to the power of the right, following the C64 ROM's power routine (`$BF7B`): anything to the power 0 is 1 (including `0^0`); 0 to any other power is 0 (including a negative power, so `0^-1` is 0, not a division by zero); a negative number to a whole-number power is computed from its size, then negated if the power is odd (`(-2)^3` is -8); a negative number to a fractional power is `ILLEGAL QUANTITY`. Any string operand: `TYPE MISMATCH`. |
 | `NegExpr` | A number: its negation. A string: `TYPE MISMATCH`. |
 | `VarRef` | The variable's value; 0 or `""` if never assigned. |
+| `CompareExpr` | Two numbers, or two strings: -1 if the actual relation of the left operand to the right (less, equal, or greater) is in `Rel`, otherwise 0. A string and a number: `TYPE MISMATCH`. |
+
+**Comparing strings** follows the C64: characters are compared one by one from the start, by their codes, and if one string is the start of the other, the shorter is less (`"A"<"AB"`). c64sh compares the bytes of the strings. For uppercase letters, digits, and punctuation the order is the same as the C64's character codes (PETSCII); for lowercase and non-ASCII characters it may differ.
+
+**Comparing numbers** is exact. Because c64sh's numbers are 64-bit floating point rather than the C64's 5-byte format (HLD *Number representation*), an equality test on computed values can differ from a C64's: `.1+.2=.3` depends on the last bits of each result.
 
 Every numeric result is limited to the C64's range: `OVERFLOW` if its size exceeds `maxNumber`, and 0 if it is nonzero and its size is below `minNumber`. A negative zero prints as `0`.
 
@@ -177,7 +182,7 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | Kind | Cause |
 |---|---|
 | `STRING TOO LONG` | Joining strings with `+` produces more than 255 characters, or a string longer than 255 characters is assigned to a variable. |
-| `TYPE MISMATCH` | Assigning a string to a number variable or a number to a string variable; `+` with a string on one side and a number on the other; `-`, `*`, `/`, `^`, or negation with any string operand. |
+| `TYPE MISMATCH` | Comparing a string with a number; assigning a string to a number variable or a number to a string variable; `+` with a string on one side and a number on the other; `-`, `*`, `/`, `^`, or negation with any string operand. |
 | `OVERFLOW` | A number literal or arithmetic result larger in size than `maxNumber`. |
 | `DIVISION BY ZERO` | `/` with a right operand of 0. |
 | `ILLEGAL QUANTITY` | `^` with a negative left operand and a right operand that is not a whole number; a value whose size is 32768 or more (other than -32768) assigned to an integer variable. |

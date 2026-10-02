@@ -27,6 +27,8 @@ const (
 	Let                   // LET
 	Equal                 // =
 	Name                  // a variable name, without spaces
+	Less                  // <
+	Greater               // >
 )
 
 var kindNames = [...]string{
@@ -49,6 +51,8 @@ var kindNames = [...]string{
 	Let:       "Let",
 	Equal:     "Equal",
 	Name:      "Name",
+	Less:      "Less",
+	Greater:   "Greater",
 }
 
 func (k Kind) String() string {

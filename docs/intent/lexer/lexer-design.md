@@ -41,6 +41,8 @@ const (
     Caret                 // ^ or ↑ (exponentiation)
     Let                   // LET
     Equal                 // =
+    Less                  // <
+    Greater               // >
     Name                  // a variable name: A, SCORE, N$ (Value: the name without spaces)
 )
 
@@ -69,7 +71,7 @@ At each position the lexer applies the first matching rule:
 | `^` or `↑` (U+2191) | `Caret`, whose value is the character as written. |
 | A digit, or `.` | `Number` token (see *Numbers*). |
 | An uppercase letter that does not begin a keyword | `Name` token (see *Names*). |
-| `=` | `Equal`. |
+| `=` `<` `>` | `Equal`, `Less`, `Greater`, one token per character; the parser combines them into comparison operators (`<>`, `<=`, …). |
 | Any other character | `Illegal` token holding that one character (a full UTF-8 character, not a single byte). |
 | A byte that is not valid UTF-8 | `Illegal` token holding that one byte. |
 

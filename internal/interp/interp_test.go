@@ -769,3 +769,83 @@ func TestIntegerVariableRange(t *testing.T) {
 		}
 	}
 }
+
+func rel(rel ast.Relation, l, r ast.Expr) *ast.CompareExpr {
+	return &ast.CompareExpr{Rel: rel, Left: l, Right: r}
+}
+
+// @spec INTERP-039
+func TestCompareNumbers(t *testing.T) {
+	ne := ast.RelLess | ast.RelGreater
+	le := ast.RelLess | ast.RelEqual
+	ge := ast.RelGreater | ast.RelEqual
+	all := ast.RelLess | ast.RelEqual | ast.RelGreater
+	cases := []struct {
+		name string
+		e    ast.Expr
+		want string
+	}{
+		{"1<2", rel(ast.RelLess, num(1), num(2)), "-1 "},
+		{"2<1", rel(ast.RelLess, num(2), num(1)), " 0 "},
+		{"1=1", rel(ast.RelEqual, num(1), num(1)), "-1 "},
+		{"1=2", rel(ast.RelEqual, num(1), num(2)), " 0 "},
+		{"2>1", rel(ast.RelGreater, num(2), num(1)), "-1 "},
+		{"1<>2", rel(ne, num(1), num(2)), "-1 "},
+		{"1<>1", rel(ne, num(1), num(1)), " 0 "},
+		{"1<=1", rel(le, num(1), num(1)), "-1 "},
+		{"2<=1", rel(le, num(2), num(1)), " 0 "},
+		{"1>=2", rel(ge, num(1), num(2)), " 0 "},
+		{"<=> is always true", rel(all, num(5), num(-5)), "-1 "},
+		{"negative numbers", rel(ast.RelLess, num(-3), num(-2)), "-1 "},
+		{"chained", rel(ast.RelLess, rel(ast.RelLess, num(3), num(2)), num(1)), "-1 "},
+	}
+	for _, c := range cases {
+		rec, err := exec(line(printStmt(item(c.e), semi)))
+		if err != nil {
+			t.Errorf("%s: unexpected error %v", c.name, err)
+			continue
+		}
+		if got := rec.String(); got != c.want {
+			t.Errorf("%s: printed %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// @spec INTERP-040
+func TestCompareStrings(t *testing.T) {
+	cases := []struct {
+		name string
+		e    ast.Expr
+		want string
+	}{
+		{"alphabetical", rel(ast.RelLess, str("APPLE"), str("BANANA")), "-1 "},
+		{"equal", rel(ast.RelEqual, str("HI"), str("HI")), "-1 "},
+		{"not equal", rel(ast.RelEqual, str("HI"), str("HO")), " 0 "},
+		{"prefix is less", rel(ast.RelLess, str("A"), str("AB")), "-1 "},
+		{"empty is least", rel(ast.RelLess, str(""), str("A")), "-1 "},
+		{"digits before letters", rel(ast.RelLess, str("9"), str("A")), "-1 "},
+		{"case matters", rel(ast.RelEqual, str("A"), str("a")), " 0 "},
+	}
+	for _, c := range cases {
+		rec, err := exec(line(printStmt(item(c.e), semi)))
+		if err != nil {
+			t.Errorf("%s: unexpected error %v", c.name, err)
+			continue
+		}
+		if got := rec.String(); got != c.want {
+			t.Errorf("%s: printed %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// @spec INTERP-041
+func TestCompareStringWithNumberIsTypeMismatch(t *testing.T) {
+	for name, e := range map[string]ast.Expr{
+		"string = number": rel(ast.RelEqual, str("1"), num(1)),
+		"number < string": rel(ast.RelLess, num(1), str("A")),
+	} {
+		if _, err := exec(line(printStmt(item(e)))); !isKind(err, basicerr.TypeMismatch) {
+			t.Errorf("%s: error = %v, want TYPE MISMATCH", name, err)
+		}
+	}
+}

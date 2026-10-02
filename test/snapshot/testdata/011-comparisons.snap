@@ -1,0 +1,23 @@
+exit status: 1
+--- stdout ---
+-1 
+ 0 
+-1 
+-1 
+-1 
+ 0 
+-1 
+-1 
+-1 
+-1 
+-1 
+-1 
+-1 
+ 0 
+-1 
+-1 
+-1 
+-1 
+ 0 
+--- stderr ---
+?TYPE MISMATCH  ERROR

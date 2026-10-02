@@ -27,6 +27,8 @@ var (
 	caret = token.Token{Kind: token.Caret, Value: "^"}
 	let   = token.Token{Kind: token.Let, Value: "LET"}
 	eq    = token.Token{Kind: token.Equal, Value: "="}
+	lt    = token.Token{Kind: token.Less, Value: "<"}
+	gt    = token.Token{Kind: token.Greater, Value: ">"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -108,6 +110,18 @@ func dumpExpr(e ast.Expr) string {
 		return "(-" + dumpExpr(e.X) + ")"
 	case *ast.VarRef:
 		return "$" + e.Name + "[" + e.Text + "]"
+	case *ast.CompareExpr:
+		rel := ""
+		if e.Rel&ast.RelLess != 0 {
+			rel += "<"
+		}
+		if e.Rel&ast.RelEqual != 0 {
+			rel += "="
+		}
+		if e.Rel&ast.RelGreater != 0 {
+			rel += ">"
+		}
+		return "(" + dumpExpr(e.Left) + " " + rel + " " + dumpExpr(e.Right) + ")"
 	default:
 		return fmt.Sprintf("<expr %T>", e)
 	}
@@ -224,6 +238,9 @@ func TestSyntaxErrorInsidePrintEndsWithBadItem(t *testing.T) {
 		{"star as first item", toks(pr, star, number("2")), `PRINT[BAD(SYNTAX)]`, true},
 		{"caret as first item", toks(pr, caret, number("2")), `PRINT[BAD(SYNTAX)]`, true},
 		{"dangling caret", toks(pr, number("2"), caret), `PRINT[BAD(SYNTAX)]`, true},
+		{"less as first item", toks(pr, lt, number("2")), `PRINT[BAD(SYNTAX)]`, true},
+		{"equal as first item", toks(pr, eq, number("2")), `PRINT[BAD(SYNTAX)]`, true},
+		{"dangling comparison", toks(pr, number("1"), lt), `PRINT[BAD(SYNTAX)]`, true},
 		{"close paren as first item", toks(pr, rp), `PRINT[BAD(SYNTAX)]`, true},
 		{"missing close paren", toks(pr, str("A"), semi, lp, number("1"), plus, number("2")), `PRINT["A" ; BAD(SYNTAX)]`, true},
 		{"empty parens", toks(pr, lp, rp), `PRINT[BAD(SYNTAX)]`, true},
@@ -418,5 +435,44 @@ func TestAssignmentSyntaxErrors(t *testing.T) {
 		{"missing =", toks(name("A"), number("5")), ``, true},
 		{"after a good statement", toks(pr, number("1"), colon, name("A"), eq), `PRINT[#1]`, true},
 		{"bad value", toks(name("A"), eq, number("1"), plus), ``, true},
+	})
+}
+
+// @spec PARSER-026
+func TestComparisons(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"equal", toks(pr, number("1"), eq, number("2")), `PRINT[(#1 = #2)]`, false},
+		{"looser than arithmetic", toks(pr, number("1"), plus, number("1"), eq, number("2")), `PRINT[((#1+#1) = #2)]`, false},
+		{"looser on the right", toks(pr, number("2"), eq, number("1"), plus, number("1")), `PRINT[(#2 = (#1+#1))]`, false},
+		{"left to right", toks(pr, number("1"), lt, number("2"), lt, number("3")), `PRINT[((#1 < #2) < #3)]`, false},
+		{"strings", toks(pr, str("A"), lt, str("B")), `PRINT[("A" < "B")]`, false},
+		{"in parentheses", toks(pr, lp, number("1"), gt, number("2"), rp, plus, number("1")), `PRINT[((#1 > #2)+#1)]`, false},
+		{"then another item", toks(pr, number("1"), eq, number("1"), semi, number("2")), `PRINT[(#1 = #1) ; #2]`, false},
+	})
+}
+
+// @spec PARSER-027
+func TestComparisonOperators(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"less", toks(pr, number("1"), lt, number("2")), `PRINT[(#1 < #2)]`, false},
+		{"greater", toks(pr, number("1"), gt, number("2")), `PRINT[(#1 > #2)]`, false},
+		{"not equal", toks(pr, number("1"), lt, gt, number("2")), `PRINT[(#1 <> #2)]`, false},
+		{"not equal reversed", toks(pr, number("1"), gt, lt, number("2")), `PRINT[(#1 <> #2)]`, false},
+		{"less or equal", toks(pr, number("1"), lt, eq, number("2")), `PRINT[(#1 <= #2)]`, false},
+		{"less or equal reversed", toks(pr, number("1"), eq, lt, number("2")), `PRINT[(#1 <= #2)]`, false},
+		{"greater or equal", toks(pr, number("1"), gt, eq, number("2")), `PRINT[(#1 => #2)]`, false},
+		{"greater or equal reversed", toks(pr, number("1"), eq, gt, number("2")), `PRINT[(#1 => #2)]`, false},
+		{"all three", toks(pr, number("1"), lt, eq, gt, number("2")), `PRINT[(#1 <=> #2)]`, false},
+		{"repeated equal", toks(pr, number("1"), eq, eq, number("2")), `PRINT[BAD(SYNTAX)]`, true},
+		{"repeated less", toks(pr, number("1"), lt, lt, number("2")), `PRINT[BAD(SYNTAX)]`, true},
+		{"repeated after another", toks(pr, number("1"), lt, eq, lt, number("2")), `PRINT[BAD(SYNTAX)]`, true},
+	})
+}
+
+// @spec PARSER-028
+func TestAssignmentOfComparison(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"A=B=C", toks(name("A"), eq, name("B"), eq, name("C")), `LET $A[A]=($B[B] = $C[C])`, false},
+		{"LET A=1<2", toks(let, name("A"), eq, number("1"), lt, number("2")), `LET $A[A]=(#1 < #2)`, false},
 	})
 }

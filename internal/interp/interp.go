@@ -182,7 +182,7 @@ func (in *Interp) write(s string) error {
 
 // @spec INTERP-003, INTERP-009, INTERP-010, INTERP-011, INTERP-012
 // @spec INTERP-020, INTERP-021, INTERP-022, INTERP-025, INTERP-026, INTERP-027, INTERP-028
-// @spec INTERP-029, INTERP-030, INTERP-031
+// @spec INTERP-029, INTERP-030, INTERP-031, INTERP-039, INTERP-040, INTERP-041
 func (in *Interp) eval(e ast.Expr) (value, error) {
 	switch e := e.(type) {
 	case *ast.StringLit:
@@ -218,6 +218,16 @@ func (in *Interp) eval(e ast.Expr) (value, error) {
 			return value{}, err
 		}
 		return binary(e.Op, l, r)
+	case *ast.CompareExpr:
+		l, err := in.eval(e.Left)
+		if err != nil {
+			return value{}, err
+		}
+		r, err := in.eval(e.Right)
+		if err != nil {
+			return value{}, err
+		}
+		return compare(e.Rel, l, r)
 	default:
 		panic(fmt.Sprintf("interp: unhandled expression %T", e))
 	}

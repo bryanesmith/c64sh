@@ -106,9 +106,10 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `006-numbers.bas` | Number literals (decimals, `E` notation, a lone `.`), C64 number printing (sign and trailing spaces, 9 digits, scientific notation), spaces inside numbers, numbers mixed with strings and in zones, `+` on numbers, the number range, and `?TYPE MISMATCH  ERROR` |
 | `007-arithmetic.bas` | `+ - * /`, precedence and left-to-right evaluation, parentheses, negation and a leading `+`, division's 9 digits, underflow to zero, items side by side, and `?DIVISION BY ZERO  ERROR` |
 | `008-exponents.bas` | `^` and `↑`, roots and negative exponents, `^` above negation and the other operators, left-to-right `^`, signs in exponents, the C64's special cases (`0^0`, `0^-1`, negative bases), and `?ILLEGAL QUANTITY  ERROR` |
-| `009-variables.bas` | Number and string variables, `=` with and without `LET`, variables in expressions and `PRINT`, unset variables, two-character names, spaces inside names, keywords inside names (`PRINTER`, `LETTER`), and `?TYPE MISMATCH  ERROR` |
+| `009-variables.bas` | Number and string variables (and why `SCORE` cannot be a name), `=` with and without `LET`, variables in expressions and `PRINT`, unset variables, two-character names, spaces inside names, keywords inside names (`PRINTER`, `LETTER`), and `?TYPE MISMATCH  ERROR` |
 | `010-integer-variables.bas` | `%` variables: rounding down (including negative values), `A`/`A%`/`A$` as separate variables, two-character names, counting, integers in calculations, the -32768..32767 range, `TI%` as an ordinary variable, and `?ILLEGAL QUANTITY  ERROR` |
 | `011-comparisons.bas` | Each comparison operator on numbers and strings, -1/0 results, comparisons after arithmetic, the alternative spellings (`><`, `=<`, `=>`, spaces, `<=>`), left-to-right chains, `=` as assignment then comparison, and `?TYPE MISMATCH  ERROR` |
+| `012-logic.bas` | `AND`, `OR`, `NOT` on comparisons, their order, bitwise results on whole numbers, rounding down, `NOT` taking in what follows, variables, and `?ILLEGAL QUANTITY  ERROR` |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

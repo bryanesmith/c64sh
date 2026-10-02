@@ -135,3 +135,17 @@ func compare(rel ast.Relation, l, r value) (value, error) {
 	}
 	return numberValue(0), nil
 }
+
+// toInt16 converts a number to a 16-bit whole number as the C64 ROM does
+// for integer variables and AND, OR, and NOT: a range check ($B1BF), then
+// rounding down ($BC9B). A string is TYPE MISMATCH; a number whose size is
+// 32768 or more, other than -32768, is ILLEGAL QUANTITY.
+func toInt16(v value) (int16, error) {
+	if !v.isNum {
+		return 0, &basicerr.Error{Kind: basicerr.TypeMismatch}
+	}
+	if !(math.Abs(v.num) < 32768 || v.num == -32768) {
+		return 0, &basicerr.Error{Kind: basicerr.IllegalQuantity}
+	}
+	return int16(math.Floor(v.num)), nil
+}

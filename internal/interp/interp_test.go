@@ -849,3 +849,68 @@ func TestCompareStringWithNumberIsTypeMismatch(t *testing.T) {
 		}
 	}
 }
+
+func not(x ast.Expr) *ast.NotExpr { return &ast.NotExpr{X: x} }
+
+// @spec INTERP-042
+func TestAndOrBitwise(t *testing.T) {
+	cases := []struct {
+		name string
+		e    ast.Expr
+		want string
+	}{
+		{"12 AND 10", bin(ast.And, num(12), num(10)), " 8 "},
+		{"12 OR 10", bin(ast.Or, num(12), num(10)), " 14 "},
+		{"true AND true", bin(ast.And, num(-1), num(-1)), "-1 "},
+		{"true AND false", bin(ast.And, num(-1), num(0)), " 0 "},
+		{"false OR true", bin(ast.Or, num(0), num(-1)), "-1 "},
+		{"rounds down", bin(ast.And, num(7.9), num(-1)), " 7 "},
+		{"negative rounds down", bin(ast.Or, num(-1.5), num(0)), "-2 "},
+		{"comparisons", bin(ast.And, rel(ast.RelLess, num(1), num(2)), rel(ast.RelLess, num(3), num(4))), "-1 "},
+		{"largest", bin(ast.And, num(32767), num(-1)), " 32767 "},
+		{"smallest", bin(ast.Or, num(-32768), num(0)), "-32768 "},
+	}
+	for _, c := range cases {
+		rec, err := exec(line(printStmt(item(c.e), semi)))
+		if err != nil {
+			t.Errorf("%s: unexpected error %v", c.name, err)
+			continue
+		}
+		if got := rec.String(); got != c.want {
+			t.Errorf("%s: printed %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// @spec INTERP-043
+func TestNotComplement(t *testing.T) {
+	runPrintCases(t, []printCase{
+		{"NOT 0", line(printStmt(item(not(num(0))))), "-1 \n"},
+		{"NOT -1", line(printStmt(item(not(num(-1))))), " 0 \n"},
+		{"NOT 5", line(printStmt(item(not(num(5))))), "-6 \n"},
+		{"NOT of a comparison", line(printStmt(item(not(rel(ast.RelEqual, num(1), num(2)))))), "-1 \n"},
+		{"NOT rounds down", line(printStmt(item(not(num(.5))))), "-1 \n"},
+	})
+}
+
+// @spec INTERP-044
+func TestLogicOperandErrors(t *testing.T) {
+	for name, e := range map[string]ast.Expr{
+		"AND too large": bin(ast.And, num(32768), num(1)),
+		"OR too small":  bin(ast.Or, num(1), num(-32768.5)),
+		"NOT too large": not(num(40000)),
+	} {
+		if _, err := exec(line(printStmt(item(e)))); !isKind(err, basicerr.IllegalQuantity) {
+			t.Errorf("%s: error = %v, want ILLEGAL QUANTITY", name, err)
+		}
+	}
+	for name, e := range map[string]ast.Expr{
+		"AND string": bin(ast.And, str("A"), num(1)),
+		"OR string":  bin(ast.Or, num(1), str("A")),
+		"NOT string": not(str("A")),
+	} {
+		if _, err := exec(line(printStmt(item(e)))); !isKind(err, basicerr.TypeMismatch) {
+			t.Errorf("%s: error = %v, want TYPE MISMATCH", name, err)
+		}
+	}
+}

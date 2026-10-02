@@ -43,7 +43,10 @@ const (
     Equal                 // =
     Less                  // <
     Greater               // >
-    Name                  // a variable name: A, SCORE, N$ (Value: the name without spaces)
+    Name                  // a variable name: A, HEIGHT, N$ (Value: the name without spaces)
+    And                   // AND
+    Or                    // OR
+    Not                   // NOT
 )
 
 type Token struct {
@@ -81,7 +84,7 @@ Inside a string literal, the bytes of the line are kept exactly as they are, inc
 
 ## Keywords
 
-The keywords are `PRINT`, `REM`, and `LET`.
+The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, and `NOT`.
 
 - **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`; `REMARK` is a `Rem` token with the comment `ARK`.
 - **Spaces inside a keyword break it.** `PR INT` is not `PRINT`; it scans as `Illegal(P) Illegal(R) Illegal(I) Illegal(N) Illegal(T)`.
@@ -106,11 +109,11 @@ A variable name is read the way the C64 ROM reads one (`$B08B`), within the C64'
 
 - It starts with an uppercase letter `A`–`Z` at a position where no keyword begins.
 - Uppercase letters and digits follow. **Spaces and tabs inside a name are skipped**, as the C64's character reader skips them: `A B` is the name `AB`.
-- **A keyword ends the name**: at each position after the first letter, if a keyword begins there, the name ends before it and the keyword is read next. This is the C64's famous rule that a keyword cannot appear inside a name: `OUTLET` is the name `OUT` followed by `LET`, and `PREMIUM` is the name `P` followed by a `REM` comment.
+- **A keyword ends the name**: at each position after the first letter, if a keyword begins there, the name ends before it and the keyword is read next. This is the C64's famous rule that a keyword cannot appear inside a name: `OUTLET` is the name `OUT` followed by `LET`, `PREMIUM` is the name `P` followed by a `REM` comment, and `SCORE` is the name `SC` followed by `OR` and the name `E`.
 - An optional `$` or `%` follows, possibly after spaces, marking a string or integer variable. It is part of the token's value.
 - Lowercase letters are not names; they remain `Illegal`, as on a C64.
 
-The token's value is the full name as written, without spaces (`SCORE`, `N$`, `C%`). Which characters matter for identity is the parser's concern (see the parser design).
+The token's value is the full name as written, without spaces (`HEIGHT`, `N$`, `C%`). Which characters matter for identity is the parser's concern (see the parser design).
 
 ## Token Rules
 
@@ -123,6 +126,9 @@ string    = `"` { character } [ `"` ] .
 name      = letter { letter | digit } [ "$" | "%" ] .   /* spaces inside are ignored; a keyword ends it */
 letter    = "A" … "Z" .
 let       = "LET" .
+and       = "AND" .
+or        = "OR" .
+not       = "NOT" .
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
             [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
 digit     = "0" … "9" .

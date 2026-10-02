@@ -22,7 +22,7 @@ import (
 // @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011, PARSER-012, PARSER-013
 // @spec PARSER-014, PARSER-015, PARSER-016, PARSER-017, PARSER-018, PARSER-019, PARSER-020
 // @spec PARSER-021, PARSER-022, PARSER-023, PARSER-024, PARSER-025, PARSER-026, PARSER-027
-// @spec PARSER-028
+// @spec PARSER-028, PARSER-029, PARSER-030
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -187,7 +187,7 @@ func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	case token.Comma:
 		p.next()
 		return &ast.Comma{}, nil
-	case token.String, token.Number, token.Name, token.Minus, token.Plus, token.LParen:
+	case token.String, token.Number, token.Name, token.Not, token.Minus, token.Plus, token.LParen:
 		expr, err := p.parseExpression()
 		if err != nil {
 			return nil, err
@@ -198,8 +198,40 @@ func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	}
 }
 
-// Expression = Sum { Relation Sum } .
+// Expression = Conjunction { or Conjunction } .
 func (p *parser) parseExpression() (ast.Expr, error) {
+	left, err := p.parseConjunction()
+	if err != nil {
+		return nil, err
+	}
+	for p.accept(token.Or) {
+		right, err := p.parseConjunction()
+		if err != nil {
+			return nil, err
+		}
+		left = &ast.BinaryExpr{Op: ast.Or, Left: left, Right: right}
+	}
+	return left, nil
+}
+
+// Conjunction = Comparison { and Comparison } .
+func (p *parser) parseConjunction() (ast.Expr, error) {
+	left, err := p.parseComparison()
+	if err != nil {
+		return nil, err
+	}
+	for p.accept(token.And) {
+		right, err := p.parseComparison()
+		if err != nil {
+			return nil, err
+		}
+		left = &ast.BinaryExpr{Op: ast.And, Left: left, Right: right}
+	}
+	return left, nil
+}
+
+// Comparison = Sum { Relation Sum } .
+func (p *parser) parseComparison() (ast.Expr, error) {
 	left, err := p.parseSum()
 	if err != nil {
 		return nil, err
@@ -340,7 +372,7 @@ func (p *parser) parseExponent() (ast.Expr, error) {
 	return p.parseOperand()
 }
 
-// Operand = string | number | Variable | "(" Expression ")" .
+// Operand = string | number | Variable | "(" Expression ")" | not Comparison .
 //
 // Parentheses produce no node: the tree's shape records the grouping.
 func (p *parser) parseOperand() (ast.Expr, error) {
@@ -351,6 +383,14 @@ func (p *parser) parseOperand() (ast.Expr, error) {
 		return &ast.NumberLit{Value: numberValue(p.next().Value)}, nil
 	case token.Name:
 		return p.parseVariable()
+	case token.Not:
+		// NOT takes in everything up to the next AND or OR, as on a C64.
+		p.next()
+		x, err := p.parseComparison()
+		if err != nil {
+			return nil, err
+		}
+		return &ast.NotExpr{X: x}, nil
 	case token.LParen:
 		p.next()
 		x, err := p.parseExpression()

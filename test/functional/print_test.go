@@ -180,7 +180,8 @@ func TestVariables(t *testing.T) {
 		{"increment", "A=1\nA=A+1\nPRINT A\n", result{" 2 \n", "", 0}},
 		{"unset number", "PRINT X\n", result{" 0 \n", "", 0}},
 		{"unset string", "PRINT X$;\"|\"\n", result{"|\n", "", 0}},
-		{"two characters count", "SCORE=10:PRINT SC\n", result{" 10 \n", "", 0}},
+		{"two characters count", "HEIGHT=10:PRINT HE\n", result{" 10 \n", "", 0}},
+		{"OR inside a name", "SCORE=10\n", result{"", "?SYNTAX  ERROR\n", 1}},
 		{"spaces inside names", "A B=3:PRINT AB\n", result{" 3 \n", "", 0}},
 		{"number and string separate", "A=1:A$=\"X\":PRINT A;A$\n", result{" 1 X\n", "", 0}},
 		{"PRINTER prints ER", "ER=4:PRINTER\n", result{" 4 \n", "", 0}},
@@ -246,6 +247,30 @@ func TestComparisons(t *testing.T) {
 		{`B=1:C=1:A=B=C:PRINT A`, result{"-1 \n", "", 0}},
 		{`PRINT 1==1`, result{"", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT "1"=1`, result{"", "?TYPE MISMATCH  ERROR\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.input, runMain(t, c.input+"\n"), c.want)
+	}
+}
+
+// TestLogic checks AND, OR, and NOT end to end, as listed in the HLD's
+// Goals.
+func TestLogic(t *testing.T) {
+	cases := []struct {
+		input string
+		want  result
+	}{
+		{`PRINT 1<2 AND 3<4`, result{"-1 \n", "", 0}},
+		{`PRINT 1<2 AND 3>4`, result{" 0 \n", "", 0}},
+		{`PRINT 1>2 OR 3<4`, result{"-1 \n", "", 0}},
+		{`PRINT NOT 0;NOT -1;NOT 5`, result{"-1  0 -6 \n", "", 0}},
+		{`PRINT 12 AND 10;12 OR 10`, result{" 8  14 \n", "", 0}},
+		{`PRINT NOT 1=2`, result{"-1 \n", "", 0}},
+		{`PRINT 0 OR 1 AND 0`, result{" 0 \n", "", 0}},
+		{`PRINT 1+NOT 0+1`, result{"-1 \n", "", 0}},
+		{`PRINT 40000 AND 1`, result{"", "?ILLEGAL QUANTITY  ERROR\n", 1}},
+		{`PRINT "A" AND 1`, result{"", "?TYPE MISMATCH  ERROR\n", 1}},
+		{`SCORE=1`, result{"", "?SYNTAX  ERROR\n", 1}},
 	}
 	for _, c := range cases {
 		check(t, c.input, runMain(t, c.input+"\n"), c.want)

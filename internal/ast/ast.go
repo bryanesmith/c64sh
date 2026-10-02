@@ -53,7 +53,12 @@ const (
 	Mul           // *
 	Div           // /
 	Pow           // ^ (exponentiation)
+	And           // AND, bitwise
+	Or            // OR, bitwise
 )
+
+// NotExpr is NOT X, the bitwise complement.
+type NotExpr struct{ X Expr }
 
 // NegExpr is -X, a leading minus sign (negation).
 type NegExpr struct{ X Expr }
@@ -109,3 +114,4 @@ func (*NegExpr) expr()    {}
 
 func (*VarRef) expr()      {}
 func (*CompareExpr) expr() {}
+func (*NotExpr) expr()     {}

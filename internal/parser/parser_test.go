@@ -29,6 +29,9 @@ var (
 	eq    = token.Token{Kind: token.Equal, Value: "="}
 	lt    = token.Token{Kind: token.Less, Value: "<"}
 	gt    = token.Token{Kind: token.Greater, Value: ">"}
+	and   = token.Token{Kind: token.And, Value: "AND"}
+	or    = token.Token{Kind: token.Or, Value: "OR"}
+	not   = token.Token{Kind: token.Not, Value: "NOT"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -101,13 +104,15 @@ func dumpExpr(e ast.Expr) string {
 	case *ast.NumberLit:
 		return "#" + strconv.FormatFloat(e.Value, 'g', -1, 64)
 	case *ast.BinaryExpr:
-		op, ok := map[ast.Op]string{ast.Add: "+", ast.Sub: "-", ast.Mul: "*", ast.Div: "/", ast.Pow: "^"}[e.Op]
+		op, ok := map[ast.Op]string{ast.Add: "+", ast.Sub: "-", ast.Mul: "*", ast.Div: "/", ast.Pow: "^", ast.And: " AND ", ast.Or: " OR "}[e.Op]
 		if !ok {
 			return fmt.Sprintf("<op %d>", e.Op)
 		}
 		return "(" + dumpExpr(e.Left) + op + dumpExpr(e.Right) + ")"
 	case *ast.NegExpr:
 		return "(-" + dumpExpr(e.X) + ")"
+	case *ast.NotExpr:
+		return "(NOT " + dumpExpr(e.X) + ")"
 	case *ast.VarRef:
 		return "$" + e.Name + "[" + e.Text + "]"
 	case *ast.CompareExpr:
@@ -241,6 +246,9 @@ func TestSyntaxErrorInsidePrintEndsWithBadItem(t *testing.T) {
 		{"less as first item", toks(pr, lt, number("2")), `PRINT[BAD(SYNTAX)]`, true},
 		{"equal as first item", toks(pr, eq, number("2")), `PRINT[BAD(SYNTAX)]`, true},
 		{"dangling comparison", toks(pr, number("1"), lt), `PRINT[BAD(SYNTAX)]`, true},
+		{"AND as first item", toks(pr, and, number("2")), `PRINT[BAD(SYNTAX)]`, true},
+		{"dangling OR", toks(pr, number("1"), or), `PRINT[BAD(SYNTAX)]`, true},
+		{"NOT alone", toks(pr, not), `PRINT[BAD(SYNTAX)]`, true},
 		{"close paren as first item", toks(pr, rp), `PRINT[BAD(SYNTAX)]`, true},
 		{"missing close paren", toks(pr, str("A"), semi, lp, number("1"), plus, number("2")), `PRINT["A" ; BAD(SYNTAX)]`, true},
 		{"empty parens", toks(pr, lp, rp), `PRINT[BAD(SYNTAX)]`, true},
@@ -388,7 +396,7 @@ func TestAssignment(t *testing.T) {
 // @spec PARSER-022
 func TestVariableIdentity(t *testing.T) {
 	runParseCases(t, []parseCase{
-		{"long name", toks(pr, name("SCORE")), `PRINT[$SC[SCORE]]`, false},
+		{"long name", toks(pr, name("HEIGHT")), `PRINT[$HE[HEIGHT]]`, false},
 		{"long string name", toks(pr, name("NAME$")), `PRINT[$NA$[NAME$]]`, false},
 		{"one-letter string name", toks(pr, name("N$")), `PRINT[$N$[N$]]`, false},
 		{"digit second", toks(pr, name("A1B")), `PRINT[$A1[A1B]]`, false},
@@ -474,5 +482,29 @@ func TestAssignmentOfComparison(t *testing.T) {
 	runParseCases(t, []parseCase{
 		{"A=B=C", toks(name("A"), eq, name("B"), eq, name("C")), `LET $A[A]=($B[B] = $C[C])`, false},
 		{"LET A=1<2", toks(let, name("A"), eq, number("1"), lt, number("2")), `LET $A[A]=(#1 < #2)`, false},
+	})
+}
+
+// @spec PARSER-029
+func TestAndOr(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"AND", toks(pr, number("12"), and, number("10")), `PRINT[(#12 AND #10)]`, false},
+		{"AND before OR", toks(pr, name("A"), or, name("B"), and, name("C")), `PRINT[($A[A] OR ($B[B] AND $C[C]))]`, false},
+		{"AND before OR on the left", toks(pr, name("A"), and, name("B"), or, name("C")), `PRINT[(($A[A] AND $B[B]) OR $C[C])]`, false},
+		{"looser than comparisons", toks(pr, number("1"), lt, number("2"), and, number("3"), lt, number("4")), `PRINT[((#1 < #2) AND (#3 < #4))]`, false},
+		{"left to right", toks(pr, number("1"), or, number("2"), or, number("4")), `PRINT[((#1 OR #2) OR #4)]`, false},
+		{"in parentheses", toks(pr, lp, number("1"), or, number("2"), rp, and, number("3")), `PRINT[((#1 OR #2) AND #3)]`, false},
+	})
+}
+
+// @spec PARSER-030
+func TestNot(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"NOT a number", toks(pr, not, number("0")), `PRINT[(NOT #0)]`, false},
+		{"takes in a comparison", toks(pr, not, number("1"), eq, number("2")), `PRINT[(NOT (#1 = #2))]`, false},
+		{"stops at AND", toks(pr, not, name("A"), and, name("B")), `PRINT[((NOT $A[A]) AND $B[B])]`, false},
+		{"mid-expression", toks(pr, number("1"), plus, not, number("0"), plus, number("1")), `PRINT[(#1+(NOT (#0+#1)))]`, false},
+		{"twice", toks(pr, not, not, number("0")), `PRINT[(NOT (NOT #0))]`, false},
+		{"after =", toks(name("A"), eq, not, number("0")), `LET $A[A]=(NOT #0)`, false},
 	})
 }

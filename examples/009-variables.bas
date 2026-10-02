@@ -21,9 +21,9 @@ REM A variable that was never set is 0, or empty for a string
 PRINT X:REM " 0 "
 PRINT "["X$"]":REM "[]"
 REM Only the first two characters of a name count
-SCORE=100
-PRINT SC:REM " 100 " (SCORE and SC are the same variable)
-PRINT SCX:REM " 100 " (so is SCX)
+HEIGHT=100
+PRINT HE:REM " 100 " (HEIGHT and HE are the same variable)
+PRINT HEX:REM " 100 " (so is HEX)
 REM Spaces inside a name are ignored
 MY VALUE=7
 PRINT MYVALUE:REM " 7 "
@@ -32,8 +32,10 @@ ER=4
 PRINTER:REM " 4 " (read as PRINT ER)
 LETTER=9
 PRINT TE:REM " 9 " (read as LET TER=9, and TER is TE)
+REM Even SCORE cannot be a name: it contains OR, so SCORE=1 is a
+REM ?SYNTAX  ERROR. Choose names without keywords, like HEIGHT or LIVES.
 REM Variables mix with numbers and strings anywhere
-PRINT "TOTAL:";A*SC+1:REM "TOTAL: 601 "
+PRINT "TOTAL:";A*HE+1:REM "TOTAL: 601 "
 PRINT A,B:REM " 6 " at column 0, " 11 " at column 10
 REM A string cannot go in a number variable, so the next line prints
 REM ?TYPE MISMATCH  ERROR and the script stops

@@ -59,7 +59,12 @@ const (
     Mul           // *
     Div           // /
     Pow           // ^ (exponentiation)
+    And           // AND, bitwise
+    Or            // OR, bitwise
 )
+
+// NotExpr is NOT X, the bitwise complement.
+type NotExpr struct{ X Expr }
 
 // NegExpr is -X, a leading minus sign (negation).
 type NegExpr struct{ X Expr }
@@ -83,7 +88,7 @@ const (
 // VarRef is a variable, used as a value or assigned to.
 type VarRef struct {
     Name string // identity: first two characters, plus "$" or "%" for a string or integer ("SC", "N$", "C%")
-    Text string // the name as written, without spaces ("SCORE")
+    Text string // the name as written, without spaces ("HEIGHT")
 }
 
 // LetStmt is an assignment: [LET] Var = Value.
@@ -101,14 +106,20 @@ Each precedence level is its own grammar rule, so a lower rule's operands are bu
 
 | Level | Rule | Operators |
 |---|---|---|
-| 1 | `Expression` | comparisons: `=` `<>` `<` `>` `<=` `>=` and the other spellings below, left to right |
-| 2 | `Sum` | `+` `-` (binary), left to right |
-| 3 | `Term` | `*` `/`, left to right |
-| 4 | `Unary` | a leading `-` (negation) or `+` |
-| 5 | `Power` | `^`, left to right |
-| 6 | `Operand` | literals and `( … )` |
+| 1 | `Expression` | `OR`, left to right |
+| 2 | `Conjunction` | `AND`, left to right |
+| 3 | `Comparison` | comparisons: `=` `<>` `<` `>` `<=` `>=` and the other spellings below, left to right |
+| 4 | `Sum` | `+` `-` (binary), left to right |
+| 5 | `Term` | `*` `/`, left to right |
+| 6 | `Unary` | a leading `-` (negation) or `+` |
+| 7 | `Power` | `^`, left to right |
+| 8 | `Operand` | literals, variables, `( … )`, and `NOT` (see below) |
 
-So `1+1=2` is `(1+1)=2`, `1<2<3` is `(1<2)<3`, `2+3*4` is 14, `(2+3)*4` is 20, `-2*3` is `(-2)*3`, `-2^2` is `-(2^2)` = -4, and `2^3^2` is `(2^3)^2` = 64, as on a C64. A leading `+` is dropped (the C64 ROM skips it: `+5` is 5 and `+"A"` is `"A"`); a leading `-` becomes a `NegExpr`. Leading signs can repeat: `--5` is 5, and `5--5` is 10.
+So `A OR B AND C` is `A OR (B AND C)`, `1<2 AND 3<4` is `(1<2) AND (3<4)`, `1+1=2` is `(1+1)=2`, `1<2<3` is `(1<2)<3`, `2+3*4` is 14, `(2+3)*4` is 20, `-2*3` is `(-2)*3`, `-2^2` is `-(2^2)` = -4, and `2^3^2` is `(2^3)^2` = 64, as on a C64. A leading `+` is dropped (the C64 ROM skips it: `+5` is 5 and `+"A"` is `"A"`); a leading `-` becomes a `NegExpr`. Leading signs can repeat: `--5` is 5, and `5--5` is 10.
+
+### NOT
+
+`NOT` binds more loosely than comparisons and more tightly than `AND`, and, as on a C64 (`$AED0`), it is read where an operand is expected and takes in everything after it up to the next `AND`, `OR`, or the end of the expression. So `NOT 1=2` is `NOT (1=2)`, `NOT A AND B` is `(NOT A) AND B`, and in the middle of an expression `1+NOT 0+1` is `1+NOT (0+1)`. The `Operand` rule expresses this: `NOT` followed by a `Comparison`.
 
 ### Comparison operators
 
@@ -124,7 +135,7 @@ An exponent may carry a sign: `2^-1` is .5. On a C64, a sign in an exponent is a
 
 A statement that begins with a name, or with `LET`, is an assignment: `A=5` and `LET A=5` are the same. A name anywhere a value is expected is a variable reference.
 
-A `VarRef`'s `Name` is the variable's identity, as on a C64: the first character, the second character if there is one, and `$` for a string variable or `%` for an integer variable. `SCORE`, `SC`, and `SCX` are all `SC`, and `NAME$` and `NA$` are both `NA$`, while `N$` is a different variable. Number, integer, and string variables never share an identity: `A`, `A%`, and `A$` are three separate variables. `Text` keeps the name as written.
+A `VarRef`'s `Name` is the variable's identity, as on a C64: the first character, the second character if there is one, and `$` for a string variable or `%` for an integer variable. `HEIGHT`, `HE`, and `HEX` are all `HE`, and `NAME$` and `NA$` are both `NA$`, while `N$` is a different variable. Number, integer, and string variables never share an identity: `A`, `A%`, and `A$` are three separate variables. `Text` keeps the name as written.
 
 These forms are valid C64 BASIC that c64sh does not support yet, so they are SYNTAX errors, following the tenet *Authentic errors over helpful ones*:
 
@@ -148,7 +159,9 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
-| `Expression = Sum { Relation Sum } .` | `parseExpression` | `ast.Expr` |
+| `Expression = Conjunction { or Conjunction } .` | `parseExpression` | `ast.Expr` |
+| `Conjunction = Comparison { and Comparison } .` | `parseConjunction` | `ast.Expr` |
+| `Comparison = Sum { Relation Sum } .` | `parseComparison` | `ast.Expr` |
 | `Relation = ( "<" \| "=" \| ">" ) { "<" \| "=" \| ">" } .` | `parseRelation` | `ast.Relation` (each symbol at most once) |
 | `Sum = Term { ( "+" \| "-" ) Term } .` | `parseSum` | `ast.Expr` |
 | `Term = Unary { ( "*" \| "/" ) Unary } .` | `parseTerm` | `ast.Expr` |
@@ -157,9 +170,9 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Exponent = "-" Unary \| "+" Unary \| Operand .` | `parseExponent` | `ast.Expr` |
 | `LetStatement = [ let ] Variable "=" Expression .` | `parseLetStatement` | `*ast.LetStmt` |
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
-| `Operand = string \| number \| Variable \| "(" Expression ")" .` | `parseOperand` | `ast.Expr` |
+| `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 

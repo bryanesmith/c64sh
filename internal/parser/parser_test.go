@@ -38,6 +38,9 @@ var (
 	list  = token.Token{Kind: token.List, Value: "LIST"}
 	nw    = token.Token{Kind: token.New, Value: "NEW"}
 	end   = token.Token{Kind: token.End, Value: "END"}
+	gotok = token.Token{Kind: token.Goto, Value: "GOTO"}
+	gok   = token.Token{Kind: token.Go, Value: "GO"}
+	tok   = token.Token{Kind: token.To, Value: "TO"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -87,6 +90,8 @@ func dumpStmt(s ast.Stmt) string {
 			return fmt.Sprintf("RUN %d", s.Line)
 		}
 		return "RUN"
+	case *ast.GotoStmt:
+		return fmt.Sprintf("GOTO %d", s.Line)
 	case *ast.ListStmt:
 		return "LIST"
 	case *ast.NewStmt:
@@ -553,7 +558,8 @@ func TestIfStatement(t *testing.T) {
 func TestIfSyntaxErrors(t *testing.T) {
 	runParseCases(t, []parseCase{
 		{"no THEN", toks(iff, number("1"), pr, str("X")), `BADSTMT`, true},
-		{"THEN line number", toks(iff, number("1"), then, number("100")), `IF #1 : BADSTMT`, true},
+		{"GO TO", toks(iff, number("1"), gok, tok, number("100")), `BADSTMT`, true},
+		{"THEN number without digits", toks(iff, number("1"), then, number(".5")), `IF #1 : BADSTMT`, true},
 		{"no condition", toks(iff, then, pr, str("X")), `BADSTMT`, true},
 		{"IF alone", toks(iff), `BADSTMT`, true},
 	})
@@ -610,5 +616,51 @@ func TestProgramCommandSyntaxErrors(t *testing.T) {
 		{"END n", toks(end, number("1")), `BADSTMT`, true},
 		{"after a statement", toks(pr, str("A"), colon, end, str("X")), `PRINT["A"] : BADSTMT`, true},
 		{"RUN too large", toks(run, number("64000")), `BADSTMT`, true},
+		{"GOTO too large", toks(gotok, number("64000")), `BADSTMT`, true},
+		{"THEN line too large", toks(iff, number("1"), then, number("64000")), `IF #1 : BADSTMT`, true},
+		{"GO without TO", toks(gok, number("10")), `BADSTMT`, true},
+		{"GO alone", toks(gok), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-038
+func TestGoto(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"GOTO n", toks(gotok, number("20")), `GOTO 20`, false},
+		{"GO TO n", toks(gok, tok, number("20")), `GOTO 20`, false},
+		{"after a statement", toks(pr, str("A"), colon, gotok, number("10")), `PRINT["A"] : GOTO 10`, false},
+		{"then a statement", toks(gotok, number("10"), colon, pr, str("X")), `GOTO 10 : PRINT["X"]`, false},
+	})
+}
+
+// @spec PARSER-039
+func TestJumpLineNumbers(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"fraction", toks(gotok, number("20.5")), `GOTO 20`, false},
+		{"exponent", toks(gotok, number("1E3")), `GOTO 1`, false},
+		{"no digits", toks(gotok, number(".5")), `GOTO 0`, false},
+		{"GOTO alone", toks(gotok), `GOTO 0`, false},
+		{"GOTO name", toks(gotok, name("A")), `GOTO 0 : BADSTMT`, true},
+		{"GO TO alone", toks(gok, tok), `GOTO 0`, false},
+		{"largest", toks(gotok, number("63999")), `GOTO 63999`, false},
+		{"RUN fraction", toks(run, number("20.5")), `RUN 20`, false},
+	})
+}
+
+// @spec PARSER-040
+func TestIfThenLineNumber(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"THEN n", toks(iff, name("A"), then, number("20")), `IF $A[A] : GOTO 20`, false},
+		{"THEN fraction", toks(iff, name("A"), then, number("20.5")), `IF $A[A] : GOTO 20`, false},
+		{"THEN n then more", toks(iff, name("A"), then, number("20"), colon, pr, str("X")), `IF $A[A] : GOTO 20 : PRINT["X"]`, false},
+		{"THEN GOTO n", toks(iff, name("A"), then, gotok, number("20")), `IF $A[A] : GOTO 20`, false},
+	})
+}
+
+// @spec PARSER-041
+func TestIfGoto(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"GOTO n", toks(iff, name("A"), gotok, number("20")), `IF $A[A] : GOTO 20`, false},
+		{"GOTO alone", toks(iff, name("A"), gotok), `IF $A[A] : GOTO 0`, false},
 	})
 }

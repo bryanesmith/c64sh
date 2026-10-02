@@ -45,6 +45,7 @@ Design: `lexer-design.md`
 - [x] **LEXER-024**: When the lexer encounters `AND`, `OR`, or `NOT` in uppercase outside a string literal, it shall produce an `And`, `Or`, or `Not` token respectively.
 - [x] **LEXER-025**: When the lexer encounters `IF` or `THEN` in uppercase outside a string literal, it shall produce an `If` or `Then` token respectively.
 - [x] **LEXER-026**: When the lexer encounters `RUN`, `LIST`, `NEW`, or `END` in uppercase outside a string literal, it shall produce a `Run`, `List`, `New`, or `End` token respectively.
+- [x] **LEXER-030**: When the lexer encounters `GOTO`, `GO`, or `TO` in uppercase outside a string literal, it shall produce a `Goto`, `Go`, or `To` token respectively, `GOTO` being one `Goto` token (the longest match) and `GO TO` a `Go` token followed by a `To` token.
 
 ## Line numbers
 

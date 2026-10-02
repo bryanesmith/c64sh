@@ -24,14 +24,14 @@ type progLine struct {
 // running program, without error.
 var errEnd = errors.New("end")
 
-// runFrom is returned by RUN: it ends the line, and the program starts
-// (again) from line, or from its first line if !hasLine.
-type runFrom struct {
+// jump is returned by RUN and GOTO: it ends the line, and the program
+// continues at line, or starts from its first line if !hasLine.
+type jump struct {
 	line    int
 	hasLine bool
 }
 
-func (*runFrom) Error() string { return "run" }
+func (*jump) Error() string { return "jump" }
 
 // Store stores text as program line n (0 to 63999), replacing any line n,
 // or deletes line n if text is empty. Either way, it clears the variables,
@@ -56,8 +56,8 @@ func (in *Interp) Store(n int, text string) {
 	}
 }
 
-// NeverRun reports whether the stored program holds lines and no RUN has
-// been executed since the Interp was created.
+// NeverRun reports whether the stored program holds lines and no RUN or
+// GOTO has been executed since the Interp was created.
 //
 // @spec INTERP-062
 func (in *Interp) NeverRun() bool {
@@ -76,15 +76,25 @@ func (in *Interp) find(n int) (int, bool) {
 func (in *Interp) execRun(s *ast.RunStmt) error {
 	in.ran = true
 	clear(in.vars)
-	return &runFrom{line: s.Line, hasLine: s.HasLine}
+	return &jump{line: s.Line, hasLine: s.HasLine}
 }
 
-// run runs the program as RUN asked, until it ends, and returns the first
-// error, carrying the number of the line it occurred in. from is the
-// program line holding the RUN, or -1 in direct mode.
+// execGoto returns the request to continue the program at a line, which
+// Exec or run carries out, keeping the variables.
+//
+// @spec INTERP-063, INTERP-064
+func (in *Interp) execGoto(s *ast.GotoStmt) error {
+	in.ran = true
+	return &jump{line: s.Line, hasLine: true}
+}
+
+// run runs the program from where RUN or GOTO asked, until it ends, and
+// returns the first error, carrying the number of the line it occurred
+// in. from is the program line holding the RUN or GOTO, or -1 in direct
+// mode.
 //
 // @spec INTERP-052, INTERP-053, INTERP-054, INTERP-055, INTERP-056, INTERP-058, INTERP-061
-func (in *Interp) run(r *runFrom, from int) error {
+func (in *Interp) run(r *jump, from int) error {
 	for {
 		i := 0
 		if r.hasLine {
@@ -101,7 +111,7 @@ func (in *Interp) run(r *runFrom, from int) error {
 				break
 			}
 		}
-		next, again := err.(*runFrom)
+		next, again := err.(*jump)
 		if !again {
 			if err == errEnd {
 				return nil

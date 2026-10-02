@@ -38,6 +38,9 @@ const (
 	List                  // LIST
 	New                   // NEW
 	End                   // END
+	Goto                  // GOTO
+	Go                    // GO (as in GO TO)
+	To                    // TO
 )
 
 var kindNames = [...]string{
@@ -71,6 +74,9 @@ var kindNames = [...]string{
 	List:      "List",
 	New:       "New",
 	End:       "End",
+	Goto:      "Goto",
+	Go:        "Go",
+	To:        "To",
 }
 
 func (k Kind) String() string {

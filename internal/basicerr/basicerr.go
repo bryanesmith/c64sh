@@ -13,6 +13,7 @@ const (
 	DivisionByZero              // DIVISION BY ZERO
 	IllegalQuantity             // ILLEGAL QUANTITY
 	UndefdStatement             // UNDEF'D STATEMENT
+	Break                       // BREAK: execution stopped by Ctrl-C
 )
 
 // names holds each kind's name as the C64 prints it.
@@ -24,6 +25,7 @@ var names = [...]string{
 	DivisionByZero:  "DIVISION BY ZERO",
 	IllegalQuantity: "ILLEGAL QUANTITY",
 	UndefdStatement: "UNDEF'D STATEMENT",
+	Break:           "BREAK",
 }
 
 // Error is a BASIC error.

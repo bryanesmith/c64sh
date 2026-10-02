@@ -123,8 +123,9 @@ In a script:
 - The first line is skipped if it starts with `#!`.
 - Blank lines are skipped.
 - c64sh **stops at the first error**, printing the error and exiting with status 1. Lines after it do not run.
+- **Ctrl-C** while a line is running stops the script, printing `BREAK` (or `BREAK IN 20` while a program runs) and exiting with status 130.
 - No banner or `READY.` is printed.
-- **If the script stored numbered lines but never ran them with `RUN`, the program runs after the last line.** So a script of numbered lines is an ordinary program, with no `RUN` needed.
+- **If the script stored numbered lines but never ran them with `RUN` or `GOTO`, the program runs after the last line.** So a script of numbered lines is an ordinary program, with no `RUN` needed.
 
 For example, this script
 
@@ -292,6 +293,7 @@ prints `A IS BIG` and `BETWEEN`.
 
 - **A false condition skips the whole rest of the line**, including statements after a colon: `IF A<3 THEN PRINT "ONE":PRINT "TWO"` prints nothing. Statements before the `IF` on the same line still run.
 - **Any number other than 0 is true**, so `IF -1 THEN …` and `IF .5 THEN …` both run. A string is true when it is not empty: `IF N$ THEN …` runs when `N$` holds something.
+- **`IF … THEN 20` jumps to line 20** of the program when the condition is true (see [Programs](#programs)).
 - **There is no `ELSE`** in BASIC V2. Use a second `IF` with the opposite test: `IF NOT A>9 THEN …`.
 - **`IF`s can follow one another**: `IF A>1 THEN IF A<3 THEN …` runs only when both are true.
 - **A skipped part of the line is never checked**, as on a C64: `IF 0 THEN PRINT "X"@` prints nothing and reports no error, because the mistake is never reached.
@@ -346,16 +348,27 @@ prints `HELLO` and `WORLD`.
 | `RUN` | Clears all variables, then runs the program from its first line. |
 | `RUN 20` | Clears all variables, then runs the program from line 20. If there is no line 20: `?UNDEF'D STATEMENT  ERROR`. |
 | `LIST` | Shows the whole program in number order, after a blank line, each line as its number, a space, and the line as typed. A `?` is shown as `PRINT`, the keyword it stands for. |
+| `GOTO 20` | Continues the program at line 20, keeping all variables. Typed directly, it runs the program from line 20. `GO TO 20` is the same. If there is no line 20: `?UNDEF'D STATEMENT  ERROR`. |
 | `NEW` | Erases the program and clears all variables. |
 | `END` | Stops the program. |
 
 - **A program stops** after its last line, at `END`, or at an error. `LIST` and `NEW` also stop a program, and `RUN` in a program starts it again from the beginning, with variables cleared.
 - **An error in a program names its line**: `?SYNTAX  ERROR IN 20`.
-- **Nothing after `RUN`, `LIST`, `NEW`, or `END` on the same line runs**, in a program or typed directly: `LIST:PRINT "X"` lists the program but does not print `X`.
-- **`LIST` lists the whole program.** Listing part of it (`LIST 10-20`) is not supported yet and is a `?SYNTAX  ERROR`.
-- **The new keywords break names that contain them**: `FRIEND=1` is a `?SYNTAX  ERROR` (it contains `END`), as are names containing `RUN`, `NEW`, or `LIST`.
+- **`IF … THEN 20` and `IF … GOTO 20`** jump to line 20 when the condition is true, which is how a program loops:
 
-See [`examples/014-program-mode.bas`](../examples/014-program-mode.bas) for every form.
+  ```
+  10 I=I+1
+  20 PRINT I;
+  30 IF I<5 THEN 10
+  ```
+
+  prints ` 1  2  3  4  5 `.
+- **Ctrl-C stops a running program**, as the C64's STOP key does, printing `BREAK IN 20` with the line it stopped in. In an interactive session, `READY.` follows, and the program and variables are kept.
+- **Nothing after `RUN`, `GOTO`, `LIST`, `NEW`, or `END` on the same line runs**, in a program or typed directly: `LIST:PRINT "X"` lists the program but does not print `X`.
+- **`LIST` lists the whole program.** Listing part of it (`LIST 10-20`) is not supported yet and is a `?SYNTAX  ERROR`.
+- **These keywords break names that contain them**: `FRIEND=1` is a `?SYNTAX  ERROR` (it contains `END`), as are names containing `RUN`, `NEW`, `LIST`, `GOTO`, `GO` (`GOLD`), or `TO` (`TOTAL`).
+
+See [`examples/014-program-mode.bas`](../examples/014-program-mode.bas) and [`examples/016-goto.bas`](../examples/016-goto.bas) for every form.
 
 ## Comments
 
@@ -391,7 +404,7 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?TYPE MISMATCH  ERROR` | A string compared with a number or used with `AND`, `OR`, or `NOT`, `+` given a string and a number, or `-`, `*`, `/`, `^`, or a minus sign in front was given a string. |
 | `?OVERFLOW  ERROR` | A number, or the result of a calculation, is larger than 1.70141183E+38. |
 | `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
-| `?UNDEF'D STATEMENT  ERROR` | `RUN` with a line number that is not in the program. |
+| `?UNDEF'D STATEMENT  ERROR` | `RUN`, `GOTO`, or `IF … THEN` with a line number that is not in the program. |
 | `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
 
 An error stops the rest of its line. Anything printed before the error stays printed, as on a C64:
@@ -417,6 +430,7 @@ An error in a running program adds the number of the line it happened in, as on 
 | 0 | Success, or an interactive session ended with Ctrl-D |
 | 1 | A script stopped at a BASIC error, or output could not be written |
 | 2 | c64sh was run incorrectly: an unknown option, more than one file, or a file that cannot be read |
+| 130 | A script was stopped by Ctrl-C (`BREAK`) |
 
 For example, `c64sh build.bas && echo done` prints `done` only if the script ran without errors.
 
@@ -427,7 +441,6 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 - **No screen emulation**: no 40-column wrapping, colors, or graphics characters. So a print zone past column 40 stays on the same line: `PRINT 2,3,4,5,6` prints ` 6 ` at column 40, where a C64 would start a new screen line.
 - **Arithmetic uses standard 64-bit floating point**, rounded to the C64's 9 digits when printed. Results match a C64 in nearly every case; a C64's own rounding occasionally differs in the last digit.
 - **The banner** reads `C64SH BASIC V2`.
-- **Ctrl-C while a program runs** ends c64sh itself; a C64 would stop the program with `BREAK`.
 
 ## Not yet supported
 
@@ -435,7 +448,7 @@ These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 - Arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
 - Functions such as `CHR$(34)`
-- `GOTO`, `GOSUB`, `FOR`, and the other ways to jump or loop in a program; `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
+- `GOSUB`, `FOR`, `ON`, and the other ways to call or loop in a program; `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 
 Every form c64sh accepts is described in this guide, and shown in use in [`examples/`](../examples/).

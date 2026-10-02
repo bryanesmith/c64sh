@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"unicode/utf8"
 
 	"github.com/bryanesmith/c64sh/internal/ast"
@@ -26,7 +27,9 @@ type Interp struct {
 	column  int              // cursor column: characters written since the last newline
 	vars    map[string]value // variables, by identity (ast.VarRef.Name)
 	program []progLine       // stored lines, in ascending order of number
-	ran     bool             // whether RUN has been executed
+	ran     bool             // whether RUN or GOTO has been executed
+
+	interrupted atomic.Bool // set by Interrupt, checked after each statement
 }
 
 // New returns an interpreter that writes program output to out.
@@ -42,10 +45,11 @@ func New(out io.Writer) *Interp {
 // been written. A RUN among the statements runs the stored program, and
 // an error in it is returned with its line number.
 //
-// @spec INTERP-001, INTERP-013, INTERP-057
+// @spec INTERP-001, INTERP-013, INTERP-057, INTERP-066
 func (in *Interp) Exec(line *ast.Line) error {
+	in.interrupted.Store(false)
 	err := in.execLine(line)
-	if r, ok := err.(*runFrom); ok {
+	if r, ok := err.(*jump); ok {
 		err = in.run(r, -1)
 	}
 	if err == errEnd {
@@ -54,12 +58,29 @@ func (in *Interp) Exec(line *ast.Line) error {
 	return err
 }
 
+// Interrupt asks the interpreter to stop, as the C64's STOP key does: the
+// statement running now finishes, and Exec returns a BREAK error. It may
+// be called from another goroutine.
+//
+// @spec INTERP-067
+func (in *Interp) Interrupt() {
+	in.interrupted.Store(true)
+}
+
 // execLine runs the statements of one line, in direct mode or in the
-// program. A false IF ends the line without error; END, LIST, NEW, and
-// RUN end it with errEnd or a *runFrom for the caller to act on.
+// program. A false IF ends the line without error; END, LIST, NEW, RUN,
+// and GOTO end it with errEnd or a *jump for the caller to act on. After
+// each statement that finishes normally (including a false IF, and a RUN
+// or GOTO before its jump), it checks for an interrupt, as the C64 checks
+// its STOP key between statements ($A7AE, $A82C).
+//
+// @spec INTERP-065
 func (in *Interp) execLine(line *ast.Line) error {
 	for _, s := range line.Statements {
 		err := in.execStmt(s)
+		if _, isJump := err.(*jump); (err == nil || err == errSkipLine || isJump) && in.interrupted.Swap(false) {
+			return &basicerr.Error{Kind: basicerr.Break}
+		}
 		if err == errSkipLine {
 			return nil // a false IF: the rest of the line does not run
 		}
@@ -153,6 +174,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return s.Err // a syntax error, now that execution has reached it
 	case *ast.RunStmt:
 		return in.execRun(s)
+	case *ast.GotoStmt:
+		return in.execGoto(s)
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:

@@ -87,3 +87,23 @@ func TestProgramErrorsNameTheLine(t *testing.T) {
 		check(t, c.name, runMain(t, c.input), c.want)
 	}
 }
+
+// @spec SHELL-SCRIPT-009
+func TestGotoInScripts(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  result
+	}{
+		{"GOTO starts the program, keeping variables", "10 PRINT A\nA=5\nGOTO 10\n", result{" 5 \n", "", 0}},
+		{"loop", "10 A=A+1:PRINT A;\n20 IF A<3 THEN 10\n", result{" 1  2  3 ", "", 0}},
+		{"IF GOTO", "10 IF 1 GOTO 30\n20 PRINT \"B\"\n30 PRINT \"C\"\n", result{"C\n", "", 0}},
+		{"GO TO", "10 GO TO 30\n20 PRINT \"B\"\n30 PRINT \"C\"\n", result{"C\n", "", 0}},
+		{"missing line", "10 GOTO 99\n", result{"", "?UNDEF'D STATEMENT  ERROR IN 10\n", 1}},
+		{"GO without TO", "GO 10\n", result{"", "?SYNTAX  ERROR\n", 1}},
+		{"GO in a name", "GOLD=1\n", result{"", "?SYNTAX  ERROR\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.name, runMain(t, c.input), c.want)
+	}
+}

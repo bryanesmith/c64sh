@@ -294,7 +294,7 @@ func TestIf(t *testing.T) {
 		{`IF 1 THEN IF 0 THEN PRINT "NO"`, result{"", "", 0}},
 		{`IF 1 THEN A=7:PRINT A`, result{" 7 \n", "", 0}},
 		{`IF 1 PRINT "X"`, result{"", "?SYNTAX  ERROR\n", 1}},
-		{`IF 1 THEN 100`, result{"", "?SYNTAX  ERROR\n", 1}},
+		{`IF 1 THEN 100`, result{"", "?UNDEF'D STATEMENT  ERROR\n", 1}},
 	}
 	for _, c := range cases {
 		check(t, c.input, runMain(t, c.input+"\n"), c.want)

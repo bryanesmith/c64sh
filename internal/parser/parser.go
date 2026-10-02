@@ -25,7 +25,7 @@ import (
 // @spec PARSER-014, PARSER-015, PARSER-016, PARSER-017, PARSER-018, PARSER-019, PARSER-020
 // @spec PARSER-021, PARSER-022, PARSER-023, PARSER-024, PARSER-025, PARSER-026, PARSER-027
 // @spec PARSER-028, PARSER-029, PARSER-030, PARSER-031, PARSER-032, PARSER-033, PARSER-034
-// @spec PARSER-035, PARSER-036, PARSER-037
+// @spec PARSER-035, PARSER-036, PARSER-037, PARSER-038, PARSER-039, PARSER-040, PARSER-041
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -86,6 +86,18 @@ func (p *parser) parseLine() (*ast.Line, error) {
 			line.Statements = append(line.Statements, stmt)
 		}
 		if _, isIf := stmt.(*ast.IfStmt); isIf {
+			// IF … THEN n is IF … THEN GOTO n ($A940).
+			if t := p.tokens[p.pos]; t.Kind == token.Number && isDigit(t.Value[0]) {
+				n, err := p.parseLineNumber()
+				if err != nil {
+					line.Statements = append(line.Statements, &ast.BadStmt{Err: err})
+					return line, err
+				}
+				line.Statements = append(line.Statements, &ast.GotoStmt{Line: n})
+				if !p.accept(token.Colon) {
+					break
+				}
+			}
 			continue // the statement after THEN
 		}
 		if !p.accept(token.Colon) {
@@ -100,7 +112,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -117,6 +129,12 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return stmt, nil
 	case token.Run:
 		stmt, err := p.parseRunStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	case token.Goto, token.Go:
+		stmt, err := p.parseGotoStatement()
 		if err != nil {
 			return nil, err
 		}
@@ -138,28 +156,51 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 	}
 }
 
-// RunStatement = run [ number ] .
+// RunStatement = run [ LineNumber ] .
 //
-// Anything after RUN other than the end of the statement makes it RUN n,
-// with n read from a following number as the ROM reads a line number
-// ($A871, $A8A0): RUN 20.5 is RUN 20, and with no digits n is 0, so
-// RUN A is RUN 0. Whatever follows n is never checked, because RUN does
-// not return to its line.
+// Anything after RUN other than the end of the statement makes it RUN n
+// ($A871): RUN A is RUN 0, as on a C64.
 func (p *parser) parseRunStatement() (*ast.RunStmt, error) {
 	p.next() // RUN
-	switch p.peek() {
-	case token.Colon, token.EOL:
+	if k := p.peek(); k == token.Colon || k == token.EOL {
 		return &ast.RunStmt{}, nil
-	case token.Number:
-		n, _, _, err := lexer.LineNumber(p.next().Value)
-		if err != nil {
-			return nil, err
-		}
-		return &ast.RunStmt{Line: n, HasLine: true}, nil
-	default:
-		return &ast.RunStmt{Line: 0, HasLine: true}, nil
 	}
+	n, err := p.parseLineNumber()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.RunStmt{Line: n, HasLine: true}, nil
 }
+
+// GotoStatement = ( goto | go to ) LineNumber .
+//
+// GO must be followed by TO ($A80E).
+func (p *parser) parseGotoStatement() (*ast.GotoStmt, error) {
+	if p.next().Kind == token.Go && !p.accept(token.To) {
+		return nil, syntaxError()
+	}
+	n, err := p.parseLineNumber()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.GotoStmt{Line: n}, nil
+}
+
+// LineNumber = [ number ] .
+//
+// A line number is read from the number's text as the ROM reads one
+// ($A96B, $A8A0): GOTO 20.5 is GOTO 20, and with no digits, or no number
+// at all, it is 0, so GOTO A is GOTO 0. Whatever follows it is never
+// checked, because a jump does not return to its line.
+func (p *parser) parseLineNumber() (int, error) {
+	if p.peek() != token.Number {
+		return 0, nil
+	}
+	n, _, _, err := lexer.LineNumber(p.next().Value)
+	return n, err
+}
+
+func isDigit(c byte) bool { return '0' <= c && c <= '9' }
 
 // ListStatement = list .
 // NewStatement  = new .
@@ -176,18 +217,20 @@ func (p *parser) parseCommand(stmt ast.Stmt) (ast.Stmt, error) {
 	return stmt, nil
 }
 
-// IfStatement = if Expression then Statement .
+// IfStatement = if Expression ( then [ LineNumber ] | /* goto, parsed as the next statement */ ) .
 //
-// The IfStmt guards the rest of the line; the Statement after THEN is
-// parsed by parseLine as the line's next statement. THEN followed by a
-// line number needs program mode and is a SYNTAX error.
+// The IfStmt guards the rest of the line; the statement after THEN, or
+// the GotoStmt for THEN's line number, is parsed by parseLine as the
+// line's next statement.
 func (p *parser) parseIfStatement() (*ast.IfStmt, error) {
 	p.next() // if
 	cond, err := p.parseExpression()
 	if err != nil {
 		return nil, err
 	}
-	if !p.accept(token.Then) {
+	// IF … GOTO n leaves the GOTO to be parsed as the next statement, as
+	// the ROM leaves it to be executed ($A92E).
+	if p.peek() != token.Goto && !p.accept(token.Then) {
 		return nil, syntaxError()
 	}
 	return &ast.IfStmt{Cond: cond}, nil

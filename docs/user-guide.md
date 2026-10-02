@@ -14,6 +14,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Arithmetic](#arithmetic)
 - [Comparisons](#comparisons)
 - [Logic](#logic)
+- [IF … THEN](#if--then)
 - [Variables](#variables)
 - [Comments](#comments)
 - [Errors](#errors)
@@ -263,6 +264,27 @@ PRINT NOT 1=2         : REM -1
 
 See [`examples/012-logic.bas`](../examples/012-logic.bas) for every form.
 
+## IF … THEN
+
+`IF` runs the rest of its line only when a condition is true:
+
+```
+A=5
+IF A>3 THEN PRINT "A IS BIG"
+IF A>1 AND A<10 THEN PRINT "BETWEEN"
+```
+
+prints `A IS BIG` and `BETWEEN`.
+
+- **A false condition skips the whole rest of the line**, including statements after a colon: `IF A<3 THEN PRINT "ONE":PRINT "TWO"` prints nothing. Statements before the `IF` on the same line still run.
+- **Any number other than 0 is true**, so `IF -1 THEN …` and `IF .5 THEN …` both run. A string is true when it is not empty: `IF N$ THEN …` runs when `N$` holds something.
+- **There is no `ELSE`** in BASIC V2. Use a second `IF` with the opposite test: `IF NOT A>9 THEN …`.
+- **`IF`s can follow one another**: `IF A>1 THEN IF A<3 THEN …` runs only when both are true.
+- **A skipped part of the line is never checked**, as on a C64: `IF 0 THEN PRINT "X"@` prints nothing and reports no error, because the mistake is never reached.
+- **`THEN` is required.** `IF A>3 PRINT "X"` is a `?SYNTAX  ERROR`.
+
+See [`examples/013-if-then.bas`](../examples/013-if-then.bas) for every form.
+
 ## Variables
 
 A variable holds a value for later. Set it with `=` (the word `LET` in front is optional), and use its name anywhere a value can go:
@@ -355,7 +377,6 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
-- `IF`
 - Arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
 - Functions such as `CHR$(34)`
 - Program mode: lines with line numbers (`10 PRINT "HELLO"`), `RUN`, `LIST`, `GOTO`

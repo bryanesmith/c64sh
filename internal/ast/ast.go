@@ -86,6 +86,14 @@ type VarRef struct {
 	Text string // the name as written, without spaces
 }
 
+// IfStmt is IF Cond THEN. It guards the rest of its line: the statements
+// after it run only when Cond is true.
+type IfStmt struct{ Cond Expr }
+
+// BadStmt marks where a statement failed to parse; it is always the last
+// statement of its line.
+type BadStmt struct{ Err error }
+
 // LetStmt is an assignment: [LET] Var = Value.
 type LetStmt struct {
 	Var   *VarRef
@@ -101,6 +109,8 @@ type BinaryExpr struct {
 func (*PrintStmt) stmt() {}
 func (*RemStmt) stmt()   {}
 func (*LetStmt) stmt()   {}
+func (*IfStmt) stmt()    {}
+func (*BadStmt) stmt()   {}
 
 func (*ExprItem) printItem()  {}
 func (*Semicolon) printItem() {}

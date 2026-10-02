@@ -914,3 +914,44 @@ func TestLogicOperandErrors(t *testing.T) {
 		}
 	}
 }
+
+func ifs(cond ast.Expr) *ast.IfStmt { return &ast.IfStmt{Cond: cond} }
+
+// @spec INTERP-045
+func TestIfTrueContinues(t *testing.T) {
+	runPrintCases(t, []printCase{
+		{"true number", line(ifs(num(1)), printStmt(item(str("A")))), "A\n"},
+		{"negative is true", line(ifs(num(-1)), printStmt(item(str("A")))), "A\n"},
+		{"fraction is true", line(ifs(num(.5)), printStmt(item(str("A")))), "A\n"},
+		{"non-empty string", line(ifs(str("X")), printStmt(item(str("A")))), "A\n"},
+		{"rest of line runs", line(ifs(num(1)), printStmt(item(str("A"))), printStmt(item(str("B")))), "A\nB\n"},
+	})
+}
+
+// @spec INTERP-046
+func TestIfFalseSkipsRestOfLine(t *testing.T) {
+	syntax := &basicerr.Error{Kind: basicerr.Syntax}
+	runPrintCases(t, []printCase{
+		{"zero", line(ifs(num(0)), printStmt(item(str("A")))), ""},
+		{"empty string", line(ifs(str("")), printStmt(item(str("A")))), ""},
+		{"skips every later statement", line(ifs(num(0)), printStmt(item(str("A"))), printStmt(item(str("B")))), ""},
+		{"earlier statements ran", line(printStmt(item(str("A"))), ifs(num(0)), printStmt(item(str("B")))), "A\n"},
+		{"BadStmt not reached", line(ifs(num(0)), &ast.BadStmt{Err: syntax}), ""},
+		{"BadItem not reached", line(ifs(num(0)), printStmt(item(str("A")), &ast.BadItem{Err: syntax})), ""},
+		{"comparison condition", line(ifs(rel(ast.RelLess, num(2), num(1))), printStmt(item(str("A")))), ""},
+	})
+	if _, err := exec(line(ifs(bin(ast.Div, num(1), num(0))), printStmt(item(str("A"))))); !isKind(err, basicerr.DivisionByZero) {
+		t.Errorf("error in condition = %v, want DIVISION BY ZERO", err)
+	}
+}
+
+// @spec INTERP-047
+func TestBadStmtReturnsItsError(t *testing.T) {
+	rec, err := exec(line(printStmt(item(str("A"))), &ast.BadStmt{Err: &basicerr.Error{Kind: basicerr.Syntax}}))
+	if !isKind(err, basicerr.Syntax) {
+		t.Errorf("error = %v, want SYNTAX", err)
+	}
+	if got := rec.String(); got != "A\n" {
+		t.Errorf("output %q, want %q", got, "A\n")
+	}
+}

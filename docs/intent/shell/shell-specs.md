@@ -64,7 +64,7 @@ Design: `shell-design.md`
 - [x] **SHELL-LINE-002**: For both interactive and script input, the shell shall process a final line that has no line terminator.
 - [x] **SHELL-LINE-003**: The shell shall read input lines of any length without error.
 - [x] **SHELL-LINE-004**: The shell shall treat a line that is empty or consists only of spaces and tabs as blank.
-- [x] **SHELL-LINE-005**: When a line contains a syntax error, the shell shall execute the statements the parser returned (the statements completed before the error and, if the error is inside a `PRINT`, that `PRINT`'s items before the error), and then report exactly one error: the first BASIC error that execution returned, or else the SYNTAX error.
+- [x] **SHELL-LINE-005**: When a line contains a syntax error, the shell shall execute the statements the parser returned, in which the error is a `BadItem` or `BadStmt` at the point where parsing failed, and report the error only if execution reaches it (so `PRINT "A":PRINT "B"@` prints `A` and `B` and reports `?SYNTAX  ERROR`, while `IF 0 THEN PRINT "A"@` reports nothing).
 - [x] **SHELL-LINE-006**: If executing a line's statements returns a BASIC error, the shell shall report that error and not report a syntax error from the same line.
 - [x] **SHELL-LINE-007**: If writing program output to stdout fails for a reason other than a closed pipe (such as a full disk), then the shell shall stop, write nothing further, and exit with status 1.
 - [x] **SHELL-LINE-008**: If stdout is a pipe whose reader has exited, then c64sh shall be terminated silently by Go's default SIGPIPE handling on its next write to stdout, writing no error message.

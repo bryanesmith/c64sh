@@ -138,13 +138,13 @@ For every line, in both modes:
 2. If the line is blank, skip it.
 3. `tokens := lexer.Lex(line)`
 4. `ast, perr := parser.Parse(tokens)`
-5. `err := interp.Exec(ast)` — runs the statements the parser returned, including a partially parsed `PRINT` that ends at the syntax error (see the parser design, *Errors inside PRINT*).
-6. If `err` is a BASIC error, display it. Otherwise, if `perr` is non-nil, display it.
+5. `err := interp.Exec(ast)` — runs the statements the parser returned. A syntax error is part of that tree, as a `BadItem` or `BadStmt` at the point where parsing failed (see the parser design, *Errors*), so it is returned only if execution reaches it.
+6. If `err` is a BASIC error, display it. The parser's own returned error is not displayed: a syntax error that execution does not reach, such as one after a false `IF`, is never reported, as on a C64.
 7. If `err` is a write error (not a BASIC error), stop and exit with status 1 without further output.
 
 When stdout is a pipe whose reader has exited (as in `c64sh script.bas | head -1`), the Go runtime's default SIGPIPE handling terminates the process silently on the next write. The shell keeps that default, which is how Unix commands behave in pipelines; step 7 therefore applies to other write failures, such as a full disk.
 
-Steps 5–6 reproduce the C64 order of events: `PRINT "A":PRINT "B"@` prints `A` and `B`, and then reports `?SYNTAX  ERROR`. Because the parser's error also travels inside the `BadItem`, `Exec` usually returns it itself; step 6 reports it once either way.
+Steps 5–6 reproduce the C64 order of events: `PRINT "A":PRINT "B"@` prints `A` and `B`, and then reports `?SYNTAX  ERROR`, while `IF 0 THEN PRINT "A"@` prints and reports nothing.
 
 ## Errors
 

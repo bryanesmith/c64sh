@@ -64,6 +64,10 @@ func (in *Interp) execStmt(s ast.Stmt) error {
         return nil
     case *ast.LetStmt:
         return in.execLet(s)
+    case *ast.IfStmt:
+        return in.execIf(s) // may end the line early
+    case *ast.BadStmt:
+        return s.Err
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
     }
@@ -102,6 +106,14 @@ After the last item, a newline (`\n`) is written **unless the last item is `;` o
 | `PRINT 2,3` | ` 2 ` + 7 spaces + ` 3 \n` (` 3 ` at column 10) |
 
 The output for one `PRINT` is collected and written in a single call to the writer. If an item fails, either because evaluating its expression fails or because it is a `BadItem`, the output of the items before it is written (a C64 prints each item as it is evaluated), and then the error is returned. For `PRINT "A";X` where `X` fails, `A` is written, with no newline.
+
+## IF
+
+Executing an `IfStmt` evaluates its condition. A number is true when it is not 0. A string is true when it is not empty: the C64 ROM's `IF` (`$A928`) tests the byte where string evaluation leaves the string's length (`$B4D5`). When the condition is true, execution continues with the next statement on the line; when it is false, **the rest of the line is skipped** without error: no later statement runs, and a `BadStmt` or `BadItem` among them is never reached. An error while evaluating the condition is returned like any other.
+
+## BadStmt
+
+Executing a `BadStmt` returns its error: the syntax error the parser found at that point, reported now that execution has reached it.
 
 ## REM
 

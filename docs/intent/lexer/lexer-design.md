@@ -47,6 +47,8 @@ const (
     And                   // AND
     Or                    // OR
     Not                   // NOT
+    If                    // IF
+    Then                  // THEN
 )
 
 type Token struct {
@@ -84,7 +86,7 @@ Inside a string literal, the bytes of the line are kept exactly as they are, inc
 
 ## Keywords
 
-The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, and `NOT`.
+The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, and `THEN`.
 
 - **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`; `REMARK` is a `Rem` token with the comment `ARK`.
 - **Spaces inside a keyword break it.** `PR INT` is not `PRINT`; it scans as `Illegal(P) Illegal(R) Illegal(I) Illegal(N) Illegal(T)`.
@@ -129,6 +131,8 @@ let       = "LET" .
 and       = "AND" .
 or        = "OR" .
 not       = "NOT" .
+if        = "IF" .
+then      = "THEN" .
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
             [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
 digit     = "0" … "9" .

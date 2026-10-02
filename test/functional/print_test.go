@@ -276,3 +276,29 @@ func TestLogic(t *testing.T) {
 		check(t, c.input, runMain(t, c.input+"\n"), c.want)
 	}
 }
+
+// TestIf checks IF ... THEN end to end, as listed in the HLD's Goals.
+func TestIf(t *testing.T) {
+	cases := []struct {
+		input string
+		want  result
+	}{
+		{`A=5:IF A>3 THEN PRINT "BIG"`, result{"BIG\n", "", 0}},
+		{`A=1:IF A>3 THEN PRINT "BIG"`, result{"", "", 0}},
+		{`IF 1 THEN PRINT "A":PRINT "B"`, result{"A\nB\n", "", 0}},
+		{`IF 0 THEN PRINT "A":PRINT "B"`, result{"", "", 0}},
+		{`PRINT "X";:IF 0 THEN PRINT "A"`, result{"X", "", 0}},
+		{`IF 0 THEN PRINT "A"@`, result{"", "", 0}},
+		{`IF 1 THEN PRINT "A"@`, result{"A\n", "?SYNTAX  ERROR\n", 1}},
+		{`IF "X" THEN PRINT "NON-EMPTY"`, result{"NON-EMPTY\n", "", 0}},
+		{`IF "" THEN PRINT "EMPTY"`, result{"", "", 0}},
+		{`IF 1<2 AND 3<4 THEN PRINT "BOTH"`, result{"BOTH\n", "", 0}},
+		{`IF 1 THEN IF 0 THEN PRINT "NO"`, result{"", "", 0}},
+		{`IF 1 THEN A=7:PRINT A`, result{" 7 \n", "", 0}},
+		{`IF 1 PRINT "X"`, result{"", "?SYNTAX  ERROR\n", 1}},
+		{`IF 1 THEN 100`, result{"", "?SYNTAX  ERROR\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.input, runMain(t, c.input+"\n"), c.want)
+	}
+}

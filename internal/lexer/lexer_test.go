@@ -339,3 +339,14 @@ func TestLogicKeywords(t *testing.T) {
 		{"AND inside a name", `BAND`, []token.Token{name("B", 0), tok(token.And, "AND", 1), eol(4)}},
 	})
 }
+
+// @spec LEXER-025
+func TestIfThenKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"IF THEN", `IFA=1THEN`, []token.Token{
+			tok(token.If, "IF", 0), name("A", 2), tok(token.Equal, "=", 3), num("1", 4), tok(token.Then, "THEN", 5), eol(9),
+		}},
+		{"THEN ends a name", `IF A THEN`, []token.Token{tok(token.If, "IF", 0), name("A", 3), tok(token.Then, "THEN", 5), eol(9)}},
+		{"IF inside a name", `DIFF`, []token.Token{name("D", 0), tok(token.If, "IF", 1), name("F", 3), eol(4)}},
+	})
+}

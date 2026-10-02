@@ -169,13 +169,11 @@ func isBlank(line string) bool {
 // @spec SHELL-LINE-005, SHELL-LINE-006, SHELL-LINE-007
 // @spec SHELL-INT-002, SHELL-INT-005, SHELL-SCRIPT-005
 func (s *session) execLine(line string) (int, bool) {
-	tree, parseErr := parser.Parse(lexer.Lex(line))
-	// The statements before a syntax error run first, as on a C64. A
-	// runtime error among them is reported instead of the syntax error.
+	// A syntax error is part of the tree, where parsing failed, so it is
+	// reported only if execution reaches it: statements before it run
+	// first, and one skipped by a false IF is never reported, as on a C64.
+	tree, _ := parser.Parse(lexer.Lex(line))
 	err := s.interp.Exec(tree)
-	if err == nil {
-		err = parseErr
-	}
 
 	basicErr, isBasic := errors.AsType[*basicerr.Error](err)
 	switch {

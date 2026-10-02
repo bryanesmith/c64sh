@@ -32,6 +32,8 @@ const (
 	And                   // AND
 	Or                    // OR
 	Not                   // NOT
+	If                    // IF
+	Then                  // THEN
 )
 
 var kindNames = [...]string{
@@ -59,6 +61,8 @@ var kindNames = [...]string{
 	And:       "And",
 	Or:        "Or",
 	Not:       "Not",
+	If:        "If",
+	Then:      "Then",
 }
 
 func (k Kind) String() string {

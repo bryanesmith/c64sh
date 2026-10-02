@@ -1,0 +1,15 @@
+exit status: 1
+--- stdout ---
+A IS BIG
+ONE
+TWO
+BEFORE
+TRUE
+ALSO TRUE
+HELLO, ALICE
+BETWEEN
+ 10 
+NOT BIG
+OOPS
+--- stderr ---
+?SYNTAX  ERROR

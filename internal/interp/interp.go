@@ -2,6 +2,7 @@
 package interp
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -40,7 +41,11 @@ func New(out io.Writer) *Interp {
 // @spec INTERP-001, INTERP-013
 func (in *Interp) Exec(line *ast.Line) error {
 	for _, s := range line.Statements {
-		if err := in.execStmt(s); err != nil {
+		err := in.execStmt(s)
+		if err == errSkipLine {
+			return nil // a false IF: the rest of the line does not run
+		}
+		if err != nil {
 			return err
 		}
 	}
@@ -95,7 +100,27 @@ func (in *Interp) execLet(s *ast.LetStmt) error {
 	return nil
 }
 
-// @spec INTERP-003, INTERP-014
+// errSkipLine is returned by execIf when its condition is false, ending
+// the line without error.
+var errSkipLine = errors.New("skip the rest of the line")
+
+// execIf evaluates an IF's condition: a number is true when it is not 0, a
+// string when it is not empty, as the C64 ROM tests the byte holding a
+// string's length ($A928, $B4D5).
+//
+// @spec INTERP-045, INTERP-046
+func (in *Interp) execIf(s *ast.IfStmt) error {
+	v, err := in.eval(s.Cond)
+	if err != nil {
+		return err
+	}
+	if (v.isNum && v.num != 0) || (!v.isNum && v.str != "") {
+		return nil
+	}
+	return errSkipLine
+}
+
+// @spec INTERP-003, INTERP-014, INTERP-047
 func (in *Interp) execStmt(s ast.Stmt) error {
 	switch s := s.(type) {
 	case *ast.PrintStmt:
@@ -104,6 +129,10 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return nil // a comment does nothing
 	case *ast.LetStmt:
 		return in.execLet(s)
+	case *ast.IfStmt:
+		return in.execIf(s)
+	case *ast.BadStmt:
+		return s.Err // a syntax error, now that execution has reached it
 	default:
 		panic(fmt.Sprintf("interp: unhandled statement %T", s))
 	}

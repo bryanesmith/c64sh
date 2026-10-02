@@ -22,7 +22,7 @@ import (
 // @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011, PARSER-012, PARSER-013
 // @spec PARSER-014, PARSER-015, PARSER-016, PARSER-017, PARSER-018, PARSER-019, PARSER-020
 // @spec PARSER-021, PARSER-022, PARSER-023, PARSER-024, PARSER-025, PARSER-026, PARSER-027
-// @spec PARSER-028, PARSER-029, PARSER-030
+// @spec PARSER-028, PARSER-029, PARSER-030, PARSER-031, PARSER-032
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -63,27 +63,41 @@ func syntaxError() error {
 }
 
 // Line = Statement { ":" Statement } .
+//
+// The statement after an IF's THEN follows it with no ":". A syntax error
+// is placed in the tree where it occurs: as a PRINT's BadItem, or as a
+// BadStmt ending the line, so that it is reported only if execution
+// reaches it.
 func (p *parser) parseLine() (*ast.Line, error) {
 	line := &ast.Line{}
 	for {
 		stmt, err := p.parseStatement()
+		if err != nil {
+			if stmt == nil {
+				stmt = &ast.BadStmt{Err: err}
+			}
+			line.Statements = append(line.Statements, stmt)
+			return line, err
+		}
 		if stmt != nil {
 			line.Statements = append(line.Statements, stmt)
 		}
-		if err != nil {
-			return line, err
+		if _, isIf := stmt.(*ast.IfStmt); isIf {
+			continue // the statement after THEN
 		}
 		if !p.accept(token.Colon) {
 			break
 		}
 	}
 	if p.peek() != token.EOL {
-		return line, syntaxError()
+		err := syntaxError()
+		line.Statements = append(line.Statements, &ast.BadStmt{Err: err})
+		return line, err
 	}
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -92,6 +106,12 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return p.parsePrintStatement()
 	case token.Rem:
 		return p.parseRemStatement()
+	case token.If:
+		stmt, err := p.parseIfStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
 	case token.Let, token.Name:
 		stmt, err := p.parseLetStatement()
 		if err != nil {
@@ -101,6 +121,23 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 	default:
 		return nil, nil
 	}
+}
+
+// IfStatement = if Expression then Statement .
+//
+// The IfStmt guards the rest of the line; the Statement after THEN is
+// parsed by parseLine as the line's next statement. THEN followed by a
+// line number needs program mode and is a SYNTAX error.
+func (p *parser) parseIfStatement() (*ast.IfStmt, error) {
+	p.next() // if
+	cond, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+	if !p.accept(token.Then) {
+		return nil, syntaxError()
+	}
+	return &ast.IfStmt{Cond: cond}, nil
 }
 
 // LetStatement = [ let ] Variable "=" Expression .

@@ -43,3 +43,4 @@ Design: `lexer-design.md`
 - [x] **LEXER-022**: When the lexer encounters `LET` in uppercase outside a string literal, it shall produce a `Let` token, and when it encounters `=` outside a string literal, an `Equal` token.
 - [x] **LEXER-023**: When the lexer encounters `<` or `>` outside a string literal, it shall produce a `Less` or `Greater` token respectively, one token per character (so `<>` is `Less Greater`).
 - [x] **LEXER-024**: When the lexer encounters `AND`, `OR`, or `NOT` in uppercase outside a string literal, it shall produce an `And`, `Or`, or `Not` token respectively.
+- [x] **LEXER-025**: When the lexer encounters `IF` or `THEN` in uppercase outside a string literal, it shall produce an `If` or `Then` token respectively.

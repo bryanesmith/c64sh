@@ -91,6 +91,14 @@ type VarRef struct {
     Text string // the name as written, without spaces ("HEIGHT")
 }
 
+// IfStmt is IF Cond THEN. It guards the rest of its line: the statements
+// after it run only when Cond is true.
+type IfStmt struct{ Cond Expr }
+
+// BadStmt marks where a statement failed to parse; it is always the last
+// statement of its line.
+type BadStmt struct{ Err error }
+
 // LetStmt is an assignment: [LET] Var = Value.
 type LetStmt struct {
     Var   *VarRef
@@ -142,6 +150,12 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 - a name whose identity is `TI`, `TI$`, or `ST`, the C64's system variables (the clock and I/O status), whether used or assigned (`TI%` and `ST%` are ordinary integer variables, as on a C64, whose check for system variables includes the type);
 - a name followed by `(`, which on a C64 is an array element (`A(1)`) or a function call (`CHR$(65)`).
 
+### IF
+
+`IF condition THEN` becomes an `IfStmt` holding the condition. The statement that follows `THEN`, and every statement after it on the line, are parsed as the line's next statements, with no `:` needed after `THEN`: `IF A>1 THEN PRINT "X":PRINT "Y"` is `IfStmt(A>1)`, `PrintStmt("X")`, `PrintStmt("Y")`. An `IfStmt` thus guards the rest of its line, which is exactly the C64's rule: when the condition is false the rest of the line is skipped, as if it were a `REM` (`$A928`). Nothing may follow `THEN`, in which case the `IF` does nothing either way, and `IF`s may follow each other (`IF A THEN IF B THEN …`).
+
+`IF X THEN 100` and `IF X GOTO 100` jump to a line number, which needs program mode. Until then, anything other than `THEN` after the condition is a SYNTAX error in place of the `IF`, while a number after `THEN` becomes a `BadStmt` following the `IfStmt`: the error is reported only when the condition is true, so `IF 0 THEN 100` does nothing, as on a C64.
+
 ### Items side by side
 
 An expression ends at the first token that cannot continue it, and PRINT then reads the next item. A token that can start an expression but not continue one begins a new item: `PRINT 2(3)` prints two numbers, ` 2  3 `. A `-` or `+` after an operand always continues the expression as a binary operator, as on a C64: `PRINT 1 -1` prints ` 0 `, and `PRINT "A"-1` is `TYPE MISMATCH`.
@@ -155,7 +169,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
@@ -169,6 +183,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Power = Operand { "^" Exponent } .` | `parsePower` | `ast.Expr` |
 | `Exponent = "-" Unary \| "+" Unary \| Operand .` | `parseExponent` | `ast.Expr` |
 | `LetStatement = [ let ] Variable "=" Expression .` | `parseLetStatement` | `*ast.LetStmt` |
+| `IfStatement = if Expression then Statement .` | `parseIfStatement` | `*ast.IfStmt` (see *IF*) |
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
 | `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison .` | `parseOperand` | `ast.Expr` |
 
@@ -186,6 +201,8 @@ The parser reports one error kind, `SYNTAX` (see the shell design for the error 
 
 Parsing stops at the first error. There is no error recovery: a C64 abandons the rest of a line at the first error, so nothing after it would ever run.
 
+The error is placed in the tree where it occurred, so that it is reported only if execution reaches it. A C64 checks a statement's syntax only as it runs it, so an error in the part of a line skipped by a false `IF` is never reported (`IF 0 THEN PRINT "A"@` does nothing). Inside a `PRINT`'s items the error is a `BadItem` (below); anywhere else, the failing statement is replaced by a `BadStmt` holding the error, as the line's last statement.
+
 ### Errors inside PRINT
 
 A C64 executes `PRINT` one item at a time, so the items before a syntax error are printed before the error is reported: `PRINT "HELLO"@` prints `HELLO`, then `?SYNTAX  ERROR`. To reproduce this, when the error occurs inside a `PRINT` statement's items, the parser keeps that statement: its `Items` are the items completed before the error, followed by an `*ast.BadItem` holding the SYNTAX error. The interpreter prints the earlier items, reaches the `BadItem`, and fails with its error, writing no final newline.
@@ -194,7 +211,7 @@ A `Rem` token where a print item is expected is a syntax error like any other: `
 
 An item that is itself malformed is replaced entirely by the `BadItem`. In `PRINT "A";"B"+@`, the items are `ExprItem("A")`, `Semicolon`, `BadItem`, so `A` is printed and `B` is not, matching a C64, which fails while evaluating `"B"+@` before printing it.
 
-When the error is at the start of a statement (the first token cannot begin a statement), there is nothing to execute, and no node is produced for that statement.
+Any other error, such as one at the start of a statement or in an assignment, replaces the whole failing statement with a `BadStmt`.
 
 ## API
 
@@ -203,8 +220,9 @@ package parser
 
 // Parse parses the tokens of one line. It always returns a non-nil Line.
 // If err is non-nil, it is a SYNTAX error, and the Line holds the
-// statements completed before the error, followed, when the error is
-// inside a PRINT statement's items, by that statement ending in a BadItem.
+// statements completed before the error, followed by either that PRINT
+// statement ending in a BadItem (an error inside PRINT's items) or a
+// BadStmt holding the error.
 func Parse(tokens []token.Token) (*ast.Line, error)
 ```
 
@@ -212,7 +230,8 @@ Examples:
 
 | Input | Returned `Line.Statements` |
 |---|---|
-| `PRINT "A":@` | `PrintStmt[ExprItem("A")]` |
+| `PRINT "A":@` | `PrintStmt[ExprItem("A")]`, `BadStmt` |
+| `IF 0 THEN @` | `IfStmt(0)`, `BadStmt` |
 | `PRINT "A":PRINT "B"@` | `PrintStmt[ExprItem("A")]`, `PrintStmt[ExprItem("B"), BadItem]` |
 | `PRINT "A"+` | `PrintStmt[BadItem]` |
 
@@ -221,7 +240,7 @@ Examples:
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
 | Parsing technique | Recursive descent, one function per rule | Parser generator; Pratt parser | Each function implements, and documents, exactly one grammar rule, so the code reads as the grammar. A Pratt parser suits operator precedence and can be introduced inside `parseExpression` when math is added, without changing the rule-per-function structure. |
-| Error with partial result | Return the statements before the error, plus a partially parsed `PRINT` ending in a `BadItem`, together with the error | Return only an error; drop the statement containing the error; a `BadStmt` node replacing the whole failing statement | Reproduces what a C64 prints before a syntax error: earlier statements run, and so do the earlier items of a failing `PRINT`. The error travels with the partial result, as in `go/parser`. `BadItem` is limited to print items, the only place where a C64 produces output partway through a statement. |
+| Error with partial result | The statements before the error, then the error itself in the tree: a `PRINT` ending in a `BadItem`, or a `BadStmt`; the error is also returned | Return only an error; drop the statement containing the error and return the error separately | Reproduces the C64's order of events: earlier statements run, and so do the earlier items of a failing `PRINT`. Placing the error in the tree means it is reported only if execution reaches it, so a syntax error after a false `IF` goes unnoticed, as on a C64, which checks syntax only as it runs. |
 | Syntax error inside a string-too-long expression | SYNTAX is reported; the concatenation is never evaluated | Evaluate operands up to the syntax error, as a C64 does | In `PRINT <long>+<long>+`, a C64 reports `STRING TOO LONG` before reaching the dangling `+`. Reproducing this needs expression evaluation interleaved with parsing, and the case needs an input line longer than a C64 can accept. |
 | Sealed interfaces | Unexported marker methods | Exported marker methods; a single node struct with a kind field | Only `internal/ast` can add node types, so type switches elsewhere can be exhaustive and a panicking `default` reliably signals a missed case. |
 | Empty statements | Dropped during parsing | `EmptyStmt` node | They have no effect, and dropping them keeps the interpreter free of a no-op case. |

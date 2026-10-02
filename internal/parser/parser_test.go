@@ -32,6 +32,8 @@ var (
 	and   = token.Token{Kind: token.And, Value: "AND"}
 	or    = token.Token{Kind: token.Or, Value: "OR"}
 	not   = token.Token{Kind: token.Not, Value: "NOT"}
+	iff   = token.Token{Kind: token.If, Value: "IF"}
+	then  = token.Token{Kind: token.Then, Value: "THEN"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -74,6 +76,13 @@ func dumpStmt(s ast.Stmt) string {
 		return "REM(" + strconv.Quote(s.Text) + ")"
 	case *ast.LetStmt:
 		return "LET " + dumpExpr(s.Var) + "=" + dumpExpr(s.Value)
+	case *ast.IfStmt:
+		return "IF " + dumpExpr(s.Cond)
+	case *ast.BadStmt:
+		if isSyntax(s.Err) {
+			return "BADSTMT"
+		}
+		return fmt.Sprintf("BADSTMT(%v)", s.Err)
 	default:
 		return fmt.Sprintf("<stmt %T>", s)
 	}
@@ -227,12 +236,12 @@ func TestRemStatement(t *testing.T) {
 // @spec PARSER-007, PARSER-011
 func TestStatementStartingWithWrongTokenIsSyntaxError(t *testing.T) {
 	runParseCases(t, []parseCase{
-		{"string", toks(str("A")), ``, true},
-		{"illegal", toks(ill("@")), ``, true},
-		{"semicolon", toks(semi), ``, true},
-		{"comma", toks(comma), ``, true},
-		{"plus", toks(plus), ``, true},
-		{"after a good statement", toks(pr, str("A"), colon, ill("X")), `PRINT["A"]`, true},
+		{"string", toks(str("A")), `BADSTMT`, true},
+		{"illegal", toks(ill("@")), `BADSTMT`, true},
+		{"semicolon", toks(semi), `BADSTMT`, true},
+		{"comma", toks(comma), `BADSTMT`, true},
+		{"plus", toks(plus), `BADSTMT`, true},
+		{"after a good statement", toks(pr, str("A"), colon, ill("X")), `PRINT["A"] : BADSTMT`, true},
 	})
 }
 
@@ -275,7 +284,7 @@ func TestParsingStopsAtFirstError(t *testing.T) {
 			`PRINT["A"] : PRINT["B" BAD(SYNTAX)]`, true},
 		{"later statement start error not parsed",
 			toks(pr, str("A"), colon, ill("@"), colon, pr, str("C")),
-			`PRINT["A"]`, true},
+			`PRINT["A"] : BADSTMT`, true},
 	})
 }
 
@@ -424,10 +433,10 @@ func TestUnsupportedNames(t *testing.T) {
 		{"TIME used", toks(pr, name("TIME")), `PRINT[BAD(SYNTAX)]`, true},
 		{"TI$ used", toks(pr, name("TI$")), `PRINT[BAD(SYNTAX)]`, true},
 		{"ST used", toks(pr, name("STATUS")), `PRINT[BAD(SYNTAX)]`, true},
-		{"TI assigned", toks(name("TI"), eq, number("1")), ``, true},
+		{"TI assigned", toks(name("TI"), eq, number("1")), `BADSTMT`, true},
 		{"array element", toks(pr, name("A"), lp, number("1"), rp), `PRINT[BAD(SYNTAX)]`, true},
 		{"function call", toks(pr, name("CHR$"), lp, number("65"), rp), `PRINT[BAD(SYNTAX)]`, true},
-		{"array assigned", toks(name("A"), lp, number("1"), rp, eq, number("2")), ``, true},
+		{"array assigned", toks(name("A"), lp, number("1"), rp, eq, number("2")), `BADSTMT`, true},
 		{"T and I separately are fine", toks(pr, name("T"), semi, name("IT")), `PRINT[$T[T] ; $IT[IT]]`, false},
 		{"TI% is ordinary", toks(pr, name("TI%"), semi, name("ST%")), `PRINT[$TI%[TI%] ; $ST%[ST%]]`, false},
 	})
@@ -436,13 +445,13 @@ func TestUnsupportedNames(t *testing.T) {
 // @spec PARSER-025, PARSER-011
 func TestAssignmentSyntaxErrors(t *testing.T) {
 	runParseCases(t, []parseCase{
-		{"LET alone", toks(let), ``, true},
-		{"LET a number", toks(let, number("5"), eq, number("1")), ``, true},
-		{"name alone", toks(name("A")), ``, true},
-		{"no value", toks(name("A"), eq), ``, true},
-		{"missing =", toks(name("A"), number("5")), ``, true},
-		{"after a good statement", toks(pr, number("1"), colon, name("A"), eq), `PRINT[#1]`, true},
-		{"bad value", toks(name("A"), eq, number("1"), plus), ``, true},
+		{"LET alone", toks(let), `BADSTMT`, true},
+		{"LET a number", toks(let, number("5"), eq, number("1")), `BADSTMT`, true},
+		{"name alone", toks(name("A")), `BADSTMT`, true},
+		{"no value", toks(name("A"), eq), `BADSTMT`, true},
+		{"missing =", toks(name("A"), number("5")), `BADSTMT`, true},
+		{"after a good statement", toks(pr, number("1"), colon, name("A"), eq), `PRINT[#1] : BADSTMT`, true},
+		{"bad value", toks(name("A"), eq, number("1"), plus), `BADSTMT`, true},
 	})
 }
 
@@ -506,5 +515,31 @@ func TestNot(t *testing.T) {
 		{"mid-expression", toks(pr, number("1"), plus, not, number("0"), plus, number("1")), `PRINT[(#1+(NOT (#0+#1)))]`, false},
 		{"twice", toks(pr, not, not, number("0")), `PRINT[(NOT (NOT #0))]`, false},
 		{"after =", toks(name("A"), eq, not, number("0")), `LET $A[A]=(NOT #0)`, false},
+	})
+}
+
+// @spec PARSER-031
+func TestIfStatement(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"IF THEN PRINT", toks(iff, name("A"), gt, number("1"), then, pr, str("X")), `IF ($A[A] > #1) : PRINT["X"]`, false},
+		{"rest of line", toks(iff, number("1"), then, pr, str("X"), colon, pr, str("Y")), `IF #1 : PRINT["X"] : PRINT["Y"]`, false},
+		{"assignment after THEN", toks(iff, number("1"), then, name("A"), eq, number("2")), `IF #1 : LET $A[A]=#2`, false},
+		{"nothing after THEN", toks(iff, number("1"), then), `IF #1`, false},
+		{"colon after THEN", toks(iff, number("1"), then, colon, pr, str("X")), `IF #1 : PRINT["X"]`, false},
+		{"nested", toks(iff, name("A"), then, iff, name("B"), then, pr, str("X")), `IF $A[A] : IF $B[B] : PRINT["X"]`, false},
+		{"after a statement", toks(pr, str("A"), colon, iff, number("0"), then, pr, str("B")), `PRINT["A"] : IF #0 : PRINT["B"]`, false},
+		{"condition with AND", toks(iff, name("A"), and, name("B"), then, pr, str("X")), `IF ($A[A] AND $B[B]) : PRINT["X"]`, false},
+		{"error after THEN is in the tree", toks(iff, number("0"), then, ill("@")), `IF #0 : BADSTMT`, true},
+		{"error in PRINT after THEN", toks(iff, number("0"), then, pr, str("A"), ill("@")), `IF #0 : PRINT["A" BAD(SYNTAX)]`, true},
+	})
+}
+
+// @spec PARSER-032
+func TestIfSyntaxErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"no THEN", toks(iff, number("1"), pr, str("X")), `BADSTMT`, true},
+		{"THEN line number", toks(iff, number("1"), then, number("100")), `IF #1 : BADSTMT`, true},
+		{"no condition", toks(iff, then, pr, str("X")), `BADSTMT`, true},
+		{"IF alone", toks(iff), `BADSTMT`, true},
 	})
 }

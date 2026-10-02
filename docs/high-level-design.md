@@ -31,13 +31,23 @@ C64 BASIC has two ways of handling a line of input:
 - **Direct mode** — a line that does not begin with a line number is executed immediately when RETURN is pressed. `PRINT "HELLO"` prints `HELLO` at once.
 - **Program mode** — a line that begins with a line number (`10 PRINT "HELLO"`) is not executed. It is stored in the program, in line-number order, replacing any existing line with the same number. Stored lines execute when `RUN` is entered, and commands such as `LIST`, `NEW`, and `GOTO` operate on the stored program.
 
-c64sh currently supports **direct mode only**. Every line, whether typed at the prompt or read from a script file or stdin, is executed immediately and independently. A line beginning with a line number is not yet accepted and fails with `?SYNTAX  ERROR`.
+c64sh supports both. The shell reads a line's number the way the C64 ROM does (`$A96B`): digits, with spaces between them ignored, up to 63999. A numbered line goes to the interpreter's stored program; any other line is lexed, parsed, and executed. A stored line is lexed and parsed when it is stored, but, as in direct mode, a syntax error in it is reported only if execution reaches it: `?SYNTAX  ERROR IN 20` when line 20 runs.
 
-Program mode is a planned feature. It adds a stored program to the shell's state and a line-number prefix to the `Line` rule; the lexer → parser → interpreter pipeline is unchanged. How script files relate to program mode (for example, whether a file of numbered lines is loaded and run automatically) is decided when program mode is designed.
+**Script files follow one rule: every line behaves exactly as if typed.** Numbered lines are stored and other lines run in direct mode, in file order. A script that stored numbered lines but never started the program itself (with `RUN`) has its program run after its last line, so a file of numbered lines is an ordinary program, with no `RUN` needed:
+
+```
+30 PRINT "1"
+PRINT "2"
+10 PRINT "3"
+PRINT "4"
+40 PRINT "5"
+```
+
+prints `2` and `4` as those lines are read, then runs the program: `3`, `1`, `5`. With `RUN` as its last line it prints the same, because the script started the program itself.
 
 ### Incremental language growth
 
-The language grows one feature at a time. The language currently supports `PRINT` with string and number arguments, arithmetic, comparisons, logical operators, `IF … THEN`, variables, and `REM` comments, in direct mode. Each new feature (numbers and math, functions such as `CHR$`, variables, program mode with line numbers, `LOAD`/`SAVE`) extends the lexer and parser, with their rule comments, then the interpreter, and gets its own tests at every layer. It also adds or extends a numbered example script in `examples/` that exercises the feature in many ways, with a snapshot test recording that script's exact output.
+The language grows one feature at a time. The language currently supports `PRINT` with string and number arguments, arithmetic, comparisons, logical operators, `IF … THEN`, variables, and `REM` comments, in direct mode and in stored programs (`RUN`, `LIST`, `NEW`, `END`). Each new feature (functions such as `CHR$`, `GOTO` and other jumps, loops, `LOAD`/`SAVE`) extends the lexer and parser, with their rule comments, then the interpreter, and gets its own tests at every layer. It also adds or extends a numbered example script in `examples/` that exercises the feature in many ways, with a snapshot test recording that script's exact output.
 
 ## Target Users
 
@@ -48,7 +58,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 ## Goals
 
 - `c64sh` started from a terminal gives an interactive prompt; each line entered is executed immediately (direct mode). While typing a line, the up and down arrows recall earlier lines from the session, and the usual terminal editing keys work (left and right arrows, Home, End, Backspace); Ctrl-C discards the line being typed. History is saved to `~/.c64sh_history`, so earlier sessions' lines can be recalled too.
-- `c64sh FILE` and executable files beginning with `#!/usr/bin/env c64sh` execute each line of the file in direct mode, as if typed. Input piped on stdin is executed the same way.
+- `c64sh FILE` and executable files beginning with `#!/usr/bin/env c64sh` process each line of the file as if typed: numbered lines are stored, and other lines run in direct mode. If the file stored numbered lines and never ran them with `RUN`, the program runs after the last line. Input piped on stdin is processed the same way.
 - `PRINT` with string literals behaves as it does on a C64: optional space after the keyword (`PRINT"X"`), `;` and `+` join strings, and `:` separates statements on one line. `,` moves to the next 10-column print zone, as on a C64.
 - Numbers are written and printed as on a C64: literals such as `5`, `3.14`, `.5`, and `1E3`; printed with a leading space (or `-`) and a trailing space, rounded to 9 significant digits, with no leading zero before the decimal point (`.5`), and in scientific notation below 0.01 and from 1E9 up (`1E-03`, `1E+09`). Numbers and strings mix freely in `PRINT` (`? "5*9=";45`).
 - Arithmetic follows C64 rules: `+`, `-`, `*`, `/`, and `^` (exponentiation, also typed `↑`, the same character code as the C64's up-arrow key), a leading `-` (negation) or `+`, and parentheses, with the C64's precedence (`^`, then negation, then `*` and `/`, then `+` and `-`, each left to right, so `-2^2` is -4 and `2^3^2` is 64). `+` also joins strings. Dividing by zero is `?DIVISION BY ZERO  ERROR`, a negative number to a fractional power is `?ILLEGAL QUANTITY  ERROR`, and using a string with an arithmetic operator other than joining is `?TYPE MISMATCH  ERROR`.
@@ -56,6 +66,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 - The logical operators `AND`, `OR`, and `NOT` work as on a C64: on whole numbers from -32768 to 32767, bit by bit, so that with true as -1 and false as 0 they also combine comparisons (`1<2 AND 3<4` is -1). `NOT` binds more loosely than comparisons, and `AND` more tightly than `OR`. A number outside the range is `?ILLEGAL QUANTITY  ERROR`; a string is `?TYPE MISMATCH  ERROR`.
 - `IF condition THEN statements` works as on a C64: when the condition is false (0), the rest of the line is skipped, including statements after `:`, and nothing in the skipped part is checked, so even a syntax error there goes unnoticed. Any nonzero number is true, and a string is true when it is not empty. BASIC V2 has no `ELSE`.
 - Variables behave as on a C64: number variables (`A`, `HEIGHT`), integer variables (`C%`, holding whole numbers from -32768 to 32767, rounding down what is stored in them), and string variables (`N$`), set with `=` with or without `LET` and used anywhere a value can go. Only the first two characters of a name count (`HEIGHT` and `HE` are the same variable), a keyword inside a name breaks it (`SCORE` contains `OR`), spaces inside a name are ignored, a variable never set is 0 or the empty string, and assigning the wrong type is `?TYPE MISMATCH  ERROR`. Values persist from line to line for the whole session or script.
+- Program mode works as on a C64: a line beginning with a number from 0 to 63999 is stored in the program, in line-number order, replacing any line with that number; a number alone deletes its line. Storing or deleting a line clears the variables, as on a C64. `LIST` prints the program as the C64 does (each line as its number, a space, and its text, with `?` shown as `PRINT`), `RUN` clears the variables and runs the program from its first line, `RUN n` from line `n`, `END` stops it, and `NEW` erases it. An error in a running program names its line: `?SYNTAX  ERROR IN 20`. A missing line `n` is `?UNDEF'D STATEMENT  ERROR`.
 - `REM` comments behave as they do on a C64: everything after `REM` to the end of the line is ignored, including colons, so comments can document scripts and follow other statements (`PRINT "A":REM SHOW A`).
 - Input the shell does not accept produces the error a C64 would print for it (for example `?SYNTAX  ERROR`).
 - The lexer, parser, and interpreter each have unit tests; functional tests run the whole shell on given input and assert on captured stdout and stderr.
@@ -66,7 +77,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 ## Non-Goals
 
 - **Emulating the C64 machine.** No screen memory, 40-column wrapping, colors, cursor control, PETSCII graphics, `PEEK`/`POKE`, or timing.
-- **Supporting the whole language at once.** Arrays, the system variables `TI`, `TI$`, and `ST`, functions, program mode (see *Direct mode and program mode*), and device commands are future features, added one at a time.
+- **Supporting the whole language at once.** Arrays, the system variables `TI`, `TI$`, and `ST`, functions, jumps and loops (`GOTO`, `GOSUB`, `FOR`), `LIST` ranges, `CLR`, `STOP` and `CONT`, and device commands are future features, added one at a time.
 - **Advanced line editing**: tab completion and history search. The interactive prompt offers history and basic editing only.
 - **Extensions beyond BASIC V2.** No keywords from BASIC 3.5/7.0 or third-party extensions.
 - **Real device I/O.** When `LOAD`/`SAVE` are added, the storage behind them will be replaceable, so tests never touch the real filesystem.
@@ -100,11 +111,11 @@ flowchart LR
 | Shell | `internal/shell` (+ `internal/basicerr`) | Parses command-line arguments, chooses interactive or script mode, reads lines, runs each through the pipeline, and reports errors. Takes its input and output streams as parameters so it can be run inside tests. Defines the BASIC error type. |
 | Lexer | `internal/lexer` (+ `internal/token`) | Turns a line of characters into tokens. Handles C64 lexical rules such as keywords with no following space. |
 | Parser | `internal/parser` (+ `internal/ast`) | Turns tokens into an AST using recursive descent, one function per grammar rule, each documented with its rule in EBNF. |
-| Interpreter | `internal/interp` | Executes the AST by switching on node type. Writes program output to a given writer. |
+| Interpreter | `internal/interp` | Executes the AST by switching on node type. Writes program output to a given writer. Holds the stored program: lexes and parses each line as it is stored, and runs, lists, and erases the program. |
 
 ### Errors
 
-A BASIC error (such as `SYNTAX`) is an ordinary Go error value that carries the C64 error name. Any stage can return one; the shell formats it the way a C64 prints it and writes it to stderr. An error stops the rest of the line it occurs in, as on a C64.
+A BASIC error (such as `SYNTAX`) is an ordinary Go error value that carries the C64 error name and, when it occurs in a running program, the program line's number. Any stage can return one; the shell formats it the way a C64 prints it (`?SYNTAX  ERROR`, or `?SYNTAX  ERROR IN 20` in a program) and writes it to stderr. An error stops the rest of the line it occurs in, and a running program, as on a C64.
 
 ### Tests
 
@@ -159,6 +170,8 @@ README.md
 | Number representation | Go `float64`, formatted as the C64 formats numbers | Emulating the C64's 5-byte floating-point format and its arithmetic routines | Rounded to the C64's 9 significant digits, nearly every result prints identically, at a fraction of the effort. The rare last-digit differences, and C64 imprecisions such as slightly-off powers, are not reproduced. Numbers are confined to the interpreter's value type, so an exact emulation could replace `float64` later without touching other components. |
 | Interactive line editing | `golang.org/x/term`'s line editor, with the terminal in raw mode only while a line is being typed | A third-party readline library (`peterh/liner`, `chzyer/readline`); a hand-written editor; no editing | `x/term` is an official Go module c64sh already uses, and it provides history and basic editing on any reader and writer, so it can be tested without a real terminal. The richer libraries add history search and completion, which are non-goals, at the cost of new dependencies. Keeping raw mode to line entry means program output, errors, and `READY.` are written exactly as before. A C64 has no command history (its screen editor re-runs any line visible on screen); history is the terminal equivalent, per the tenet *C64 language, Unix I/O*. |
 | History between sessions | Saved to `~/.c64sh_history` (or `$C64SH_HISTORY`), rewritten after each line | Not saved; saved only on exit; appended line by line | Recalling earlier sessions' lines is expected of a shell. Rewriting after each line keeps the file at most 100 lines and loses nothing if c64sh is killed; saving on exit loses the session on a crash, and appending grows the file without bound. The file lives in the user's home directory, like other shells' history files, readable only by the user. |
+| Scripts and program mode | Every script line behaves as if typed; a program the script stored but never ran is run after the last line | (a) Scripts run in direct mode only, so numbered lines need a `RUN` line; (b) a script whose first line is numbered is loaded as a whole program and run, other lines being errors; (c) numbered and unnumbered lines are separated, the unnumbered ones running after the program | One rule explains every script, including ones mixing numbered and direct lines, and matches typing the file at the prompt. Running a stored but never-run program at the end means a file of numbered lines works as a program without remembering `RUN`, while a script that runs its program itself (or several times) is left as written. (a) is a usability trap; (b) and (c) need rules a reader cannot see in the file. |
+| Program storage | The interpreter keeps each stored line's text (for `LIST`) and its parsed tree (for running), and parses lines when they are stored | Keep only text and parse each line when it runs, as the C64 does; a separate program package | Parsing once avoids re-parsing lines that run many times, and because syntax errors are part of the tree, a line with a mistake is still reported only when it runs. The interpreter already owns execution state (variables, the column); `RUN`, `LIST`, and `NEW` act on the program, so it lives there too. |
 | Stream handling | Shell takes `io.Reader`/`io.Writer` parameters | Shell uses `os.Stdin`/`os.Stdout` directly | Functional tests run the shell in-process and capture output, and the same seam will let future device commands use replaceable storage. |
 
 ## Success Metrics

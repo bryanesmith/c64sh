@@ -16,6 +16,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Logic](#logic)
 - [IF … THEN](#if--then)
 - [Variables](#variables)
+- [Programs](#programs)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -59,7 +60,7 @@ HELLO
 READY.
 ```
 
-Each line you type runs as soon as you press Return; this is the C64's *direct mode*. `READY.` appears after each line, as on a C64. Pressing Return on an empty line does nothing.
+Each line you type runs as soon as you press Return; this is the C64's *direct mode*. `READY.` appears after each line, as on a C64. A line that starts with a number is stored in the program instead (see [Programs](#programs)), with no `READY.` after it. Pressing Return on an empty line does nothing.
 
 End the session with **Ctrl-D** at the start of a line.
 
@@ -93,7 +94,7 @@ The banner and `READY.` are written to stderr, and program output to stdout, so 
 
 ## Scripts
 
-A script is a text file of BASIC lines. c64sh runs them in order, each in direct mode, as if you had typed them:
+A script is a text file of BASIC lines. c64sh handles them in order, each exactly as if you had typed it: a line with a line number is stored in the program (see [Programs](#programs)), and any other line runs at once:
 
 ```sh
 c64sh hello.bas
@@ -123,6 +124,19 @@ In a script:
 - Blank lines are skipped.
 - c64sh **stops at the first error**, printing the error and exiting with status 1. Lines after it do not run.
 - No banner or `READY.` is printed.
+- **If the script stored numbered lines but never ran them with `RUN`, the program runs after the last line.** So a script of numbered lines is an ordinary program, with no `RUN` needed.
+
+For example, this script
+
+```
+#!/usr/bin/env c64sh
+30 PRINT "THREE"
+PRINT "FIRST"
+10 PRINT "ONE"
+20 PRINT "TWO"
+```
+
+prints `FIRST` at once, then runs the program at the end: `ONE`, `TWO`, `THREE`. With a `RUN` line at the end it prints the same; a script that runs its program itself is left as written. See [`examples/015-numbered-scripts.bas`](../examples/015-numbered-scripts.bas).
 
 ## PRINT
 
@@ -309,6 +323,40 @@ prints `B IS 11 ` and `HELLO, ALICE`.
 
 See [`examples/009-variables.bas`](../examples/009-variables.bas) and [`examples/010-integer-variables.bas`](../examples/010-integer-variables.bas) for every form.
 
+## Programs
+
+A line that starts with a number is not run: it is **stored** in the program, as on a C64. `RUN` then runs the stored lines in number order:
+
+```
+10 PRINT "HELLO"
+20 PRINT "WORLD"
+RUN
+```
+
+prints `HELLO` and `WORLD`.
+
+- **Line numbers** go from 0 to 63999. Lines are kept in number order, whatever order they are typed in, so leaving gaps (10, 20, 30) leaves room to add lines between them later.
+- **Typing a line with a number already used replaces that line.** Typing a number alone (`20`) deletes its line.
+- **A stored line is checked only when it runs**: `10 PRINT "A"@` is stored without complaint, and the mistake is reported when line 10 runs.
+- **Storing or deleting a line clears all variables**, as on a C64.
+- In an interactive session, no `READY.` follows a stored line.
+
+| Command | Effect |
+|---|---|
+| `RUN` | Clears all variables, then runs the program from its first line. |
+| `RUN 20` | Clears all variables, then runs the program from line 20. If there is no line 20: `?UNDEF'D STATEMENT  ERROR`. |
+| `LIST` | Shows the whole program in number order, after a blank line, each line as its number, a space, and the line as typed. A `?` is shown as `PRINT`, the keyword it stands for. |
+| `NEW` | Erases the program and clears all variables. |
+| `END` | Stops the program. |
+
+- **A program stops** after its last line, at `END`, or at an error. `LIST` and `NEW` also stop a program, and `RUN` in a program starts it again from the beginning, with variables cleared.
+- **An error in a program names its line**: `?SYNTAX  ERROR IN 20`.
+- **Nothing after `RUN`, `LIST`, `NEW`, or `END` on the same line runs**, in a program or typed directly: `LIST:PRINT "X"` lists the program but does not print `X`.
+- **`LIST` lists the whole program.** Listing part of it (`LIST 10-20`) is not supported yet and is a `?SYNTAX  ERROR`.
+- **The new keywords break names that contain them**: `FRIEND=1` is a `?SYNTAX  ERROR` (it contains `END`), as are names containing `RUN`, `NEW`, or `LIST`.
+
+See [`examples/014-program-mode.bas`](../examples/014-program-mode.bas) for every form.
+
 ## Comments
 
 `REM` starts a comment. Everything after it, to the end of the line, is ignored:
@@ -343,6 +391,7 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?TYPE MISMATCH  ERROR` | A string compared with a number or used with `AND`, `OR`, or `NOT`, `+` given a string and a number, or `-`, `*`, `/`, `^`, or a minus sign in front was given a string. |
 | `?OVERFLOW  ERROR` | A number, or the result of a calculation, is larger than 1.70141183E+38. |
 | `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
+| `?UNDEF'D STATEMENT  ERROR` | `RUN` with a line number that is not in the program. |
 | `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
 
 An error stops the rest of its line. Anything printed before the error stays printed, as on a C64:
@@ -354,6 +403,12 @@ PRINT "A":PRINT "B"@
 prints `A` and `B`, then `?SYNTAX  ERROR`.
 
 Errors always start on a new line, even if the output before them ended with `;`.
+
+An error in a running program adds the number of the line it happened in, as on a C64:
+
+```
+?SYNTAX  ERROR IN 20
+```
 
 ## Exit status
 
@@ -372,6 +427,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 - **No screen emulation**: no 40-column wrapping, colors, or graphics characters. So a print zone past column 40 stays on the same line: `PRINT 2,3,4,5,6` prints ` 6 ` at column 40, where a C64 would start a new screen line.
 - **Arithmetic uses standard 64-bit floating point**, rounded to the C64's 9 digits when printed. Results match a C64 in nearly every case; a C64's own rounding occasionally differs in the last digit.
 - **The banner** reads `C64SH BASIC V2`.
+- **Ctrl-C while a program runs** ends c64sh itself; a C64 would stop the program with `BREAK`.
 
 ## Not yet supported
 
@@ -379,7 +435,7 @@ These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 - Arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
 - Functions such as `CHR$(34)`
-- Program mode: lines with line numbers (`10 PRINT "HELLO"`), `RUN`, `LIST`, `GOTO`
+- `GOTO`, `GOSUB`, `FOR`, and the other ways to jump or loop in a program; `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 
 Every form c64sh accepts is described in this guide, and shown in use in [`examples/`](../examples/).

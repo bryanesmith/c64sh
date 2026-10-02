@@ -44,3 +44,10 @@ Design: `lexer-design.md`
 - [x] **LEXER-023**: When the lexer encounters `<` or `>` outside a string literal, it shall produce a `Less` or `Greater` token respectively, one token per character (so `<>` is `Less Greater`).
 - [x] **LEXER-024**: When the lexer encounters `AND`, `OR`, or `NOT` in uppercase outside a string literal, it shall produce an `And`, `Or`, or `Not` token respectively.
 - [x] **LEXER-025**: When the lexer encounters `IF` or `THEN` in uppercase outside a string literal, it shall produce an `If` or `Then` token respectively.
+- [x] **LEXER-026**: When the lexer encounters `RUN`, `LIST`, `NEW`, or `END` in uppercase outside a string literal, it shall produce a `Run`, `List`, `New`, or `End` token respectively.
+
+## Line numbers
+
+- [x] **LEXER-027**: When `lexer.LineNumber` is given text that begins, after any spaces and tabs, with a digit, it shall return `ok` true, `n` the value of the digits read from there, skipping spaces and tabs between them and stopping at the first other character, and `rest` the text after the last digit and any spaces and tabs following it (`10 PRINT` gives 10 and `PRINT`, `1 0X` gives 10 and `X`, `10.5` gives 10 and `.5`, and `010` gives 10 and the empty string).
+- [x] **LEXER-028**: When `lexer.LineNumber` is given text that does not begin, after any spaces and tabs, with a digit, it shall return `ok` false and a nil error.
+- [x] **LEXER-029**: If the digits read by `lexer.LineNumber` have a value above 63999, then it shall return `ok` true and a SYNTAX error.

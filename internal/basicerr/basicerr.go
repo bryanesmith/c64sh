@@ -12,6 +12,7 @@ const (
 	Overflow                    // OVERFLOW
 	DivisionByZero              // DIVISION BY ZERO
 	IllegalQuantity             // ILLEGAL QUANTITY
+	UndefdStatement             // UNDEF'D STATEMENT
 )
 
 // names holds each kind's name as the C64 prints it.
@@ -22,10 +23,15 @@ var names = [...]string{
 	Overflow:        "OVERFLOW",
 	DivisionByZero:  "DIVISION BY ZERO",
 	IllegalQuantity: "ILLEGAL QUANTITY",
+	UndefdStatement: "UNDEF'D STATEMENT",
 }
 
 // Error is a BASIC error.
-type Error struct{ Kind Kind }
+type Error struct {
+	Kind    Kind
+	Line    int  // the program line where the error occurred, if HasLine
+	HasLine bool // false for an error in direct mode
+}
 
 // Error returns the error's C64 name, such as "SYNTAX".
 //

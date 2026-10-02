@@ -11,6 +11,7 @@ func TestErrorReturnsC64Name(t *testing.T) {
 		Overflow:        "OVERFLOW",
 		DivisionByZero:  "DIVISION BY ZERO",
 		IllegalQuantity: "ILLEGAL QUANTITY",
+		UndefdStatement: "UNDEF'D STATEMENT",
 	}
 	for kind, want := range cases {
 		if got := (&Error{Kind: kind}).Error(); got != want {

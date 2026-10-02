@@ -7,7 +7,7 @@ prefix: INTERP
 
 ## Context and Design Philosophy
 
-The interpreter executes an `*ast.Line` by walking it with type switches. It writes program output to an `io.Writer` it is given and knows nothing about terminals, files, prompts, or how errors are displayed. Those belong to the shell.
+The interpreter executes an `*ast.Line` by walking it with type switches. It also holds the stored program: lines entered with a line number, which `RUN` executes in order. It writes program output to an `io.Writer` it is given and knows nothing about terminals, files, prompts, or how errors are displayed. Those belong to the shell.
 
 Its output follows C64 BASIC V2 semantics, including the C64's 10-column print zones, adjusted for a terminal as the HLD's *C64 language, Unix I/O* tenet requires: where a C64 moves its cursor right to reach a print zone, the interpreter writes spaces.
 
@@ -25,11 +25,20 @@ type Interp struct {
 // New returns an interpreter that writes program output to out.
 func New(out io.Writer) *Interp
 
-// Exec runs the statements of line in order. It stops at the first
-// statement that fails and returns that error; statements after it do
-// not run. Output from statements before the failure has already been
-// written.
+// Exec runs the statements of line in order, in direct mode. It stops at
+// the first statement that fails and returns that error; statements after
+// it do not run. Output from statements before the failure has already
+// been written. A RUN among the statements runs the stored program, and
+// an error in it is returned with its line number.
 func (in *Interp) Exec(line *ast.Line) error
+
+// Store stores text as program line n (0 to 63999), replacing any line n,
+// or deletes line n if text is empty. Either way, it clears the variables.
+func (in *Interp) Store(n int, text string)
+
+// NeverRun reports whether the stored program holds lines and no RUN has
+// been executed since the Interp was created.
+func (in *Interp) NeverRun() bool
 
 // Column returns the cursor column: the number of characters written
 // since the last newline. It is 0 at the start of a line.
@@ -40,7 +49,7 @@ func (in *Interp) Column() int
 func (in *Interp) FreshLine() error
 ```
 
-An `Interp` carries state between lines: the cursor column, which starts at 0, and the variables, which start empty. It is created once per shell session, so both persist from line to line for the whole session or script. When program mode is added, the stored program also lives in `Interp`.
+An `Interp` carries state between lines: the cursor column, which starts at 0, the variables, which start empty, and the stored program, which starts empty. It is created once per shell session, so all three persist from line to line for the whole session or script.
 
 ## Cursor Column
 
@@ -68,6 +77,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
         return in.execIf(s) // may end the line early
     case *ast.BadStmt:
         return s.Err
+    case *ast.RunStmt, *ast.ListStmt, *ast.NewStmt, *ast.EndStmt:
+        … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
     }
@@ -114,6 +125,44 @@ Executing an `IfStmt` evaluates its condition. A number is true when it is not 0
 ## BadStmt
 
 Executing a `BadStmt` returns its error: the syntax error the parser found at that point, reported now that execution has reached it.
+
+## Program mode
+
+### Storing lines
+
+`Store` keeps each line's number, its text exactly as given (the text after the line number, which the shell has read with `lexer.LineNumber`), and the text lexed and parsed into an `*ast.Line`. Lines are kept in ascending order of line number. Storing a line with the number of an existing line replaces it, and storing empty text deletes the line, or does nothing if there is no such line.
+
+The text is parsed when the line is stored, so running a line many times does not parse it again. A syntax error in it is part of the parsed tree (a `BadStmt` or `BadItem`), so it is reported only when execution reaches it, as on a C64, which checks a line's syntax only as it runs it.
+
+**Storing or deleting a line clears the variables**, as on a C64, where the variables live in memory just after the program and the ROM clears them whenever the program changes (`$A4ED`, `$A52A`): after `A=5` and `10 PRINT A`, `PRINT A` prints ` 0 `.
+
+### RUN
+
+`RUN` clears the variables and runs the program from its first line; `RUN n` clears the variables and runs it from line `n`, or fails with `UNDEF'D STATEMENT` if there is no line `n` (the variables are cleared either way, as the ROM clears them first, `$A87D`). A `RUN` with an empty program does nothing. `RUN` never returns to the line it is on, so nothing after it on that line runs.
+
+Running the program executes each line's statements, in line-number order, until one of these happens:
+
+- **The last line finishes**: the program ends.
+- **`END` runs**: the program ends.
+- **`LIST` or `NEW` runs**: it does its work, then the program ends.
+- **A statement fails**: the program stops, and the error is returned with the number of the line it occurred in (`Line` and `HasLine` on the `basicerr.Error`), so the shell prints `?SYNTAX  ERROR IN 20`.
+- **`RUN` runs**: the program starts again, with the variables cleared.
+
+A false `IF` ends only its own line; the program continues with the next line. Program output and the cursor column carry on across lines exactly as in direct mode.
+
+### LIST
+
+`LIST` writes the whole program, in line-number order, as the C64 ROM does (`$A6C9`). Before each line it writes a newline, then the line number with no leading space, one space, and the line's text: `10 PRINT "HI"`. In the text, a `?` that the lexer reads as `PRINT` (outside strings and comments) is written as `PRINT`, because a C64 stores both as the same keyword: `10 ?"HI"` lists as `10 PRINT"HI"`. Everything else is written as it was typed, including spaces. An empty program writes nothing.
+
+Because each line starts with a newline, the listing begins with one: a blank line after the `LIST` command in a terminal, as on a C64. After the last line `LIST` writes a newline too, because on a C64 a listing is always followed by `READY.`, whose message begins with one (`$A714`, `$A376`); so whatever follows starts on a fresh line, in a script as well. Then `LIST` stops, like `END`: in a program, the program ends; in direct mode, the rest of the line does not run (`$A714` returns to `READY.`).
+
+### NEW, END
+
+`NEW` erases the program and clears the variables, then stops like `END`. `END` stops: it ends a running program, and in direct mode it ends the line. Neither writes anything.
+
+### NeverRun
+
+`NeverRun` lets the shell run a script's program when the script never ran it itself (see the shell design). It is true when the program holds at least one line and no `RUN` has been executed, successfully or not, since the `Interp` was created.
 
 ## REM
 
@@ -205,7 +254,10 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `OVERFLOW` | A number literal or arithmetic result larger in size than `maxNumber`. |
 | `DIVISION BY ZERO` | `/` with a right operand of 0. |
 | `ILLEGAL QUANTITY` | An operand of `AND`, `OR`, or `NOT` whose size is 32768 or more (other than -32768); `^` with a negative left operand and a right operand that is not a whole number; a value whose size is 32768 or more (other than -32768) assigned to an integer variable. |
-| `SYNTAX` | A `BadItem` reached while executing `PRINT`; the error is the one the parser stored in it. |
+| `SYNTAX` | A `BadItem` reached while executing `PRINT`, or a `BadStmt` reached; the error is the one the parser stored in it. |
+| `UNDEF'D STATEMENT` | `RUN n` where the program has no line `n`. |
+
+An error that occurs while the program is running carries the number of the line it occurred in; for `RUN n` that is the line holding the `RUN`, and in direct mode there is none.
 
 If writing to the output fails (for example, stdout is a closed pipe), `Exec` returns that write error unchanged. It is not a BASIC error.
 
@@ -222,7 +274,10 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Trailing `;` or `,` | Suppresses the newline | Always end with a newline | C64 BASIC V2 behavior. Scripts rely on it to build one line of output from several statements. |
 | 255-character limit | Enforced on concatenation results | No limit | Tenet *C64 language, Unix I/O*: string semantics are language behavior. Enforcing it now avoids a behavior change when string functions arrive. |
 | Output writes | One write per `PRINT`; on failure, one write of the items before the failing one | One write per item; write nothing on failure | Keeps output of a single statement together and reduces system calls when output is unbuffered, while still showing exactly what a C64 would have printed before the error. |
-| State | `Interp` value created once per session | Stateless function | Variables and the stored program will need a home that persists across lines. |
+| State | `Interp` value created once per session | Stateless function | Variables and the stored program need a home that persists across lines. |
+| Stored line form | Text and parsed tree, parsed once when stored | Text only, parsed each time the line runs, as the C64 does; tree only | The tree runs a line many times without parsing again; syntax errors are in the tree, so they are still reported only when reached. `LIST` needs the text as typed, which the tree does not keep (spaces, `?`). |
+| Ending execution | `END`, `LIST`, `NEW`, and `RUN` end the line or program through internal sentinel values returned like errors | Flags on the `Interp` checked after every statement | The same path already ends a line for a false `IF`; returning a value keeps the control flow visible in each statement's code. |
+| `LIST` layout | A newline before each line, as the ROM writes it, and one after the last | Only a newline after each line; leave the last line unfinished, for `FreshLine` to end | The screen matches a C64's exactly, including the blank line after `LIST`. Ending the last line stands in for the newline that begins the C64's `READY.`, which always follows a listing; without it, a script's listing would run into its next output. |
 
 ## Open Questions & Future Decisions
 

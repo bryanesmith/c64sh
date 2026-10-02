@@ -34,7 +34,6 @@ func TestUnsupportedInputIsSyntaxError(t *testing.T) {
 		want  result
 	}{
 		{`print "hi"`, result{"", "?SYNTAX  ERROR\n", 1}},
-		{`10 PRINT "FOO"`, result{"", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT CHR$(34)`, result{"", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT (1+2`, result{"", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT "HELLO"@`, result{"HELLO\n", "?SYNTAX  ERROR\n", 1}},
@@ -90,7 +89,6 @@ func TestNumbers(t *testing.T) {
 		{`PRINT 1E39`, result{"", "?OVERFLOW  ERROR\n", 1}},
 		{`PRINT 1E39+"A"`, result{"", "?OVERFLOW  ERROR\n", 1}},
 		{`PRINT -5`, result{"-5 \n", "", 0}},
-		{`10 PRINT "HI"`, result{"", "?SYNTAX  ERROR\n", 1}},
 	}
 	for _, c := range cases {
 		check(t, c.input, runMain(t, c.input+"\n"), c.want)

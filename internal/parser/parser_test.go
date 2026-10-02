@@ -34,6 +34,10 @@ var (
 	not   = token.Token{Kind: token.Not, Value: "NOT"}
 	iff   = token.Token{Kind: token.If, Value: "IF"}
 	then  = token.Token{Kind: token.Then, Value: "THEN"}
+	run   = token.Token{Kind: token.Run, Value: "RUN"}
+	list  = token.Token{Kind: token.List, Value: "LIST"}
+	nw    = token.Token{Kind: token.New, Value: "NEW"}
+	end   = token.Token{Kind: token.End, Value: "END"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -78,6 +82,17 @@ func dumpStmt(s ast.Stmt) string {
 		return "LET " + dumpExpr(s.Var) + "=" + dumpExpr(s.Value)
 	case *ast.IfStmt:
 		return "IF " + dumpExpr(s.Cond)
+	case *ast.RunStmt:
+		if s.HasLine {
+			return fmt.Sprintf("RUN %d", s.Line)
+		}
+		return "RUN"
+	case *ast.ListStmt:
+		return "LIST"
+	case *ast.NewStmt:
+		return "NEW"
+	case *ast.EndStmt:
+		return "END"
 	case *ast.BadStmt:
 		if isSyntax(s.Err) {
 			return "BADSTMT"
@@ -541,5 +556,59 @@ func TestIfSyntaxErrors(t *testing.T) {
 		{"THEN line number", toks(iff, number("1"), then, number("100")), `IF #1 : BADSTMT`, true},
 		{"no condition", toks(iff, then, pr, str("X")), `BADSTMT`, true},
 		{"IF alone", toks(iff), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-033
+func TestRun(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"RUN", toks(run), `RUN`, false},
+		{"RUN then a statement", toks(run, colon, pr, str("X")), `RUN : PRINT["X"]`, false},
+	})
+}
+
+// @spec PARSER-034
+func TestRunLineNumber(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"RUN n", toks(run, number("20")), `RUN 20`, false},
+		{"RUN 0", toks(run, number("0")), `RUN 0`, false},
+		{"largest", toks(run, number("63999")), `RUN 63999`, false},
+		{"fraction", toks(run, number("20.5")), `RUN 20`, false},
+		{"exponent", toks(run, number("1E3")), `RUN 1`, false},
+		{"no digits", toks(run, number(".5")), `RUN 0`, false},
+		{"then a statement", toks(run, number("20"), colon, pr, str("X")), `RUN 20 : PRINT["X"]`, false},
+	})
+}
+
+// @spec PARSER-035
+func TestRunOtherArgumentIsLineZero(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"name", toks(run, name("A")), `RUN 0 : BADSTMT`, true},
+		{"string", toks(run, str("X")), `RUN 0 : BADSTMT`, true},
+		{"minus", toks(run, minus, number("5")), `RUN 0 : BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-036, PARSER-007
+func TestListNewEnd(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"LIST", toks(list), `LIST`, false},
+		{"NEW", toks(nw), `NEW`, false},
+		{"END", toks(end), `END`, false},
+		{"after a statement", toks(pr, str("A"), colon, end), `PRINT["A"] : END`, false},
+		{"before a statement", toks(list, colon, pr, str("A")), `LIST : PRINT["A"]`, false},
+		{"after THEN", toks(iff, number("1"), then, end), `IF #1 : END`, false},
+	})
+}
+
+// @spec PARSER-037
+func TestProgramCommandSyntaxErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"LIST n", toks(list, number("10")), `BADSTMT`, true},
+		{"LIST range", toks(list, number("10"), minus, number("20")), `BADSTMT`, true},
+		{"NEW junk", toks(nw, name("X")), `BADSTMT`, true},
+		{"END n", toks(end, number("1")), `BADSTMT`, true},
+		{"after a statement", toks(pr, str("A"), colon, end, str("X")), `PRINT["A"] : BADSTMT`, true},
+		{"RUN too large", toks(run, number("64000")), `BADSTMT`, true},
 	})
 }

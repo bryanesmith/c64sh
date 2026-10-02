@@ -1,0 +1,8 @@
+exit status: 0
+--- stdout ---
+FIRST
+SECOND
+ONE
+TWO
+THREE
+--- stderr ---

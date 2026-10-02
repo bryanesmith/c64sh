@@ -9,8 +9,12 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/bryanesmith/c64sh/internal/basicerr"
 	"github.com/bryanesmith/c64sh/internal/token"
 )
+
+// maxLineNumber is the largest line number the C64 accepts.
+const maxLineNumber = 63999
 
 // keywords are matched case-sensitively, at any position outside a string,
 // whatever follows them.
@@ -26,6 +30,10 @@ var keywords = []struct {
 	{"NOT", token.Not},
 	{"IF", token.If},
 	{"THEN", token.Then},
+	{"RUN", token.Run},
+	{"LIST", token.List},
+	{"NEW", token.New},
+	{"END", token.End},
 }
 
 // symbols maps single-character tokens to their kinds.
@@ -54,7 +62,7 @@ const upArrow = "\u2191"
 // @spec LEXER-001, LEXER-002, LEXER-003, LEXER-004, LEXER-005, LEXER-006, LEXER-007
 // @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013, LEXER-014
 // @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018, LEXER-019, LEXER-020, LEXER-021
-// @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025
+// @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025, LEXER-026
 func Lex(line string) []token.Token {
 	var toks []token.Token
 	emit := func(k token.Kind, value string, pos int) {
@@ -97,6 +105,10 @@ func Lex(line string) []token.Token {
 		// not   = "NOT" .
 		// if    = "IF" .
 		// then  = "THEN" .
+		// run   = "RUN" .
+		// list  = "LIST" .
+		// new   = "NEW" .
+		// end   = "END" .
 		if text, kind, ok := matchKeyword(line[i:]); ok {
 			if kind == token.Rem {
 				// A comment runs to the end of the line, untokenized.
@@ -249,4 +261,36 @@ func matchKeyword(s string) (string, token.Kind, bool) {
 		return "", 0, false
 	}
 	return keywords[best].text, keywords[best].kind, true
+}
+
+// LineNumber reads the line number at the start of s, after any spaces
+// and tabs, as the C64 ROM reads one ($A96B). ok is false if s does not
+// begin with a digit. rest is the text after the number and the spaces
+// and tabs after it. err is a SYNTAX error if the number exceeds 63999.
+//
+//	line_number = digit { digit } .   /* spaces inside are ignored */
+//
+// @spec LEXER-027, LEXER-028, LEXER-029
+func LineNumber(s string) (n int, rest string, ok bool, err error) {
+	i := skipBlanks(s, 0)
+	if i == len(s) || !isDigit(s[i]) {
+		return 0, s, false, nil
+	}
+	for i < len(s) && isDigit(s[i]) {
+		n = n*10 + int(s[i]-'0')
+		if n > maxLineNumber {
+			return 0, "", true, &basicerr.Error{Kind: basicerr.Syntax}
+		}
+		i = skipBlanks(s, i+1)
+	}
+	return n, s[i:], true, nil
+}
+
+// skipBlanks returns the index of the first character at or after i that
+// is not a space or tab.
+func skipBlanks(s string, i int) int {
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	return i
 }

@@ -104,6 +104,18 @@ type LetStmt struct {
     Var   *VarRef
     Value Expr
 }
+
+// RunStmt is RUN, or RUN n when HasLine is set: clear the variables and
+// run the stored program from its first line, or from line n.
+type RunStmt struct {
+    Line    int
+    HasLine bool
+}
+
+// Program commands without arguments.
+type ListStmt struct{} // LIST: print the stored program
+type NewStmt struct{}  // NEW: erase the stored program and the variables
+type EndStmt struct{}  // END: stop
 ```
 
 Binary operators are left-associative within a precedence level: `"A"+"B"+"C"` is `BinaryExpr(Add, BinaryExpr(Add, "A", "B"), "C")`, and `8-2-1` is `(8-2)-1`. The parser does not check operand types: whether `+` joins strings, adds numbers, or is a type mismatch is decided by the interpreter from the values, as on a C64.
@@ -154,7 +166,14 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 
 `IF condition THEN` becomes an `IfStmt` holding the condition. The statement that follows `THEN`, and every statement after it on the line, are parsed as the line's next statements, with no `:` needed after `THEN`: `IF A>1 THEN PRINT "X":PRINT "Y"` is `IfStmt(A>1)`, `PrintStmt("X")`, `PrintStmt("Y")`. An `IfStmt` thus guards the rest of its line, which is exactly the C64's rule: when the condition is false the rest of the line is skipped, as if it were a `REM` (`$A928`). Nothing may follow `THEN`, in which case the `IF` does nothing either way, and `IF`s may follow each other (`IF A THEN IF B THEN …`).
 
-`IF X THEN 100` and `IF X GOTO 100` jump to a line number, which needs program mode. Until then, anything other than `THEN` after the condition is a SYNTAX error in place of the `IF`, while a number after `THEN` becomes a `BadStmt` following the `IfStmt`: the error is reported only when the condition is true, so `IF 0 THEN 100` does nothing, as on a C64.
+`IF X THEN 100` and `IF X GOTO 100` jump to a line number, which needs `GOTO`. Until then, anything other than `THEN` after the condition is a SYNTAX error in place of the `IF`, while a number after `THEN` becomes a `BadStmt` following the `IfStmt`: the error is reported only when the condition is true, so `IF 0 THEN 100` does nothing, as on a C64.
+
+### Program commands
+
+`RUN`, `LIST`, `NEW`, and `END` act on the stored program (see the interpreter design). Each stops the line it is on, so nothing after it on the line ever runs.
+
+- **`LIST`, `NEW`, and `END` take no arguments.** If anything other than `:` or the end of the line follows one, it is a SYNTAX error in place of the statement, so the command does not run, as on a C64 (`$A642`, `$A831`, `$A69C`). `LIST 10` and `LIST 10-20`, which list part of a program on a C64, are among these errors: ranges are not supported yet.
+- **`RUN` alone** runs the program from its first line. **Anything else after `RUN` makes it `RUN n`**, with `n` read from the following `Number` token's text by `lexer.LineNumber`, as the ROM reads it with the same routine (`$A871`, `$A8A0`): `RUN 20` starts at line 20, and `RUN 20.5` also at line 20. When no digits follow, `n` is 0, so `RUN A` is `RUN 0`, as on a C64. A line number above 63999 is a SYNTAX error in place of the `RUN`. What follows the line number is never checked, because `RUN` does not return to its line.
 
 ### Items side by side
 
@@ -169,7 +188,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
@@ -184,10 +203,14 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Exponent = "-" Unary \| "+" Unary \| Operand .` | `parseExponent` | `ast.Expr` |
 | `LetStatement = [ let ] Variable "=" Expression .` | `parseLetStatement` | `*ast.LetStmt` |
 | `IfStatement = if Expression then Statement .` | `parseIfStatement` | `*ast.IfStmt` (see *IF*) |
+| `RunStatement = run [ number ] .` | `parseRunStatement` | `*ast.RunStmt` (see *Program commands*) |
+| `ListStatement = list .` | `parseCommand` | `*ast.ListStmt` |
+| `NewStatement = new .` | `parseCommand` | `*ast.NewStmt` |
+| `EndStatement = end .` | `parseCommand` | `*ast.EndStmt` (`parseCommand` parses any command without arguments) |
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
 | `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 
@@ -196,6 +219,7 @@ Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `name
 The parser reports one error kind, `SYNTAX` (see the shell design for the error type and how it is printed). It is returned when:
 
 - a statement begins with a token that cannot start a statement (for example `Illegal`, `String`, `;`), or an assignment lacks its variable, its `=`, or its value, or
+- `LIST`, `NEW`, or `END` is followed by anything other than `:` or `EOL`, or the line number after `RUN` exceeds 63999, or
 - inside a statement, the next token is not one the rule allows (for example `Illegal`, an operator with no operand after it, a `(` without its `)`, or a `)` without its `(`), or
 - after a statement, the next token is neither `:` nor `EOL`.
 
@@ -234,6 +258,8 @@ Examples:
 | `IF 0 THEN @` | `IfStmt(0)`, `BadStmt` |
 | `PRINT "A":PRINT "B"@` | `PrintStmt[ExprItem("A")]`, `PrintStmt[ExprItem("B"), BadItem]` |
 | `PRINT "A"+` | `PrintStmt[BadItem]` |
+| `RUN 20` | `RunStmt(20)` |
+| `LIST 10` | `BadStmt` |
 
 ## Decisions & Alternatives
 
@@ -252,6 +278,7 @@ Examples:
 | Variable identity | Computed by the parser into `VarRef.Name` | Computed by the interpreter at each use | One place decides identity; the interpreter only stores and looks up. |
 | Unsupported names (`TI`, `ST`, arrays, functions) | SYNTAX error | Treat as ordinary variables | On a C64 these read the clock, the I/O status, an array element, or a function result; silently treating them as plain variables would print wrong answers. |
 | Comparison representation | `CompareExpr` with a `Relation` bit set | One `Op` per operator (`<`, `<=`, …) | A set of relations reproduces the C64's own rule for combining `<`, `=`, and `>` directly, including the unusual spellings, with one evaluation rule. |
+| Argument after `RUN` | Read with the ROM's line-number routine, 0 when no digits follow | A SYNTAX error unless a plain line number follows | The C64 reads it this way, so `RUN 20.5` runs from line 20 and `RUN A` from line 0; reproducing it costs nothing, since the same routine reads line numbers at the start of a line. |
 | Parenthesized expressions | No node; `( … )` returns its inner expression | A `ParenExpr` node | Parentheses only group; the tree's shape already records the grouping. |
 | Type checking of `+` | In the interpreter, from the operand values | In the parser, from the operand kinds | BASIC V2 types are known at run time (variables will hold either kind), and a C64 reports `?TYPE MISMATCH  ERROR` when the statement runs, after earlier statements have run. |
 

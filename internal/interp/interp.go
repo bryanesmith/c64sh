@@ -1,4 +1,5 @@
-// Package interp executes the AST of a line of C64 BASIC.
+// Package interp executes the AST of a line of C64 BASIC, and holds and
+// runs the stored program.
 package interp
 
 import (
@@ -21,9 +22,11 @@ const zoneWidth = 10
 
 // Interp executes lines, writing program output to its writer.
 type Interp struct {
-	out    io.Writer
-	column int              // cursor column: characters written since the last newline
-	vars   map[string]value // variables, by identity (ast.VarRef.Name)
+	out     io.Writer
+	column  int              // cursor column: characters written since the last newline
+	vars    map[string]value // variables, by identity (ast.VarRef.Name)
+	program []progLine       // stored lines, in ascending order of number
+	ran     bool             // whether RUN has been executed
 }
 
 // New returns an interpreter that writes program output to out.
@@ -33,13 +36,28 @@ func New(out io.Writer) *Interp {
 	return &Interp{out: out, vars: map[string]value{}}
 }
 
-// Exec runs the statements of line in order. It stops at the first
-// statement that fails and returns that error; statements after it do
-// not run. Output from statements before the failure has already been
-// written.
+// Exec runs the statements of line in order, in direct mode. It stops at
+// the first statement that fails and returns that error; statements after
+// it do not run. Output from statements before the failure has already
+// been written. A RUN among the statements runs the stored program, and
+// an error in it is returned with its line number.
 //
-// @spec INTERP-001, INTERP-013
+// @spec INTERP-001, INTERP-013, INTERP-057
 func (in *Interp) Exec(line *ast.Line) error {
+	err := in.execLine(line)
+	if r, ok := err.(*runFrom); ok {
+		err = in.run(r, -1)
+	}
+	if err == errEnd {
+		return nil
+	}
+	return err
+}
+
+// execLine runs the statements of one line, in direct mode or in the
+// program. A false IF ends the line without error; END, LIST, NEW, and
+// RUN end it with errEnd or a *runFrom for the caller to act on.
+func (in *Interp) execLine(line *ast.Line) error {
 	for _, s := range line.Statements {
 		err := in.execStmt(s)
 		if err == errSkipLine {
@@ -133,6 +151,14 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execIf(s)
 	case *ast.BadStmt:
 		return s.Err // a syntax error, now that execution has reached it
+	case *ast.RunStmt:
+		return in.execRun(s)
+	case *ast.ListStmt:
+		return in.execList()
+	case *ast.NewStmt:
+		return in.execNew()
+	case *ast.EndStmt:
+		return errEnd
 	default:
 		panic(fmt.Sprintf("interp: unhandled statement %T", s))
 	}

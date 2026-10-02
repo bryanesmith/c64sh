@@ -67,3 +67,21 @@ Design: `interp-design.md`
 - [x] **INTERP-045**: When executing an `ast.IfStmt` whose condition is a number other than 0, or a string that is not empty, the interpreter shall continue with the next statement on the line.
 - [x] **INTERP-046**: When executing an `ast.IfStmt` whose condition is 0 or the empty string, the interpreter shall execute no further statements on the line and return no error, even if those statements include an `ast.BadStmt` or a `PRINT` with an `ast.BadItem`.
 - [x] **INTERP-047**: When executing an `ast.BadStmt`, the interpreter shall return the error it holds.
+
+## Program mode
+
+- [x] **INTERP-048**: When `Store` is called with line number `n` and non-empty text, the interpreter shall store the text and the result of lexing and parsing it as program line `n`, replacing any existing line `n`, keeping the program's lines in ascending order of line number.
+- [x] **INTERP-049**: When `Store` is called with line number `n` and empty text, the interpreter shall delete program line `n` if there is one.
+- [x] **INTERP-050**: When `Store` is called, the interpreter shall clear all variables, whether it stores, replaces, or deletes a line, or finds no line to delete.
+- [x] **INTERP-051**: When `Store` is given text containing a syntax error, the interpreter shall store the line without reporting the error, which is reported only if execution reaches it when the line runs.
+- [x] **INTERP-052**: When executing an `ast.RunStmt` with `HasLine` false, the interpreter shall clear all variables, execute the statements of each program line in ascending order of line number, starting from the first line, and end the program after the last line; with an empty program it shall do nothing further.
+- [x] **INTERP-053**: When executing an `ast.RunStmt` with `HasLine` true, the interpreter shall clear all variables and run the program as in INTERP-052, starting from line `Line`.
+- [x] **INTERP-054**: If an `ast.RunStmt` names a line that is not in the program, then the interpreter shall fail with an UNDEF'D STATEMENT error, after clearing the variables.
+- [x] **INTERP-055**: When an `ast.IfStmt`'s condition is false in a running program, the interpreter shall skip the rest of that line only and continue with the next program line.
+- [x] **INTERP-056**: If a statement fails while the program is running, then the interpreter shall stop the program and return the error with `Line` set to the number of the line containing the statement and `HasLine` true (for a failing `RUN n`, the line holding the `RUN`); an error in direct mode shall have `HasLine` false.
+- [x] **INTERP-057**: When executing an `ast.RunStmt`, `ast.ListStmt`, `ast.NewStmt`, or `ast.EndStmt`, the interpreter shall execute no further statements on the line holding it, in direct mode or in a program.
+- [x] **INTERP-058**: When executing an `ast.EndStmt` in a running program, or an `ast.ListStmt` or `ast.NewStmt`, the interpreter shall end the program, if one is running, and return no error.
+- [x] **INTERP-059**: When executing an `ast.ListStmt`, the interpreter shall write, for each program line in ascending order, a newline, the line number without a leading space, one space, and the line's text with each `?` that the lexer reads as a `Print` token written as `PRINT` (so `10 ?"HI"` lists as `10 PRINT"HI"`), followed by a newline after the last line; for an empty program it shall write nothing.
+- [x] **INTERP-060**: When executing an `ast.NewStmt`, the interpreter shall delete every program line and clear all variables.
+- [x] **INTERP-061**: When executing an `ast.RunStmt` in a running program, the interpreter shall start the program again as INTERP-052 and INTERP-053 specify.
+- [x] **INTERP-062**: `NeverRun` shall return true when the program holds at least one line and no `ast.RunStmt` has been executed since the interpreter was created, and false otherwise.

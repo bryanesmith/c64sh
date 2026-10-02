@@ -58,7 +58,7 @@ The shell runs in one of two modes, chosen at startup:
 
 `stdin` is a terminal when it is an `*os.File` for which `golang.org/x/term.IsTerminal` reports true. Any other reader (a pipe, a regular file, `/dev/null`, or a test's `strings.Reader`) is not. Functional tests reach interactive mode through `Run` (see *Test Seam*).
 
-Both modes run every line in direct mode (see HLD *Direct mode and program mode*): each line is executed immediately and independently.
+Both modes handle every line as if it were typed at a C64 (see HLD *Direct mode and program mode*): a line beginning with a line number is stored in the interpreter's program, and any other line runs immediately, in direct mode.
 
 ### Interactive mode
 
@@ -71,7 +71,7 @@ On startup the shell writes a C64-style banner and a ready prompt to **stderr**:
 READY.
 ```
 
-It then reads lines. After each non-blank line has run (successfully or with an error), it writes `READY.` on its own line to stderr. Before it, the shell calls the interpreter's `FreshLine`, which writes a newline to stdout if program output left the line unfinished (for example after `PRINT "A";`), so `READY.` starts on a fresh line, as on a C64. A blank line (empty or only spaces and tabs) does nothing and prints no `READY.`, as on a C64.
+It then reads lines. After each non-blank line has run (successfully or with an error), it writes `READY.` on its own line to stderr. Before it, the shell calls the interpreter's `FreshLine`, which writes a newline to stdout if program output left the line unfinished (for example after `PRINT "A";`), so `READY.` starts on a fresh line, as on a C64. A blank line (empty or only spaces and tabs) does nothing and prints no `READY.`, as on a C64. Neither does a numbered line that is stored: a C64 stores the line and waits for the next one without printing `READY.` (`$A52A` returns to the input loop directly). A line number above 63999 is a SYNTAX error, followed by `READY.` like any other error.
 
 End of input (Ctrl-D at the start of a line) writes a newline to stderr, so the user's own shell prompt starts on a fresh line, and ends the session with exit status 0. Ctrl-C while a line is being typed discards that line (see *Line Editing*); Ctrl-C while a line is running terminates the process with the default signal behavior.
 
@@ -124,6 +124,7 @@ Lines are read from `FILE`, or from stdin when there is no `FILE`.
 - Blank lines are skipped.
 - A BASIC error is reported (see *Error display*) and the shell stops with exit status 1. Lines after it do not run.
 - If all lines run without error, the exit status is 0.
+- **When input ends, a stored program that the script never ran is run.** If the program is not empty and no `RUN` has been executed during the script, the shell runs it, exactly as if a final `RUN` line followed; an error in it is reported and sets exit status 1, like any other. So a script of numbered lines runs as a program without a `RUN` line, while a script that runs its program itself, once or several times, is left as written.
 - When input ends, nothing is added to the output. A script whose last output is `PRINT "A";` ends with `A` and no newline, as `printf "A"` does in a Unix shell; this lets scripts produce output without a trailing newline on purpose.
 
 Stopping at the first error matches a C64 running a program, which halts at the failing line, and prevents later lines from running on the assumption that earlier ones succeeded.
@@ -136,8 +137,8 @@ For every line, in both modes:
 
 1. Remove the trailing `\n` and, if present, a trailing `\r` (so files with Windows line endings work). A final line without a line terminator is still run.
 2. If the line is blank, skip it.
-3. `tokens := lexer.Lex(line)`
-4. `ast, perr := parser.Parse(tokens)`
+3. If `lexer.LineNumber(line)` finds a line number, store the line: `interp.Store(n, rest)`, which also deletes line `n` when `rest` is empty. Nothing else happens for that line, and no `READY.` follows it. A line number above 63999 is a SYNTAX error, displayed as in step 6.
+4. Otherwise, `tokens := lexer.Lex(line)` and `ast, perr := parser.Parse(tokens)`.
 5. `err := interp.Exec(ast)` — runs the statements the parser returned. A syntax error is part of that tree, as a `BadItem` or `BadStmt` at the point where parsing failed (see the parser design, *Errors*), so it is returned only if execution reaches it.
 6. If `err` is a BASIC error, display it. The parser's own returned error is not displayed: a syntax error that execution does not reach, such as one after a false `IF`, is never reported, as on a C64.
 7. If `err` is a write error (not a BASIC error), stop and exit with status 1 without further output.
@@ -164,9 +165,14 @@ const (
     Overflow                  // OVERFLOW
     DivisionByZero            // DIVISION BY ZERO
     IllegalQuantity           // ILLEGAL QUANTITY
+    UndefdStatement           // UNDEF'D STATEMENT
 )
 
-type Error struct{ Kind Kind }
+type Error struct {
+    Kind    Kind
+    Line    int  // the program line where the error occurred, if HasLine
+    HasLine bool // false for an error in direct mode
+}
 
 func (e *Error) Error() string // the C64 name, e.g. "SYNTAX"
 ```
@@ -181,7 +187,7 @@ A BASIC error is written to stderr as:
 ?<NAME>  ERROR
 ```
 
-with **two spaces** between the name and `ERROR`, followed by a newline, exactly as a C64 prints it in direct mode — for example `?SYNTAX  ERROR` and `?STRING TOO LONG  ERROR`.
+with **two spaces** between the name and `ERROR`, followed by a newline, exactly as a C64 prints it in direct mode — for example `?SYNTAX  ERROR` and `?STRING TOO LONG  ERROR`. An error in a running program (one with `HasLine` set) adds ` IN ` and the line number before the newline, as the C64 ROM does (`$A469`, `$BDC2`): `?SYNTAX  ERROR IN 20`.
 
 A C64 moves to a new line before printing an error. The shell does the same: before writing the error to stderr, it calls the interpreter's `FreshLine`, which writes a newline to **stdout** if program output left the line unfinished (for example after `PRINT "A";`, on this line or an earlier one). This keeps the error on its own line in a terminal, and keeps redirected stdout ending in a complete line.
 
@@ -231,7 +237,9 @@ Functional tests live in `test/functional/` (package `functional_test`). Each te
 | Banner text | `**** C64SH BASIC V2 ****` | The C64's own `**** COMMODORE 64 BASIC V2 ****` and `64K RAM SYSTEM  38911 BASIC BYTES FREE` | Evokes the C64 start-up screen without presenting c64sh as a Commodore product, and without claiming a memory size that does not apply. |
 | Line reading | Unbounded line length | `bufio.Scanner` with its 64 KB default limit | A BASIC line in a script has no reason to fail because of an implementation buffer size. |
 | Script errors | Stop at first error, exit 1 | Continue and exit non-zero at the end; continue and exit 0 | A C64 program halts at the failing line. Continuing risks later lines acting on the assumption that earlier ones worked. |
-| Error format | `?NAME  ERROR` with two spaces, to stderr | Single space; to stdout; include a line number or column | Tenet *Authentic errors over helpful ones*: this is the exact direct-mode C64 message. stderr per tenet *C64 language, Unix I/O*. |
+| Error format | `?NAME  ERROR` with two spaces, plus ` IN n` in a running program, to stderr | Single space; to stdout; include a column, or a line number in direct mode | Tenet *Authentic errors over helpful ones*: this is the exact C64 message. stderr per tenet *C64 language, Unix I/O*. |
+| Numbered lines | Read by `lexer.LineNumber`, stored with `interp.Store`; no `READY.` after them | Parse every line and let the parser report a line number | A stored line is checked only when it runs, so the shell needs its text, not a parse; this is also how the C64's input loop decides (`$A494`). |
+| Program never run by a script | Run when input ends | Leave it unrun; require `RUN` | See HLD *Scripts and program mode*. |
 | Newline before error | Written to stdout when program output is mid-line | Write nothing; write the newline to stderr | A C64 starts error messages on a new line. Writing it to stdout keeps redirected output ending with a complete line. |
 | Exit statuses | 0 / 1 BASIC or output error / 2 usage | Single non-zero status | Distinguishes "the script failed" from "c64sh was invoked wrongly", as `grep` and `diff` do. |
 | Shebang handling | Skip only a first line beginning with `#!` | Treat `#` as a comment everywhere | `#` is not a comment in BASIC V2; only the shebang needs special handling. |
@@ -251,9 +259,8 @@ Functional tests live in `test/functional/` (package `functional_test`). Each te
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. When program mode is added, the shell holds the stored program, and error messages from running programs gain the C64's ` IN <line>` suffix (`?SYNTAX  ERROR IN 10`). How script files interact with program mode is decided then.
-2. Interactive line editing (history, arrow keys) is out of scope for now (HLD *Non-Goals*).
-3. How user-guide examples are kept in sync with functional tests (hand-copied cases or extraction from the guide) is decided when the user guide is written.
+1. Interactive line editing (history, arrow keys) is out of scope for now (HLD *Non-Goals*).
+2. How user-guide examples are kept in sync with functional tests (hand-copied cases or extraction from the guide) is decided when the user guide is written.
 
 ## References
 

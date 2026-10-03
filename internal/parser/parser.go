@@ -30,7 +30,7 @@ import (
 // @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
 // @spec PARSER-048, PARSER-049, PARSER-050, PARSER-051, PARSER-052, PARSER-053, PARSER-054
 // @spec PARSER-055, PARSER-056
-// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065, PARSER-066, PARSER-067, PARSER-068
+// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065, PARSER-066, PARSER-067, PARSER-068, PARSER-069, PARSER-070
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -726,9 +726,22 @@ func (p *parser) parseInputFileStatement() (ast.Stmt, error) {
 	return &ast.InputStmt{File: file, Vars: vars}, nil
 }
 
-// PrintItem = Expression | ";" | "," .
+// PrintItem = Expression | ";" | "," | tab Expression ")" | spc Expression ")" .
 func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	switch p.peek() {
+	case token.Tab, token.Spc:
+		kind := p.next().Kind
+		x, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+		if !p.accept(token.RParen) {
+			return nil, syntaxError()
+		}
+		if kind == token.Tab {
+			return &ast.TabItem{X: x}, nil
+		}
+		return &ast.SpcItem{X: x}, nil
 	case token.Semicolon:
 		p.next()
 		return &ast.Semicolon{}, nil
@@ -981,7 +994,7 @@ var arity = map[string][2]int{
 	"ABS": {1, 1}, "INT": {1, 1}, "SGN": {1, 1}, "SQR": {1, 1}, "RND": {1, 1}, "LOG": {1, 1},
 	"EXP": {1, 1}, "SIN": {1, 1}, "COS": {1, 1}, "TAN": {1, 1}, "ATN": {1, 1},
 	"LEN": {1, 1}, "CHR$": {1, 1}, "ASC": {1, 1}, "STR$": {1, 1}, "VAL": {1, 1},
-	"LEFT$": {2, 2}, "RIGHT$": {2, 2}, "MID$": {2, 3},
+	"LEFT$": {2, 2}, "RIGHT$": {2, 2}, "MID$": {2, 3}, "POS": {1, 1},
 }
 
 // Call = function "(" Expression { "," Expression } ")" .

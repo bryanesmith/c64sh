@@ -179,3 +179,9 @@ Design: `interp-design.md`
 - [x] **INTERP-127**: The interpreter shall return for `LEN(S$)` the number of characters of `S$`; for `LEFT$(S$,N)` and `RIGHT$(S$,N)` its first or last `N` characters, or all of it if shorter; and for `MID$(S$,P,N)` the `N` characters (all, if `N` is omitted) from position `P`, counting from 1, or the empty string if `P` is past the end; `MID$` with `P` of 0 shall fail with ILLEGAL QUANTITY.
 - [x] **INTERP-128**: The interpreter shall return for `CHR$(N)` the one-character string whose code is `N`, and for `ASC(S$)` the code of the first character of `S$`, failing with ILLEGAL QUANTITY for the empty string.
 - [x] **INTERP-129**: The interpreter shall return for `STR$(X)` `X` formatted as `PRINT` formats a number, without the trailing space, and for `VAL(S$)` the number at the start of `S$`, read as `INPUT` reads a number, or 0 if there is none, failing with OVERFLOW if it is too large.
+
+## Print formatting
+
+- [x] **INTERP-130**: When executing a `TabItem`, the interpreter shall write `X - C` spaces if the cursor column `C` (the screen's, for a storage file) is less than `X`, and nothing otherwise; for an `SpcItem`, `X` spaces; `X` being rounded down and required to be from 0 to 255 (ILLEGAL QUANTITY otherwise, TYPE MISMATCH for a string).
+- [x] **INTERP-131**: When the last item of a `PRINT` is a `TabItem` or `SpcItem`, the interpreter shall not write the final newline.
+- [x] **INTERP-132**: When evaluating `POS(X)`, the interpreter shall evaluate `X`, of either type, and return the cursor column.

@@ -62,6 +62,8 @@ const (
 	On                    // ON
 	Function              // a built-in function: ABS, INT, …, SIN (Value: the name)
 	Pi                    // π
+	Tab                   // TAB(
+	Spc                   // SPC(
 )
 
 var kindNames = [...]string{
@@ -119,6 +121,8 @@ var kindNames = [...]string{
 	On:        "On",
 	Function:  "Function",
 	Pi:        "Pi",
+	Tab:       "Tab",
+	Spc:       "Spc",
 }
 
 func (k Kind) String() string {

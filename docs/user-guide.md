@@ -181,6 +181,15 @@ ALICE     12
 
 If the cursor is already at the start of a zone, `,` moves a whole zone: `PRINT "0123456789","X"` puts `X` at column 20. The column carries over from one `PRINT` to the next when a line is left open with `;` or `,`, so later output still lines up with the zones.
 
+**`TAB(N)`** moves to column `N`, and **`SPC(N)`** moves `N` columns to the right, for lining up columns anywhere:
+
+```
+PRINT "NAME";TAB(12);"SCORE"
+PRINT "ALICE";TAB(12);120
+```
+
+puts both `SCORE` and ` 120 ` at column 12. If the cursor is already at or past column `N`, `TAB` does nothing. `N` is rounded down and must be from 0 to 255. A `PRINT` that ends with `TAB(…)` or `SPC(…)` leaves the line open, like `;`. `TAB(` and `SPC(` are written with no space before the `(`, and work only in `PRINT`. **`POS(0)`** gives the cursor's column (any value can go in the parentheses), so `PRINT "HELLO";POS(0)` prints `HELLO 5 `.
+
 **Staying on the same line.** If a `PRINT` ends with `;` or `,`, no newline is printed, so the next `PRINT` continues the same line:
 
 ```

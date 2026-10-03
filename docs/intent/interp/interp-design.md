@@ -168,9 +168,13 @@ A panic here means a node type was added to `internal/ast` without interpreter s
 | `ExprItem` | A string value as it is; a number value in C64 number format (see *Numbers*) followed by one space. |
 | `Semicolon` | Nothing. It only separates items. |
 | `Comma` | Spaces up to the start of the next print zone: `10 - (column % 10)` spaces, where `column` is the cursor column at that point. This is never 0: at the start of a zone (column 0, 10, 20, …), a comma moves a full 10 columns, as the C64 ROM does. |
+| `TabItem` | Spaces up to column `X`: `X - column` spaces if the cursor is left of column `X`, otherwise nothing (`$AAF8`). |
+| `SpcItem` | `X` spaces. |
 | `BadItem` | Nothing; execution of the `PRINT` fails with the item's error (see below). The parser produces a `BadItem` where a syntax error occurred inside a `PRINT`. |
 
-After the last item, a newline (`\n`) is written **unless the last item is `;` or `,`**. This is the C64 rule, and it is how a BASIC program prints several things on one line:
+For `TabItem` and `SpcItem`, `X` is rounded down and must be from 0 to 255 (else `ILLEGAL QUANTITY`; a string is `TYPE MISMATCH`). Like a comma, `TAB` counts from the screen's cursor column, even when writing to a storage file.
+
+After the last item, a newline (`\n`) is written **unless the last item is `;`, `,`, `TAB(`, or `SPC(`** (the ROM continues past `TAB(` and `SPC(` as it does past `;`, `$AB13`). This is the C64 rule, and it is how a BASIC program prints several things on one line:
 
 | Input | Output |
 |---|---|
@@ -448,6 +452,7 @@ A `CallExpr` evaluates its argument, which must be a number (else `TYPE MISMATCH
 | `EXP(X)` | e to the power `X`; `OVERFLOW` if larger than the C64's largest number. |
 | `SIN(X)`, `COS(X)`, `TAN(X)`, `ATN(X)` | In radians; `TAN` of an angle whose cosine is exactly 0 is `DIVISION BY ZERO`, as the ROM divides the sine by the cosine (`$E2B4`). |
 | `RND(X)` | A pseudo-random number at least 0 and less than 1 (see below). |
+| `POS(X)` | The cursor column (see *Cursor Column*), counting the output of the `PRINT` items before it on the screen, which a C64 has already printed; `X`, of either type, is ignored, as the ROM ignores it (`$B39E`). |
 
 Results are limited to the C64's range like any other number (see *Values*).
 

@@ -524,3 +524,13 @@ func TestStringFunctionKeywords(t *testing.T) {
 		{"VAL in a name", "VALUE", []token.Token{tok(token.Function, "VAL", 0), name("UE", 3), eol(5)}},
 	})
 }
+
+// @spec LEXER-040
+func TestPrintFormattingKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"TAB(", "TAB(5)", []token.Token{tok(token.Tab, "TAB(", 0), num("5", 4), tok(token.RParen, ")", 5), eol(6)}},
+		{"SPC(", "SPC(2)", []token.Token{tok(token.Spc, "SPC(", 0), num("2", 4), tok(token.RParen, ")", 5), eol(6)}},
+		{"TAB with a space", "TAB (5)", []token.Token{name("TAB", 0), tok(token.LParen, "(", 4), num("5", 5), tok(token.RParen, ")", 6), eol(7)}},
+		{"POS", "POS(0)", []token.Token{tok(token.Function, "POS", 0), tok(token.LParen, "(", 3), num("0", 4), tok(token.RParen, ")", 5), eol(6)}},
+	})
+}

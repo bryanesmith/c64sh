@@ -30,6 +30,17 @@ func (in *Interp) now() time.Time {
 //
 // @spec INTERP-122, INTERP-123
 func (in *Interp) call(e *ast.CallExpr) (value, error) {
+	if e.Name == "POS" {
+		// The argument is evaluated and ignored, whatever its type ($B39E).
+		// @spec INTERP-132
+		if _, err := in.eval(e.Args[0]); err != nil {
+			return value{}, err
+		}
+		if in.printing {
+			return numberValue(float64(in.printColumn)), nil
+		}
+		return numberValue(float64(in.column)), nil
+	}
 	if strings.HasSuffix(e.Name, "$") || e.Name == "LEN" || e.Name == "ASC" || e.Name == "VAL" {
 		return in.callString(e)
 	}

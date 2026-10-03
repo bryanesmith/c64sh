@@ -129,6 +129,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `023-computed-jumps.bas` | `ON … GOTO` in a loop, `ON … GOSUB` returning after the statement, indexes rounded down, 0 and past the list falling through, `ON` typed directly, and `?ILLEGAL QUANTITY  ERROR` |
 | `024-number-functions.bas` | `ABS`, `SGN`, `INT` (and rounding with it), `SQR`, `EXP`, `LOG`, the trigonometric functions and `π`, a function in `DEF FN`, `RND` with a negative seed and dice rolls, and `?ILLEGAL QUANTITY  ERROR` |
 | `025-string-functions.bas` | `LEN`, `LEFT$`, `RIGHT$`, `MID$` (with and without a length, and past the end), `CHR$`, `ASC`, `STR$`, `VAL`, and idioms: reversing a string, checking a first letter, building a string; `?ILLEGAL QUANTITY  ERROR` |
+| `026-print-formatting.bas` | `TAB` columns with a ruler, `TAB` past its column, `SPC`, a bar chart, a line left open by `TAB`, `POS(0)`, and `?ILLEGAL QUANTITY  ERROR` |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

@@ -195,6 +195,10 @@ func dumpItem(it ast.PrintItem) string {
 		return ";"
 	case *ast.Comma:
 		return ","
+	case *ast.TabItem:
+		return "TAB(" + dumpExpr(it.X) + ")"
+	case *ast.SpcItem:
+		return "SPC(" + dumpExpr(it.X) + ")"
 	case *ast.BadItem:
 		if isSyntax(it.Err) {
 			return "BAD(SYNTAX)"
@@ -1061,5 +1065,26 @@ func TestStringFunctionArity(t *testing.T) {
 		{"MID$ 1", toks(pr, fun("MID$"), lp, name("A$"), rp), `PRINT[BAD(SYNTAX)]`, true},
 		{"LEFT$ 1", toks(pr, fun("LEFT$"), lp, name("A$"), rp), `PRINT[BAD(SYNTAX)]`, true},
 		{"CHR$ 2", toks(pr, fun("CHR$"), lp, number("65"), comma, number("1"), rp), `PRINT[BAD(SYNTAX)]`, true},
+	})
+}
+
+// @spec PARSER-069
+func TestTabSpc(t *testing.T) {
+	tab := token.Token{Kind: token.Tab, Value: "TAB("}
+	spc := token.Token{Kind: token.Spc, Value: "SPC("}
+	runParseCases(t, []parseCase{
+		{"TAB", toks(pr, tab, number("5"), rp, str("X")), `PRINT[TAB(#5) "X"]`, false},
+		{"SPC", toks(pr, str("A"), spc, name("N"), plus, number("1"), rp, str("B")), `PRINT["A" SPC(($N[N]+#1)) "B"]`, false},
+		{"PRINT#", toks(prf, number("1"), comma, tab, number("3"), rp), `PRINT##1[TAB(#3)]`, false},
+		{"no )", toks(pr, tab, number("5")), `PRINT[BAD(SYNTAX)]`, true},
+		{"outside PRINT", toks(name("A"), eq, tab, number("5"), rp), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-070
+func TestPos(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"POS", toks(pr, fun("POS"), lp, number("0"), rp), `PRINT[POS(#0)]`, false},
+		{"two arguments", toks(pr, fun("POS"), lp, number("0"), comma, number("1"), rp), `PRINT[BAD(SYNTAX)]`, true},
 	})
 }

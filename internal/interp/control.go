@@ -7,36 +7,77 @@ import (
 	"github.com/bryanesmith/c64sh/internal/basicerr"
 )
 
-// frame is an entry of the control stack.
+// frame is an entry of the control stack: a FOR or a GOSUB.
 type frame struct {
-	name        string  // the FOR variable's identity
-	limit, step float64 // the end value and the step
-	resume      pos     // where the loop continues: just after its FOR
+	gosub       bool    // a GOSUB entry; otherwise a FOR entry
+	name        string  // FOR: the variable's identity
+	limit, step float64 // FOR: the end value and the step
+	resume      pos     // where execution continues: just after the FOR or GOSUB
 }
 
-// forBytes is the C64 stack space a FOR entry takes, and forRoom the
-// space in use at which a FOR finds no room: the ROM's check at $A3FB,
-// with the stack depth of a running program.
+// The C64 stack space each entry takes, and the space in use at which a
+// FOR or GOSUB finds no room: the ROM's check at $A3FB, with the stack
+// depth of a running program. A GOSUB's 7 bytes include the statement
+// loop's return address that it leaves behind its 5-byte entry.
 const (
-	forBytes = 18
-	forRoom  = 169
+	forBytes   = 18
+	gosubBytes = 7
+	forRoom    = 169
+	gosubRoom  = 179
 )
 
 // stackBytes returns the C64 stack space the control stack takes.
 func (in *Interp) stackBytes() int {
-	return len(in.stack) * forBytes
+	n := 0
+	for _, f := range in.stack {
+		if f.gosub {
+			n += gosubBytes
+		} else {
+			n += forBytes
+		}
+	}
+	return n
 }
 
 // findFor searches the control stack from the top for the FOR entry of
 // the variable name, or the topmost FOR entry if name is empty, stopping
 // at the first entry that is not a FOR ($A38A).
+//
+// @spec INTERP-080
 func (in *Interp) findFor(name string) (int, bool) {
-	for i := len(in.stack) - 1; i >= 0; i-- {
+	for i := len(in.stack) - 1; i >= 0 && !in.stack[i].gosub; i-- {
 		if name == "" || in.stack[i].name == name {
 			return i, true
 		}
 	}
 	return 0, false
+}
+
+// execGosub pushes a GOSUB entry and jumps to the subroutine ($A883).
+//
+// @spec INTERP-077
+func (in *Interp) execGosub(s *ast.GosubStmt) error {
+	if in.stackBytes() >= gosubRoom {
+		return &basicerr.Error{Kind: basicerr.OutOfMemory}
+	}
+	in.ran = true
+	in.stack = append(in.stack, frame{gosub: true, resume: in.after()})
+	return &jump{line: s.Line, hasLine: true}
+}
+
+// execReturn passes over FOR entries to the topmost other entry, which
+// must be a GOSUB, removes it and everything above it, and continues
+// after its GOSUB ($A8D2).
+//
+// @spec INTERP-078, INTERP-079
+func (in *Interp) execReturn() error {
+	for i := len(in.stack) - 1; i >= 0; i-- {
+		if f := in.stack[i]; f.gosub {
+			in.stack = in.stack[:i]
+			return &resume{at: f.resume}
+		}
+	}
+	return &basicerr.Error{Kind: basicerr.ReturnWithoutGosub}
 }
 
 // execFor starts a loop as the ROM does ($A742): assign the start value,

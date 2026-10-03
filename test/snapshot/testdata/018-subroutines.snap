@@ -1,0 +1,13 @@
+exit status: 1
+--- stdout ---
+MAIN STARTS
+  IN THE SUBROUTINE
+BACK IN MAIN
+  IN THE SUBROUTINE
+ABCD
+ 9 
+ 81 
+DONE 81 
+FIRST
+--- stderr ---
+?RETURN WITHOUT GOSUB  ERROR IN 20

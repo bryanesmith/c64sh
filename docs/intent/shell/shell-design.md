@@ -125,7 +125,7 @@ Lines are read from `FILE`, or from stdin when there is no `FILE`.
 - A BASIC error is reported (see *Error display*) and the shell stops with exit status 1. Lines after it do not run.
 - If all lines run without error, the exit status is 0.
 - **Ctrl-C** while a line runs stops the script (see *Interrupts*): `BREAK`, or `BREAK IN n` in a program, is written to stderr and the exit status is 130, which Unix shells use for a command ended by Ctrl-C (128 + SIGINT).
-- **When input ends, a stored program that the script never ran is run.** If the program is not empty and no `RUN` or `GOTO` has been executed during the script, the shell runs it, exactly as if a final `RUN` line followed; an error in it is reported and sets exit status 1, like any other. So a script of numbered lines runs as a program without a `RUN` line, while a script that runs its program itself, once or several times, is left as written.
+- **When input ends, a stored program that the script never ran is run.** If the program is not empty and no `RUN`, `GOTO`, or `GOSUB` has been executed during the script, the shell runs it, exactly as if a final `RUN` line followed; an error in it is reported and sets exit status 1, like any other. So a script of numbered lines runs as a program without a `RUN` line, while a script that runs its program itself, once or several times, is left as written.
 - When input ends, nothing is added to the output. A script whose last output is `PRINT "A";` ends with `A` and no newline, as `printf "A"` does in a Unix shell; this lets scripts produce output without a trailing newline on purpose.
 
 Stopping at the first error matches a C64 running a program, which halts at the failing line, and prevents later lines from running on the assumption that earlier ones succeeded.
@@ -175,6 +175,7 @@ const (
     UndefdStatement           // UNDEF'D STATEMENT
     NextWithoutFor            // NEXT WITHOUT FOR
     OutOfMemory               // OUT OF MEMORY
+    ReturnWithoutGosub        // RETURN WITHOUT GOSUB
     Break                     // BREAK: execution stopped by Ctrl-C
 )
 

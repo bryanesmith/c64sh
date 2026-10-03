@@ -26,7 +26,7 @@ import (
 // @spec PARSER-021, PARSER-022, PARSER-023, PARSER-024, PARSER-025, PARSER-026, PARSER-027
 // @spec PARSER-028, PARSER-029, PARSER-030, PARSER-031, PARSER-032, PARSER-033, PARSER-034
 // @spec PARSER-035, PARSER-036, PARSER-037, PARSER-038, PARSER-039, PARSER-040, PARSER-041
-// @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045
+// @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -113,7 +113,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -152,6 +152,14 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 			return nil, err
 		}
 		return stmt, nil
+	case token.Gosub:
+		stmt, err := p.parseGosubStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	case token.Return:
+		return p.parseCommand(&ast.ReturnStmt{})
 	case token.List:
 		return p.parseCommand(&ast.ListStmt{})
 	case token.New:
@@ -247,6 +255,16 @@ func (p *parser) parseNextStatement() (*ast.NextStmt, error) {
 	return s, nil
 }
 
+// GosubStatement = gosub LineNumber .
+func (p *parser) parseGosubStatement() (*ast.GosubStmt, error) {
+	p.next() // GOSUB
+	n, err := p.parseLineNumber()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.GosubStmt{Line: n}, nil
+}
+
 // GotoStatement = ( goto | go to ) LineNumber .
 //
 // GO must be followed by TO ($A80E).
@@ -277,9 +295,10 @@ func (p *parser) parseLineNumber() (int, error) {
 
 func isDigit(c byte) bool { return '0' <= c && c <= '9' }
 
-// ListStatement = list .
-// NewStatement  = new .
-// EndStatement  = end .
+// ReturnStatement = return .
+// ListStatement   = list .
+// NewStatement    = new .
+// EndStatement    = end .
 //
 // parseCommand parses a command that takes no arguments. Anything after
 // it other than the end of the statement is a syntax error in its place,

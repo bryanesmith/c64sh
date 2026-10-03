@@ -36,8 +36,8 @@ func (in *Interp) Exec(line *ast.Line) error
 // or deletes line n if text is empty. Either way, it clears the variables.
 func (in *Interp) Store(n int, text string)
 
-// NeverRun reports whether the stored program holds lines and no RUN or
-// GOTO has been executed since the Interp was created.
+// NeverRun reports whether the stored program holds lines and no RUN,
+// GOTO, or GOSUB has been executed since the Interp was created.
 func (in *Interp) NeverRun() bool
 
 // Interrupt asks the interpreter to stop, as the C64's STOP key does: the
@@ -83,7 +83,7 @@ func (in *Interp) execStmt(s ast.Stmt) error {
     case *ast.BadStmt:
         return s.Err
     case *ast.RunStmt, *ast.GotoStmt, *ast.ListStmt, *ast.NewStmt, *ast.EndStmt,
-        *ast.ForStmt, *ast.NextStmt:
+        *ast.ForStmt, *ast.NextStmt, *ast.GosubStmt, *ast.ReturnStmt:
         … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
@@ -148,10 +148,10 @@ The interpreter executes statements from a **position**: a line, either a progra
 
 ### Control stack
 
-`FOR` pushes an entry onto the control stack, which `NEXT` reads; the C64 keeps these on the processor stack (`$A742`). A `FOR` entry holds the loop variable, the end value, the step, and the position just after the `FOR`.
+`FOR` and `GOSUB` push entries onto the control stack, which `NEXT` and `RETURN` read; the C64 keeps these on the processor stack (`$A742`, `$A883`). A `FOR` entry holds the loop variable, the end value, the step, and the position just after the `FOR`; a `GOSUB` entry holds the position just after the `GOSUB`.
 
 - **Clearing.** The stack is emptied whenever the variables are cleared (`RUN`, `NEW`, storing or deleting a line) and when an error stops execution (`$A462`). It is kept when execution ends normally or with `BREAK`, as on a C64, so a `NEXT` typed after a program ends can continue a loop the program left unfinished. When `Exec` returns, entries whose position is in its direct-mode line are removed, together with every entry above them, because that line is gone; on a C64 they would point into the input buffer, which the next line overwrites.
-- **Size.** Each `FOR` entry takes 18 bytes of the C64's stack. Before pushing one, the ROM checks for room (`$A3FB`); with the stack depth of a running program, a `FOR` fails with `OUT OF MEMORY` when the entries already on the stack take 169 bytes or more, so 10 loops can be nested and the 11th fails. c64sh applies the same rule in direct mode. The stack space a C64 uses while evaluating expressions is not counted.
+- **Size.** Each `FOR` entry takes 18 bytes of the C64's stack, and each `GOSUB` entry 7 (5 bytes of entry, and the 2-byte return address of the statement loop that the `GOSUB` leaves behind it, which its `RETURN` uses). Before pushing an entry, the ROM checks for room (`$A3FB`); with the stack depth of a running program, a `FOR` fails with `OUT OF MEMORY` when the entries already on the stack take 169 bytes or more, and a `GOSUB` when they take 179 bytes or more. So 10 loops can be nested and the 11th fails, and 26 subroutine calls can be nested and the 27th fails. c64sh applies the same rule in direct mode. The stack space a C64 uses while evaluating expressions is not counted.
 
 ### FOR and NEXT
 
@@ -168,6 +168,14 @@ So the body always runs at least once: the test is made only at `NEXT`.
 Executing `NEXT V` (`$AD1E`) searches the stack from the top for the `FOR` entry of `V`, or for the topmost `FOR` entry if `NEXT` has no variable. The search passes over `FOR` entries for other variables and stops at the first entry that is not a `FOR`; if it finds no match it fails with `NEXT WITHOUT FOR`. Entries above the match are removed (they are loops left unfinished inside this one). Then it adds the step to `V`, stores the result in `V`, and compares it with the end value: the loop is complete when `V` has passed the end value, that is, it is greater for a positive step, less for a negative step, or equal for a step of 0. If the loop is not complete, execution continues at the entry's position; if it is, the entry is removed and execution continues after the variable, with the next variable of `NEXT I,J` if there is one. The variable keeps its last value after the loop: after `FOR I=1 TO 3:NEXT`, `I` is 4.
 
 Because c64sh numbers are 64-bit floating point (HLD *Number representation*), a loop with a fractional step, such as `FOR I=0 TO 1 STEP .1`, can in rare cases run a different number of times than on a C64, whose numbers round differently.
+
+### GOSUB and RETURN
+
+`GOSUB n` checks for stack room (see *Control stack*), pushes a `GOSUB` entry holding the position just after the `GOSUB` statement, and continues at line `n` like `GOTO` (`$A883`); if there is no line `n`, it fails with `UNDEF'D STATEMENT`. Like `GOTO`, it works in direct mode, running the program from line `n`, and keeps the variables.
+
+`RETURN` (`$A8D2`) searches the control stack from the top, passing over every `FOR` entry, to the first entry that is not a `FOR`. If that is a `GOSUB` entry, it removes it and every entry above it (loops begun inside the subroutine and left unfinished) and continues at the entry's position: the statement after the `GOSUB`, which can be in the middle of a line, or in the line typed in direct mode. Otherwise (the stack holds only `FOR` entries, or none) it fails with `RETURN WITHOUT GOSUB`.
+
+Because `NEXT` and `FOR` search only above the topmost non-`FOR` entry, a `NEXT` inside a subroutine cannot reach a loop begun outside it: it fails with `NEXT WITHOUT FOR`.
 
 ### RUN
 
@@ -207,7 +215,7 @@ Because each line starts with a newline, the listing begins with one: a blank li
 
 ### NeverRun
 
-`NeverRun` lets the shell run a script's program when the script never ran it itself (see the shell design). It is true when the program holds at least one line and no `RUN` or `GOTO` has been executed, successfully or not, since the `Interp` was created.
+`NeverRun` lets the shell run a script's program when the script never ran it itself (see the shell design). It is true when the program holds at least one line and no `RUN`, `GOTO`, or `GOSUB` has been executed, successfully or not, since the `Interp` was created.
 
 ## REM
 
@@ -301,7 +309,8 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `ILLEGAL QUANTITY` | An operand of `AND`, `OR`, or `NOT` whose size is 32768 or more (other than -32768); `^` with a negative left operand and a right operand that is not a whole number; a value whose size is 32768 or more (other than -32768) assigned to an integer variable. |
 | `SYNTAX` | A `BadItem` reached while executing `PRINT`, or a `BadStmt` reached; the error is the one the parser stored in it. |
 | `NEXT WITHOUT FOR` | `NEXT` with no matching `FOR` entry above the topmost non-`FOR` entry of the control stack. |
-| `OUT OF MEMORY` | A `FOR` with no room left on the C64's stack (see *Control stack*). |
+| `OUT OF MEMORY` | A `FOR` or `GOSUB` with no room left on the C64's stack (see *Control stack*). |
+| `RETURN WITHOUT GOSUB` | `RETURN` with no `GOSUB` entry on the control stack, other than `FOR` entries above it. |
 | `UNDEF'D STATEMENT` | `RUN n` or `GOTO n` where the program has no line `n`. |
 | `BREAK` | `Interrupt` was called (see *BREAK*). |
 
@@ -324,7 +333,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Output writes | One write per `PRINT`; on failure, one write of the items before the failing one | One write per item; write nothing on failure | Keeps output of a single statement together and reduces system calls when output is unbuffered, while still showing exactly what a C64 would have printed before the error. |
 | State | `Interp` value created once per session | Stateless function | Variables and the stored program need a home that persists across lines. |
 | Execution model | A position (line, statement index) and a control stack of entries holding positions | Run line by line, with loops handled by re-running whole lines; a tree-walking loop construct built by the parser | A C64 resumes a loop just after its `FOR`, which can be mid-line or in the direct-mode line, and lets `NEXT` and `FOR` be anywhere, unmatched in the text. Only positions reproduce that; a parsed loop construct would reject valid programs such as one `FOR` with two `NEXT`s. |
-| Stack limit | The ROM's byte budget: 18 bytes per `FOR`, `OUT OF MEMORY` from 169 bytes in use | No limit; a fixed count of loops | It is the C64's own rule, derived from the stack check at `$A3FB`, and it stops runaway programs from growing memory without end. |
+| Stack limit | The ROM's byte budget: 18 bytes per `FOR` and 7 per `GOSUB`, `OUT OF MEMORY` from 169 bytes in use for a `FOR` and 179 for a `GOSUB` | No limit; a fixed count of loops | It is the C64's own rule, derived from the stack check at `$A3FB`, and it stops runaway programs from growing memory without end. |
 | Interrupting | A flag set by `Interrupt` and checked after each statement | Cancel through a `context.Context` passed to `Exec`; the shell kills the run some other way | The C64 checks its STOP key between statements, so checking there gives the same `BREAK IN n`. A flag keeps the interpreter free of signals and goroutines; the shell decides where interrupts come from. |
 | Stored line form | Text and parsed tree, parsed once when stored | Text only, parsed each time the line runs, as the C64 does; tree only | The tree runs a line many times without parsing again; syntax errors are in the tree, so they are still reported only when reached. `LIST` needs the text as typed, which the tree does not keep (spaces, `?`). |
 | Ending execution | `END`, `LIST`, `NEW`, `RUN`, and `GOTO` end the line or program through internal sentinel values returned like errors | Flags on the `Interp` checked after every statement | The same path already ends a line for a false `IF`; returning a value keeps the control flow visible in each statement's code. |

@@ -155,10 +155,18 @@ type ForStmt struct {
 // NextStmt is NEXT [Var {, Var}]; Vars is empty for a bare NEXT.
 type NextStmt struct{ Vars []*VarRef }
 
-func (*ForStmt) stmt()  {}
-func (*NextStmt) stmt() {}
-func (*RunStmt) stmt()  {}
-func (*GotoStmt) stmt() {}
-func (*ListStmt) stmt() {}
-func (*NewStmt) stmt()  {}
-func (*EndStmt) stmt()  {}
+// GosubStmt is GOSUB n: call the subroutine at line n.
+type GosubStmt struct{ Line int }
+
+// ReturnStmt is RETURN: return from the latest subroutine.
+type ReturnStmt struct{}
+
+func (*GosubStmt) stmt()  {}
+func (*ReturnStmt) stmt() {}
+func (*ForStmt) stmt()    {}
+func (*NextStmt) stmt()   {}
+func (*RunStmt) stmt()    {}
+func (*GotoStmt) stmt()   {}
+func (*ListStmt) stmt()   {}
+func (*NewStmt) stmt()    {}
+func (*EndStmt) stmt()    {}

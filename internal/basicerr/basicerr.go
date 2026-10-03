@@ -6,30 +6,32 @@ package basicerr
 type Kind int
 
 const (
-	Syntax          Kind = iota // SYNTAX
-	StringTooLong               // STRING TOO LONG
-	TypeMismatch                // TYPE MISMATCH
-	Overflow                    // OVERFLOW
-	DivisionByZero              // DIVISION BY ZERO
-	IllegalQuantity             // ILLEGAL QUANTITY
-	UndefdStatement             // UNDEF'D STATEMENT
-	Break                       // BREAK: execution stopped by Ctrl-C
-	NextWithoutFor              // NEXT WITHOUT FOR
-	OutOfMemory                 // OUT OF MEMORY
+	Syntax             Kind = iota // SYNTAX
+	StringTooLong                  // STRING TOO LONG
+	TypeMismatch                   // TYPE MISMATCH
+	Overflow                       // OVERFLOW
+	DivisionByZero                 // DIVISION BY ZERO
+	IllegalQuantity                // ILLEGAL QUANTITY
+	UndefdStatement                // UNDEF'D STATEMENT
+	Break                          // BREAK: execution stopped by Ctrl-C
+	NextWithoutFor                 // NEXT WITHOUT FOR
+	OutOfMemory                    // OUT OF MEMORY
+	ReturnWithoutGosub             // RETURN WITHOUT GOSUB
 )
 
 // names holds each kind's name as the C64 prints it.
 var names = [...]string{
-	Syntax:          "SYNTAX",
-	StringTooLong:   "STRING TOO LONG",
-	TypeMismatch:    "TYPE MISMATCH",
-	Overflow:        "OVERFLOW",
-	DivisionByZero:  "DIVISION BY ZERO",
-	IllegalQuantity: "ILLEGAL QUANTITY",
-	UndefdStatement: "UNDEF'D STATEMENT",
-	Break:           "BREAK",
-	NextWithoutFor:  "NEXT WITHOUT FOR",
-	OutOfMemory:     "OUT OF MEMORY",
+	Syntax:             "SYNTAX",
+	StringTooLong:      "STRING TOO LONG",
+	TypeMismatch:       "TYPE MISMATCH",
+	Overflow:           "OVERFLOW",
+	DivisionByZero:     "DIVISION BY ZERO",
+	IllegalQuantity:    "ILLEGAL QUANTITY",
+	UndefdStatement:    "UNDEF'D STATEMENT",
+	Break:              "BREAK",
+	NextWithoutFor:     "NEXT WITHOUT FOR",
+	OutOfMemory:        "OUT OF MEMORY",
+	ReturnWithoutGosub: "RETURN WITHOUT GOSUB",
 }
 
 // Error is a BASIC error.

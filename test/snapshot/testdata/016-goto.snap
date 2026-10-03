@@ -1,0 +1,12 @@
+exit status: 1
+--- stdout ---
+START
+END
+ 1  2  3  4  5 
+A IS 0
+DONE
+N IS 7 
+N IS 0 
+BEFORE
+--- stderr ---
+?UNDEF'D STATEMENT  ERROR IN 20

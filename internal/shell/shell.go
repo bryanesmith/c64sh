@@ -9,10 +9,12 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/signal"
 	"strings"
 
 	"golang.org/x/term"
 
+	"github.com/bryanesmith/c64sh/internal/ast"
 	"github.com/bryanesmith/c64sh/internal/basicerr"
 	"github.com/bryanesmith/c64sh/internal/interp"
 	"github.com/bryanesmith/c64sh/internal/lexer"
@@ -25,8 +27,8 @@ const usage = `usage: c64sh [FILE]
 Runs Commodore 64 BASIC V2. With FILE, or when input is piped, each line
 is handled as if typed, and c64sh stops at the first error: numbered
 lines are stored, other lines run, and a stored program that was never
-run with RUN runs at the end. Otherwise c64sh starts an interactive
-session; end it with Ctrl-D.
+run with RUN or GOTO runs at the end. Otherwise c64sh starts an
+interactive session; end it with Ctrl-D. Ctrl-C stops a running program.
 `
 
 // banner is written to stderr when an interactive session starts.
@@ -190,7 +192,7 @@ func (s *session) execLine(line string) (int, bool) {
 		// run first, and one skipped by a false IF is never reported, as
 		// on a C64.
 		tree, _ := parser.Parse(lexer.Lex(line))
-		err = s.interp.Exec(tree)
+		err = s.exec(tree)
 	}
 
 	basicErr, isBasic := errors.AsType[*basicerr.Error](err)
@@ -198,6 +200,9 @@ func (s *session) execLine(line string) (int, bool) {
 	case err == nil:
 	case isBasic:
 		s.report(basicErr)
+		if !s.interactive && basicErr.Kind == basicerr.Break {
+			return 130, true // 128 + SIGINT, as Unix shells report Ctrl-C
+		}
 		if !s.interactive {
 			return 1, true
 		}
@@ -211,12 +216,49 @@ func (s *session) execLine(line string) (int, bool) {
 	return 0, false
 }
 
-// report writes a BASIC error the way a C64 prints it, on a fresh line,
-// naming the program line it occurred in, if any.
+// notifyInterrupt and stopInterrupt start and stop delivering SIGINT to
+// a channel; tests replace them.
+var (
+	notifyInterrupt = func(c chan<- os.Signal) { signal.Notify(c, os.Interrupt) }
+	stopInterrupt   = signal.Stop
+)
+
+// exec executes a line, turning SIGINT (Ctrl-C) during it into a call to
+// the interpreter's Interrupt. Outside exec, SIGINT keeps the handling it
+// had when c64sh started.
 //
-// @spec SHELL-ERR-001, SHELL-ERR-002
+// @spec SHELL-BREAK-001, SHELL-BREAK-002
+func (s *session) exec(tree *ast.Line) error {
+	sigs := make(chan os.Signal, 1)
+	notifyInterrupt(sigs)
+	defer stopInterrupt(sigs)
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-sigs:
+			s.interp.Interrupt()
+		case <-done:
+		}
+	}()
+	return s.interp.Exec(tree)
+}
+
+// report writes a BASIC error the way a C64 prints it, on a fresh line,
+// naming the program line it occurred in, if any. BREAK is written
+// without "?" and "ERROR", as a C64 writes it.
+//
+// @spec SHELL-ERR-001, SHELL-ERR-002, SHELL-ERR-004
 func (s *session) report(err *basicerr.Error) {
 	s.freshLine()
+	if err.Kind == basicerr.Break {
+		io.WriteString(s.stderr, "BREAK")
+		if err.HasLine {
+			fmt.Fprintf(s.stderr, " IN %d", err.Line)
+		}
+		io.WriteString(s.stderr, "\n")
+		return
+	}
 	if err.HasLine {
 		fmt.Fprintf(s.stderr, "?%s  ERROR IN %d\n", err.Error(), err.Line)
 		return

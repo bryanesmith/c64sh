@@ -417,3 +417,14 @@ func TestLineNumberTooLarge(t *testing.T) {
 		}
 	}
 }
+
+// @spec LEXER-030
+func TestGotoKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"GOTO", "GOTO 10", []token.Token{tok(token.Goto, "GOTO", 0), num("10", 5), eol(7)}},
+		{"GO TO", "GO TO 10", []token.Token{tok(token.Go, "GO", 0), tok(token.To, "TO", 3), num("10", 6), eol(8)}},
+		{"GOTO without spaces", "GOTO10", []token.Token{tok(token.Goto, "GOTO", 0), num("10", 4), eol(6)}},
+		{"GO in a name", "GOLD", []token.Token{tok(token.Go, "GO", 0), name("LD", 2), eol(4)}},
+		{"TO in a name", "TOTAL", []token.Token{tok(token.To, "TO", 0), name("TAL", 2), eol(5)}},
+	})
+}

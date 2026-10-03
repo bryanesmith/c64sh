@@ -36,9 +36,14 @@ func (in *Interp) Exec(line *ast.Line) error
 // or deletes line n if text is empty. Either way, it clears the variables.
 func (in *Interp) Store(n int, text string)
 
-// NeverRun reports whether the stored program holds lines and no RUN has
-// been executed since the Interp was created.
+// NeverRun reports whether the stored program holds lines and no RUN or
+// GOTO has been executed since the Interp was created.
 func (in *Interp) NeverRun() bool
+
+// Interrupt asks the interpreter to stop, as the C64's STOP key does: the
+// statement running now finishes, and Exec returns a BREAK error. It may
+// be called from another goroutine.
+func (in *Interp) Interrupt()
 
 // Column returns the cursor column: the number of characters written
 // since the last newline. It is 0 at the start of a line.
@@ -77,7 +82,7 @@ func (in *Interp) execStmt(s ast.Stmt) error {
         return in.execIf(s) // may end the line early
     case *ast.BadStmt:
         return s.Err
-    case *ast.RunStmt, *ast.ListStmt, *ast.NewStmt, *ast.EndStmt:
+    case *ast.RunStmt, *ast.GotoStmt, *ast.ListStmt, *ast.NewStmt, *ast.EndStmt:
         … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
@@ -147,8 +152,20 @@ Running the program executes each line's statements, in line-number order, until
 - **`LIST` or `NEW` runs**: it does its work, then the program ends.
 - **A statement fails**: the program stops, and the error is returned with the number of the line it occurred in (`Line` and `HasLine` on the `basicerr.Error`), so the shell prints `?SYNTAX  ERROR IN 20`.
 - **`RUN` runs**: the program starts again, with the variables cleared.
+- **`GOTO n` runs**: the program continues at line `n`, or stops with `UNDEF'D STATEMENT` if there is no line `n`.
+- **The interpreter is interrupted** (see *BREAK*): the program stops with a `BREAK` error.
 
 A false `IF` ends only its own line; the program continues with the next line. Program output and the cursor column carry on across lines exactly as in direct mode.
+
+### GOTO
+
+`GOTO n` continues at line `n` without clearing the variables: in a running program it jumps there, and in direct mode it runs the program from there, which is how a C64 continues a program while keeping its variables. If there is no line `n`, it fails with `UNDEF'D STATEMENT`, carrying the line holding the `GOTO` when the program is running. Like `RUN`, it never returns to its line. `IF … THEN n` and `IF … GOTO n` are an `IfStmt` followed by a `GotoStmt`, so they jump only when the condition is true.
+
+### BREAK
+
+`Interrupt` sets a flag, safe to set from another goroutine, that the interpreter checks after each statement finishes, as the C64 checks its STOP key between statements (`$A7AE`, `$A82C`). The check happens after any statement that completes normally, including a false `IF` (which ends its line) and a `RUN` or `GOTO` (before the jump), but not after one that fails or ends execution (`END`, `LIST`, `NEW`). When the flag is set, the interpreter clears it and stops with a `BREAK` error (`basicerr.Break`). In a running program the error carries the line of the statement just finished, which is the line the C64 reports: after `20 GOTO 10`, it is line 20. In direct mode it carries no line.
+
+`Exec` clears the flag when it starts, so an interrupt that arrives after a line has finished does not stop the next one.
 
 ### LIST
 
@@ -162,7 +179,7 @@ Because each line starts with a newline, the listing begins with one: a blank li
 
 ### NeverRun
 
-`NeverRun` lets the shell run a script's program when the script never ran it itself (see the shell design). It is true when the program holds at least one line and no `RUN` has been executed, successfully or not, since the `Interp` was created.
+`NeverRun` lets the shell run a script's program when the script never ran it itself (see the shell design). It is true when the program holds at least one line and no `RUN` or `GOTO` has been executed, successfully or not, since the `Interp` was created.
 
 ## REM
 
@@ -255,9 +272,10 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `DIVISION BY ZERO` | `/` with a right operand of 0. |
 | `ILLEGAL QUANTITY` | An operand of `AND`, `OR`, or `NOT` whose size is 32768 or more (other than -32768); `^` with a negative left operand and a right operand that is not a whole number; a value whose size is 32768 or more (other than -32768) assigned to an integer variable. |
 | `SYNTAX` | A `BadItem` reached while executing `PRINT`, or a `BadStmt` reached; the error is the one the parser stored in it. |
-| `UNDEF'D STATEMENT` | `RUN n` where the program has no line `n`. |
+| `UNDEF'D STATEMENT` | `RUN n` or `GOTO n` where the program has no line `n`. |
+| `BREAK` | `Interrupt` was called (see *BREAK*). |
 
-An error that occurs while the program is running carries the number of the line it occurred in; for `RUN n` that is the line holding the `RUN`, and in direct mode there is none.
+An error that occurs while the program is running carries the number of the line it occurred in; for `RUN n` and `GOTO n` that is the line holding the statement, and in direct mode there is none.
 
 If writing to the output fails (for example, stdout is a closed pipe), `Exec` returns that write error unchanged. It is not a BASIC error.
 
@@ -275,8 +293,9 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | 255-character limit | Enforced on concatenation results | No limit | Tenet *C64 language, Unix I/O*: string semantics are language behavior. Enforcing it now avoids a behavior change when string functions arrive. |
 | Output writes | One write per `PRINT`; on failure, one write of the items before the failing one | One write per item; write nothing on failure | Keeps output of a single statement together and reduces system calls when output is unbuffered, while still showing exactly what a C64 would have printed before the error. |
 | State | `Interp` value created once per session | Stateless function | Variables and the stored program need a home that persists across lines. |
+| Interrupting | A flag set by `Interrupt` and checked after each statement | Cancel through a `context.Context` passed to `Exec`; the shell kills the run some other way | The C64 checks its STOP key between statements, so checking there gives the same `BREAK IN n`. A flag keeps the interpreter free of signals and goroutines; the shell decides where interrupts come from. |
 | Stored line form | Text and parsed tree, parsed once when stored | Text only, parsed each time the line runs, as the C64 does; tree only | The tree runs a line many times without parsing again; syntax errors are in the tree, so they are still reported only when reached. `LIST` needs the text as typed, which the tree does not keep (spaces, `?`). |
-| Ending execution | `END`, `LIST`, `NEW`, and `RUN` end the line or program through internal sentinel values returned like errors | Flags on the `Interp` checked after every statement | The same path already ends a line for a false `IF`; returning a value keeps the control flow visible in each statement's code. |
+| Ending execution | `END`, `LIST`, `NEW`, `RUN`, and `GOTO` end the line or program through internal sentinel values returned like errors | Flags on the `Interp` checked after every statement | The same path already ends a line for a false `IF`; returning a value keeps the control flow visible in each statement's code. |
 | `LIST` layout | A newline before each line, as the ROM writes it, and one after the last | Only a newline after each line; leave the last line unfinished, for `FreshLine` to end | The screen matches a C64's exactly, including the blank line after `LIST`. Ending the last line stands in for the newline that begins the C64's `READY.`, which always follows a listing; without it, a script's listing would run into its next output. |
 
 ## Open Questions & Future Decisions

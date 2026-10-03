@@ -2,7 +2,10 @@ package interp
 
 import (
 	"errors"
+	"regexp"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/bryanesmith/c64sh/internal/basicerr"
 	"github.com/bryanesmith/c64sh/internal/lexer"
@@ -170,6 +173,8 @@ func TestProgramCommandsEndTheirLine(t *testing.T) {
 		{"END", lines(`END:PRINT "X"`), "", nil},
 		{"END after a statement", lines(`PRINT "A":END:PRINT "X"`), "A\n", nil},
 		{"END in a program", lines(`10 PRINT "A":END:PRINT "X"`, "RUN"), "A\n", nil},
+		{"GOTO", lines(`10 PRINT "A"`, `GOTO 10:PRINT "X"`), "A\n", nil},
+		{"GOTO in a program", lines(`10 GOTO 30:PRINT "X"`, `20 PRINT "B"`, `30 PRINT "C"`, "RUN"), "C\n", nil},
 	})
 }
 
@@ -231,11 +236,149 @@ func TestNeverRun(t *testing.T) {
 		{"lines deleted", lines(`10 PRINT "A"`, "10"), false},
 		{"after NEW", lines(`10 PRINT "A"`, "NEW"), false},
 		{"error in program", lines(`10 @`, "RUN"), false},
+		{"after GOTO", lines(`10 PRINT "A"`, "GOTO 10"), false},
+		{"after failing GOTO", lines(`10 PRINT "A"`, "GOTO 99"), false},
 	}
 	for _, c := range cases {
 		in, _, _ := session(t, c.lines...)
 		if got := in.NeverRun(); got != c.want {
 			t.Errorf("%s: NeverRun() = %v, want %v", c.name, got, c.want)
 		}
+	}
+}
+
+// @spec INTERP-063
+func TestGotoContinuesAtLine(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"forward", lines(`10 GOTO 30`, `20 PRINT "B"`, `30 PRINT "C"`, "RUN"), "C\n", nil},
+		{"backward", lines(`10 A=A+1:IF A=3 THEN END`, `20 PRINT A;`, `30 GOTO 10`, "RUN"), " 1  2 ", nil},
+		{"direct keeps variables", lines(`10 PRINT A`, "A=5", "GOTO 10"), " 5 \n", nil},
+		{"direct to a middle line", lines(`10 PRINT "A"`, `20 PRINT "B"`, "GOTO 20"), "B\n", nil},
+		{"IF THEN n", lines(`10 IF 1 THEN 30`, `20 PRINT "B"`, `30 PRINT "C"`, "RUN"), "C\n", nil},
+		{"IF THEN n false", lines(`10 IF 0 THEN 30`, `20 PRINT "B"`, `30 PRINT "C"`, "RUN"), "B\nC\n", nil},
+		{"IF GOTO n", lines(`10 IF 1 GOTO 30`, `20 PRINT "B"`, `30 PRINT "C"`, "RUN"), "C\n", nil},
+		{"GO TO", lines(`10 GO TO 30`, `20 PRINT "B"`, `30 PRINT "C"`, "RUN"), "C\n", nil},
+		{"direct IF THEN n", lines(`10 PRINT "A"`, "IF 1 THEN 10"), "A\n", nil},
+	})
+}
+
+// @spec INTERP-064
+func TestGotoMissingLine(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"in a program", lines(`10 PRINT "A"`, `20 GOTO 99`, "RUN"), "A\n", errIn(basicerr.UndefdStatement, 20)},
+		{"direct", lines(`10 PRINT "A"`, "GOTO 99"), "", &basicerr.Error{Kind: basicerr.UndefdStatement}},
+		{"empty program", lines("GOTO"), "", &basicerr.Error{Kind: basicerr.UndefdStatement}},
+		{"line 0 by default", lines(`0 PRINT "ZERO"`, "GOTO"), "ZERO\n", nil},
+	})
+}
+
+// syncRecorder is a recorder safe for one goroutine writing while another
+// reads.
+type syncRecorder struct {
+	mu  chan struct{}
+	buf strings.Builder
+}
+
+func newSyncRecorder() *syncRecorder { return &syncRecorder{mu: make(chan struct{}, 1)} }
+
+func (r *syncRecorder) Write(p []byte) (int, error) {
+	r.mu <- struct{}{}
+	defer func() { <-r.mu }()
+	return r.buf.Write(p)
+}
+
+func (r *syncRecorder) String() string {
+	r.mu <- struct{}{}
+	defer func() { <-r.mu }()
+	return r.buf.String()
+}
+
+// runUntilInterrupted runs program, a list of stored lines, with RUN, calls
+// Interrupt from another goroutine once output appears, and returns the
+// output and Exec's error.
+func runUntilInterrupted(t *testing.T, program ...string) (string, error) {
+	t.Helper()
+	rec := newSyncRecorder()
+	in := New(rec)
+	for _, l := range program {
+		if err := enter(in, l); err != nil {
+			t.Fatal(err)
+		}
+	}
+	done := make(chan error, 1)
+	go func() {
+		tree, _ := parser.Parse(lexer.Lex("RUN"))
+		done <- in.Exec(tree)
+	}()
+	for rec.String() == "" {
+		time.Sleep(time.Millisecond)
+	}
+	in.Interrupt()
+	select {
+	case err := <-done:
+		return rec.String(), err
+	case <-time.After(10 * time.Second):
+		t.Fatal("Exec did not stop after Interrupt")
+		return "", nil
+	}
+}
+
+// @spec INTERP-065, INTERP-067
+func TestInterruptStopsProgram(t *testing.T) {
+	out, err := runUntilInterrupted(t, `10 PRINT "A";`, "20 GOTO 10")
+	var be *basicerr.Error
+	if !errors.As(err, &be) || be.Kind != basicerr.Break || !be.HasLine || (be.Line != 10 && be.Line != 20) {
+		t.Errorf("error %#v, want BREAK in line 10 or 20", err)
+	}
+	if !regexp.MustCompile(`^A+$`).MatchString(out) {
+		t.Errorf("output %q, want A repeated", out)
+	}
+
+	_, err = runUntilInterrupted(t, `10 PRINT "A";:GOTO 10`)
+	if !sameErr(err, errIn(basicerr.Break, 10)) {
+		t.Errorf("one-line loop: error %#v, want BREAK IN 10", err)
+	}
+
+	_, err = runUntilInterrupted(t, `10 PRINT "A";:IF 0 THEN @`, "20 GOTO 10")
+	if !errors.As(err, &be) || be.Kind != basicerr.Break {
+		t.Errorf("false IF: error %#v, want BREAK", err)
+	}
+}
+
+// @spec INTERP-065
+func TestInterruptInDirectMode(t *testing.T) {
+	// The first PRINT's output interrupts, as Ctrl-C during it would.
+	w := &interruptingWriter{}
+	in := New(w)
+	w.in = in
+	tree, _ := parser.Parse(lexer.Lex(`PRINT "A":PRINT "B"`))
+	err := in.Exec(tree)
+	if !sameErr(err, &basicerr.Error{Kind: basicerr.Break}) {
+		t.Errorf("error %#v, want BREAK with no line", err)
+	}
+	if w.buf.String() != "A\n" {
+		t.Errorf("output %q, want %q", w.buf.String(), "A\n")
+	}
+}
+
+// interruptingWriter calls Interrupt on its interpreter when written to.
+type interruptingWriter struct {
+	in  *Interp
+	buf strings.Builder
+}
+
+func (w *interruptingWriter) Write(p []byte) (int, error) {
+	w.in.Interrupt()
+	return w.buf.Write(p)
+}
+
+// @spec INTERP-066
+func TestExecDiscardsEarlierInterrupt(t *testing.T) {
+	rec := &recorder{}
+	in := New(rec)
+	in.Interrupt()
+	tree, _ := parser.Parse(lexer.Lex(`PRINT "A":PRINT "B"`))
+	if err := in.Exec(tree); err != nil || rec.String() != "A\nB\n" {
+		t.Errorf("output %q, error %v; want both lines and no error", rec.String(), err)
 	}
 }

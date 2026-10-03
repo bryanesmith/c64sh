@@ -133,6 +133,10 @@ type RunStmt struct {
 	HasLine bool
 }
 
+// GotoStmt is GOTO n, GO TO n, or the n of IF … THEN n: continue the
+// program at line n.
+type GotoStmt struct{ Line int }
+
 // ListStmt is LIST: print the stored program.
 type ListStmt struct{}
 
@@ -143,6 +147,7 @@ type NewStmt struct{}
 type EndStmt struct{}
 
 func (*RunStmt) stmt()  {}
+func (*GotoStmt) stmt() {}
 func (*ListStmt) stmt() {}
 func (*NewStmt) stmt()  {}
 func (*EndStmt) stmt()  {}

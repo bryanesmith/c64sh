@@ -53,16 +53,21 @@ Design: `shell-design.md`
 - [x] **SHELL-SCRIPT-002**: In script mode, if the first line of input begins with `#!`, the shell shall skip that line.
 - [x] **SHELL-SCRIPT-003**: In script mode, the shell shall process a line beginning with `#!` that is not the first line as ordinary input.
 - [x] **SHELL-SCRIPT-004**: In script mode, the shell shall skip blank lines.
-- [x] **SHELL-SCRIPT-005**: In script mode, if a line reports a BASIC error, the shell shall run no later lines and exit with status 1.
+- [x] **SHELL-SCRIPT-005**: In script mode, if a line reports a BASIC error, the shell shall run no later lines and exit with status 1, or with status 130 if the error is a BREAK.
 - [x] **SHELL-SCRIPT-006**: In script mode, when every line has run without a BASIC error, the shell shall exit with status 0.
 - [x] **SHELL-SCRIPT-007**: When an executable file whose first line is `#!/usr/bin/env c64sh` is run and `c64sh` is on `PATH`, the file's remaining lines shall run in script mode.
 - [x] **SHELL-SCRIPT-008**: In script mode, when input ends and any program run under SHELL-SCRIPT-009 has finished, the shell shall write nothing further, even if the output written to stdout does not end with a newline.
-- [x] **SHELL-SCRIPT-009**: In script mode, when input ends without a BASIC error and the interpreter's `NeverRun` reports true, the shell shall run the line `RUN` as if it followed the last line, reporting any BASIC error from it and exiting with status 1 if there is one.
+- [x] **SHELL-SCRIPT-009**: In script mode, when input ends without a BASIC error and the interpreter's `NeverRun` reports true, the shell shall run the line `RUN` as if it followed the last line, reporting any BASIC error from it and exiting as SHELL-SCRIPT-005 specifies if there is one.
 
 ## Program lines
 
 - [x] **SHELL-PROG-001**: When `lexer.LineNumber` finds a line number at the start of a non-blank line, the shell shall call the interpreter's `Store` with that number and the rest of the line, and shall not otherwise execute the line.
 - [x] **SHELL-PROG-002**: If `lexer.LineNumber` returns an error for a line, then the shell shall report it as a BASIC error, store nothing, and continue as for any other line reporting an error (SHELL-INT-005, SHELL-SCRIPT-005).
+
+## Interrupts
+
+- [x] **SHELL-BREAK-001**: While the interpreter executes a line, when the process receives SIGINT (Ctrl-C), the shell shall call the interpreter's `Interrupt`.
+- [x] **SHELL-BREAK-002**: While the shell is not executing a line, it shall leave SIGINT's handling as it was when the shell started (by default, terminating the process).
 
 ## Line handling
 
@@ -77,6 +82,7 @@ Design: `shell-design.md`
 
 ## Error display
 
-- [x] **SHELL-ERR-001**: When the shell reports a BASIC error, it shall write to stderr `?`, the error's C64 name, two spaces, `ERROR`, then, if the error has `HasLine` set, ` IN ` and its line number, and a newline (such as `?SYNTAX  ERROR`, `?STRING TOO LONG  ERROR`, and `?SYNTAX  ERROR IN 20`).
+- [x] **SHELL-ERR-001**: When the shell reports a BASIC error other than BREAK, it shall write to stderr `?`, the error's C64 name, two spaces, `ERROR`, then, if the error has `HasLine` set, ` IN ` and its line number, and a newline (such as `?SYNTAX  ERROR`, `?STRING TOO LONG  ERROR`, and `?SYNTAX  ERROR IN 20`).
 - [x] **SHELL-ERR-002**: When the shell reports a BASIC error, it shall first call the interpreter's `FreshLine`, so that stdout gains a newline when program output left the line unfinished.
-- [x] **SHELL-ERR-003**: `basicerr.Error`'s `Error` method shall return the error kind's C64 name: `SYNTAX` for `Syntax`, `STRING TOO LONG` for `StringTooLong`, `TYPE MISMATCH` for `TypeMismatch`, `OVERFLOW` for `Overflow`, `DIVISION BY ZERO` for `DivisionByZero`, `ILLEGAL QUANTITY` for `IllegalQuantity`, and `UNDEF'D STATEMENT` for `UndefdStatement`.
+- [x] **SHELL-ERR-003**: `basicerr.Error`'s `Error` method shall return the error kind's C64 name: `SYNTAX` for `Syntax`, `STRING TOO LONG` for `StringTooLong`, `TYPE MISMATCH` for `TypeMismatch`, `OVERFLOW` for `Overflow`, `DIVISION BY ZERO` for `DivisionByZero`, `ILLEGAL QUANTITY` for `IllegalQuantity`, `UNDEF'D STATEMENT` for `UndefdStatement`, and `BREAK` for `Break`.
+- [x] **SHELL-ERR-004**: When the shell reports a BREAK error, it shall first call the interpreter's `FreshLine`, then write to stderr `BREAK`, then, if the error has `HasLine` set, ` IN ` and its line number, and a newline (such as `BREAK IN 20`).

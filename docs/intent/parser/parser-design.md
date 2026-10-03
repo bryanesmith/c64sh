@@ -156,6 +156,15 @@ type DefStmt struct {
     BodyErr     error
 }
 
+// FileArgs are the arguments of LOAD, SAVE, and VERIFY: the file name,
+// the device, and the secondary address, each nil when omitted.
+type FileArgs struct{ Name, Device, Secondary Expr }
+
+// LoadStmt, SaveStmt, and VerifyStmt are LOAD, SAVE, and VERIFY.
+type LoadStmt struct{ FileArgs }
+type SaveStmt struct{ FileArgs }
+type VerifyStmt struct{ FileArgs }
+
 // FnExpr is FN Name(Arg): a call of a user-defined function.
 type FnExpr struct {
     Name *VarRef
@@ -244,6 +253,10 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 
 `FN` is read where an operand is expected, followed by the function's name and a parenthesized argument: `FN SQ(3)` is an `FnExpr`. An integer name is a SYNTAX error; a missing `(` or `)` too.
 
+### LOAD, SAVE, VERIFY
+
+Each takes up to three arguments, separated by commas, as on a C64 (`$E1D4`): the file name, the device, and the secondary address, each an expression, so `SAVE "GAME",8` and `LOAD N$,D` are valid. Any may be omitted from the end: `LOAD` alone, `LOAD "GAME"`. A comma not followed by an expression, or anything after the arguments other than `:` or the end of the line, is a SYNTAX error in place of the statement. The types and ranges of the arguments are checked when the statement runs.
+
 ### Items side by side
 
 An expression ends at the first token that cannot continue it, and PRINT then reads the next item. A token that can start an expression but not continue one begins a new item: `PRINT 2(3)` prints two numbers, ` 2  3 `. A `-` or `+` after an operand always continues the expression as a binary operator, as on a C64: `PRINT 1 -1` prints ` 0 `, and `PRINT "A"-1` is `TYPE MISMATCH`.
@@ -257,7 +270,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
@@ -281,6 +294,10 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `GetStatement = get Variable { "," Variable } .` | `parseGetStatement` | `*ast.GetStmt` |
 | `DefStatement = def fn FunctionName "(" FunctionName ")" "=" Expression .` | `parseDefStatement` | `*ast.DefStmt` (body errors kept in `BodyErr`) |
 | `FunctionName = name .` | `parseFunctionName` | `*ast.VarRef` (not an integer name; may be followed by `(`) |
+| `LoadStatement = load FileArgs .` | `parseFileStatement` | `*ast.LoadStmt` |
+| `SaveStatement = save FileArgs .` | `parseFileStatement` | `*ast.SaveStmt` |
+| `VerifyStatement = verify FileArgs .` | `parseFileStatement` | `*ast.VerifyStmt` |
+| `FileArgs = [ Expression [ "," Expression [ "," Expression ] ] ] .` | `parseFileArgs` | `ast.FileArgs` |
 | `GotoStatement = ( goto \| go to ) LineNumber .` | `parseGotoStatement` | `*ast.GotoStmt` |
 | `LineNumber = [ number ] .` | `parseLineNumber` | `int`: the line number, 0 if there is none (see *Program commands*) |
 | `ListStatement = list .` | `parseCommand` | `*ast.ListStmt` |
@@ -289,7 +306,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
 | `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison \| fn FunctionName "(" Expression ")" .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 

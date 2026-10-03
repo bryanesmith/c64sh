@@ -46,6 +46,9 @@ var keywords = []struct {
 	{"GET", token.Get},
 	{"DEF", token.Def},
 	{"FN", token.Fn},
+	{"LOAD", token.Load},
+	{"SAVE", token.Save},
+	{"VERIFY", token.Verify},
 }
 
 // symbols maps single-character tokens to their kinds.
@@ -74,7 +77,7 @@ const upArrow = "\u2191"
 // @spec LEXER-001, LEXER-002, LEXER-003, LEXER-004, LEXER-005, LEXER-006, LEXER-007
 // @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013, LEXER-014
 // @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018, LEXER-019, LEXER-020, LEXER-021
-// @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025, LEXER-026, LEXER-030, LEXER-031, LEXER-032, LEXER-033, LEXER-034
+// @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025, LEXER-026, LEXER-030, LEXER-031, LEXER-032, LEXER-033, LEXER-034, LEXER-035
 func Lex(line string) []token.Token {
 	var toks []token.Token
 	emit := func(k token.Kind, value string, pos int) {
@@ -133,6 +136,9 @@ func Lex(line string) []token.Token {
 		// get   = "GET" .
 		// def   = "DEF" .
 		// fn    = "FN" .
+		// load  = "LOAD" .
+		// save  = "SAVE" .
+		// verify = "VERIFY" .
 		if text, kind, ok := matchKeyword(line[i:]); ok {
 			if kind == token.Rem {
 				// A comment runs to the end of the line, untokenized.

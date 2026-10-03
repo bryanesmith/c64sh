@@ -143,7 +143,7 @@ func firstDifference(got, want string) (int, string, string) {
 	}
 }
 
-// @spec SNAPSHOT-001, SNAPSHOT-008, SNAPSHOT-009
+// @spec SNAPSHOT-001, SNAPSHOT-008, SNAPSHOT-009, SNAPSHOT-010
 func TestExamples(t *testing.T) {
 	files := examples(t)
 	want := map[string]bool{}
@@ -153,7 +153,13 @@ func TestExamples(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			stdin, _ := os.ReadFile(filepath.Join(snapshotDir, name+".input")) // none: empty stdin
-			status := shell.Main([]string{filepath.Join(examplesDir, file)}, bytes.NewReader(stdin), &stdout, &stderr)
+			path, err := filepath.Abs(filepath.Join(examplesDir, file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			status := inTempDir(t, func() int {
+				return shell.Main([]string{path}, bytes.NewReader(stdin), &stdout, &stderr)
+			})
 			matchSnapshot(t, name, snapshotFile(name), format(status, stdout.String(), stderr.String()))
 		})
 	}
@@ -186,6 +192,26 @@ func TestExamples(t *testing.T) {
 			t.Errorf("input file %s has no example in examples/; delete it", path)
 		}
 	}
+}
+
+// inTempDir runs f with a new, empty temporary directory as the current
+// directory, so that files an example saves are discarded, and returns
+// what f returns.
+func inTempDir(t *testing.T, f func() int) int {
+	t.Helper()
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(old); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	return f()
 }
 
 // @spec SNAPSHOT-002

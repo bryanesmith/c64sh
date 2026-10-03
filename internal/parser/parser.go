@@ -28,6 +28,7 @@ import (
 // @spec PARSER-035, PARSER-036, PARSER-037, PARSER-038, PARSER-039, PARSER-040, PARSER-041
 // @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
 // @spec PARSER-048, PARSER-049, PARSER-050, PARSER-051, PARSER-052, PARSER-053, PARSER-054
+// @spec PARSER-055, PARSER-056
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -114,7 +115,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -167,6 +168,8 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 			return nil, err
 		}
 		return stmt, nil
+	case token.Load, token.Save, token.Verify:
+		return p.parseFileStatement()
 	case token.Def:
 		stmt, err := p.parseDefStatement()
 		if err != nil {
@@ -325,6 +328,49 @@ func (p *parser) parseVariableList() ([]*ast.VarRef, error) {
 		return nil, syntaxError()
 	}
 	return vars, nil
+}
+
+// LoadStatement   = load FileArgs .
+// SaveStatement   = save FileArgs .
+// VerifyStatement = verify FileArgs .
+func (p *parser) parseFileStatement() (ast.Stmt, error) {
+	kind := p.next().Kind
+	args, err := p.parseFileArgs()
+	if err != nil {
+		return nil, err
+	}
+	switch kind {
+	case token.Load:
+		return &ast.LoadStmt{FileArgs: args}, nil
+	case token.Save:
+		return &ast.SaveStmt{FileArgs: args}, nil
+	default:
+		return &ast.VerifyStmt{FileArgs: args}, nil
+	}
+}
+
+// FileArgs = [ Expression [ "," Expression [ "," Expression ] ] ] .
+//
+// The arguments must end the statement.
+func (p *parser) parseFileArgs() (ast.FileArgs, error) {
+	var a ast.FileArgs
+	slots := []*ast.Expr{&a.Name, &a.Device, &a.Secondary}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		for i, slot := range slots {
+			e, err := p.parseExpression()
+			if err != nil {
+				return a, err
+			}
+			*slot = e
+			if i == len(slots)-1 || !p.accept(token.Comma) {
+				break
+			}
+		}
+	}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return a, syntaxError()
+	}
+	return a, nil
 }
 
 // DefStatement = def fn FunctionName "(" FunctionName ")" "=" Expression .

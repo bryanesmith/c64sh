@@ -130,6 +130,14 @@ Lines are read from `FILE`, or from stdin when there is no `FILE`.
 
 Stopping at the first error matches a C64 running a program, which halts at the failing line, and prevents later lines from running on the assumption that earlier ones succeeded.
 
+## Program Files
+
+The shell gives the interpreter storage for `LOAD`, `SAVE`, and `VERIFY` that reads and writes files in the **current directory** (names are relative paths). A file it creates gets permissions `0644`. `WriteFile` with `replace` false creates the file only if it does not exist, so another process cannot slip a file in between a check and the write.
+
+In interactive mode the shell also gives the interpreter stderr for the C64's tape and disk messages (`SAVING HELLO`, `LOADING`), so they appear beside `READY.` and stay out of redirected stdout. In script mode there are no messages.
+
+A `StorageError` from executing a line is reported as `c64sh: ` and the file, then: for a disk file that may not be replaced, `file exists (use SAVE "@0:NAME" to replace it)`, with the name the program used without any `0:`; otherwise the reason. In interactive mode the shell then writes `READY.` and continues; in script mode it stops with exit status 1, like a BASIC error.
+
 ## Keyboard Input
 
 The shell gives the interpreter a console (`interp.Console`) for `INPUT` and `GET`. Both read **stdin**, whatever the mode:
@@ -187,6 +195,12 @@ const (
     ReturnWithoutGosub        // RETURN WITHOUT GOSUB
     IllegalDirect             // ILLEGAL DIRECT
     UndefdFunction            // UNDEF'D FUNCTION
+    FileNotFound              // FILE NOT FOUND
+    DeviceNotPresent          // DEVICE NOT PRESENT
+    IllegalDeviceNumber       // ILLEGAL DEVICE NUMBER
+    MissingFileName           // MISSING FILE NAME
+    Load                      // LOAD
+    Verify                    // VERIFY
     Break                     // BREAK: execution stopped by Ctrl-C
 )
 

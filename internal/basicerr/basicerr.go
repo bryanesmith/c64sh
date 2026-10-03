@@ -6,36 +6,48 @@ package basicerr
 type Kind int
 
 const (
-	Syntax             Kind = iota // SYNTAX
-	StringTooLong                  // STRING TOO LONG
-	TypeMismatch                   // TYPE MISMATCH
-	Overflow                       // OVERFLOW
-	DivisionByZero                 // DIVISION BY ZERO
-	IllegalQuantity                // ILLEGAL QUANTITY
-	UndefdStatement                // UNDEF'D STATEMENT
-	Break                          // BREAK: execution stopped by Ctrl-C
-	NextWithoutFor                 // NEXT WITHOUT FOR
-	OutOfMemory                    // OUT OF MEMORY
-	ReturnWithoutGosub             // RETURN WITHOUT GOSUB
-	IllegalDirect                  // ILLEGAL DIRECT
-	UndefdFunction                 // UNDEF'D FUNCTION
+	Syntax              Kind = iota // SYNTAX
+	StringTooLong                   // STRING TOO LONG
+	TypeMismatch                    // TYPE MISMATCH
+	Overflow                        // OVERFLOW
+	DivisionByZero                  // DIVISION BY ZERO
+	IllegalQuantity                 // ILLEGAL QUANTITY
+	UndefdStatement                 // UNDEF'D STATEMENT
+	Break                           // BREAK: execution stopped by Ctrl-C
+	NextWithoutFor                  // NEXT WITHOUT FOR
+	OutOfMemory                     // OUT OF MEMORY
+	ReturnWithoutGosub              // RETURN WITHOUT GOSUB
+	IllegalDirect                   // ILLEGAL DIRECT
+	UndefdFunction                  // UNDEF'D FUNCTION
+	FileNotFound                    // FILE NOT FOUND
+	DeviceNotPresent                // DEVICE NOT PRESENT
+	IllegalDeviceNumber             // ILLEGAL DEVICE NUMBER
+	MissingFileName                 // MISSING FILE NAME
+	Load                            // LOAD
+	Verify                          // VERIFY
 )
 
 // names holds each kind's name as the C64 prints it.
 var names = [...]string{
-	Syntax:             "SYNTAX",
-	StringTooLong:      "STRING TOO LONG",
-	TypeMismatch:       "TYPE MISMATCH",
-	Overflow:           "OVERFLOW",
-	DivisionByZero:     "DIVISION BY ZERO",
-	IllegalQuantity:    "ILLEGAL QUANTITY",
-	UndefdStatement:    "UNDEF'D STATEMENT",
-	Break:              "BREAK",
-	NextWithoutFor:     "NEXT WITHOUT FOR",
-	OutOfMemory:        "OUT OF MEMORY",
-	ReturnWithoutGosub: "RETURN WITHOUT GOSUB",
-	IllegalDirect:      "ILLEGAL DIRECT",
-	UndefdFunction:     "UNDEF'D FUNCTION",
+	Syntax:              "SYNTAX",
+	StringTooLong:       "STRING TOO LONG",
+	TypeMismatch:        "TYPE MISMATCH",
+	Overflow:            "OVERFLOW",
+	DivisionByZero:      "DIVISION BY ZERO",
+	IllegalQuantity:     "ILLEGAL QUANTITY",
+	UndefdStatement:     "UNDEF'D STATEMENT",
+	Break:               "BREAK",
+	NextWithoutFor:      "NEXT WITHOUT FOR",
+	OutOfMemory:         "OUT OF MEMORY",
+	ReturnWithoutGosub:  "RETURN WITHOUT GOSUB",
+	IllegalDirect:       "ILLEGAL DIRECT",
+	UndefdFunction:      "UNDEF'D FUNCTION",
+	FileNotFound:        "FILE NOT FOUND",
+	DeviceNotPresent:    "DEVICE NOT PRESENT",
+	IllegalDeviceNumber: "ILLEGAL DEVICE NUMBER",
+	MissingFileName:     "MISSING FILE NAME",
+	Load:                "LOAD",
+	Verify:              "VERIFY",
 }
 
 // Error is a BASIC error.

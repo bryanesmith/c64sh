@@ -23,17 +23,19 @@ const zoneWidth = 10
 
 // Interp executes lines, writing program output to its writer.
 type Interp struct {
-	out     io.Writer
-	column  int                     // cursor column: characters written since the last newline
-	vars    map[string]value        // variables, by identity (ast.VarRef.Name)
-	program []progLine              // stored lines, in ascending order of number
-	ran     bool                    // whether RUN or GOTO has been executed
-	direct  *ast.Line               // the line Exec is running, in direct mode
-	stack   []frame                 // the control stack: FOR and GOSUB entries
-	cur     pos                     // the position of the statement executing
-	console Console                 // where INPUT and GET read
-	fns     map[string]*ast.DefStmt // user-defined functions, by name identity
-	calls   int                     // user-defined function calls in progress
+	out      io.Writer
+	column   int                     // cursor column: characters written since the last newline
+	vars     map[string]value        // variables, by identity (ast.VarRef.Name)
+	program  []progLine              // stored lines, in ascending order of number
+	ran      bool                    // whether RUN or GOTO has been executed
+	direct   *ast.Line               // the line Exec is running, in direct mode
+	stack    []frame                 // the control stack: FOR and GOSUB entries
+	cur      pos                     // the position of the statement executing
+	console  Console                 // where INPUT and GET read
+	fns      map[string]*ast.DefStmt // user-defined functions, by name identity
+	calls    int                     // user-defined function calls in progress
+	storage  Storage                 // where LOAD, SAVE, and VERIFY find files
+	messages io.Writer               // where tape and disk messages go; nil for none
 
 	interrupted atomic.Bool // set by Interrupt, checked after each statement
 }
@@ -158,6 +160,12 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execGet(s)
 	case *ast.DefStmt:
 		return in.execDef(s)
+	case *ast.LoadStmt:
+		return in.execLoad(s)
+	case *ast.SaveStmt:
+		return in.execSave(s)
+	case *ast.VerifyStmt:
+		return in.execVerify(s)
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:

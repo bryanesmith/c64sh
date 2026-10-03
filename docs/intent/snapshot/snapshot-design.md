@@ -123,6 +123,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `019-keyboard-input.bas` | `INPUT` with and without a prompt, several values, `?? `, `?REDO FROM START`, `?EXTRA IGNORED`, quoted strings, a `GET` wait loop, and `?ILLEGAL DIRECT  ERROR`; its answers come from `019-keyboard-input.input` |
 | `020-user-functions.bas` | `DEF FN` and `FN`, the protected parameter, bodies using other variables and functions, two-character names separate from variables, and a body mistake reported at the call (`?SYNTAX  ERROR IN 120`) |
 | `021-saving-programs.bas` | `SAVE`, `LOAD`, and `VERIFY` on tape and disk, `LOAD` chaining a running program with its variables, names with and without an extension, replacing on tape and with `@0:` on disk, and the disk's refusal to replace a file |
+| `022-data-files.bas` | `OPEN`, `PRINT#`, and `CLOSE` writing a disk file, an `INPUT#` loop ended by `ST`, `GET#`, `CMD`, the printer, appending with `,S,A`, and `?FILE NOT FOUND  ERROR` opening a missing file |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

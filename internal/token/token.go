@@ -53,6 +53,12 @@ const (
 	Load                  // LOAD
 	Save                  // SAVE
 	Verify                // VERIFY
+	PrintFile             // PRINT#
+	InputFile             // INPUT#
+	Open                  // OPEN
+	Close                 // CLOSE
+	Cmd                   // CMD
+	Hash                  // #
 )
 
 var kindNames = [...]string{
@@ -101,6 +107,12 @@ var kindNames = [...]string{
 	Load:      "Load",
 	Save:      "Save",
 	Verify:    "Verify",
+	PrintFile: "PrintFile",
+	InputFile: "InputFile",
+	Open:      "Open",
+	Close:     "Close",
+	Cmd:       "Cmd",
+	Hash:      "Hash",
 }
 
 func (k Kind) String() string {

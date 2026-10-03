@@ -53,6 +53,12 @@ var (
 	load  = token.Token{Kind: token.Load, Value: "LOAD"}
 	save  = token.Token{Kind: token.Save, Value: "SAVE"}
 	verif = token.Token{Kind: token.Verify, Value: "VERIFY"}
+	prf   = token.Token{Kind: token.PrintFile, Value: "PRINT#"}
+	inf   = token.Token{Kind: token.InputFile, Value: "INPUT#"}
+	openk = token.Token{Kind: token.Open, Value: "OPEN"}
+	close = token.Token{Kind: token.Close, Value: "CLOSE"}
+	cmdk  = token.Token{Kind: token.Cmd, Value: "CMD"}
+	hash  = token.Token{Kind: token.Hash, Value: "#"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -86,11 +92,23 @@ func dump(l *ast.Line) string {
 func dumpStmt(s ast.Stmt) string {
 	switch s := s.(type) {
 	case *ast.PrintStmt:
-		var items []string
-		for _, it := range s.Items {
-			items = append(items, dumpItem(it))
+		prefix := "PRINT["
+		if s.File != nil {
+			prefix = "PRINT#" + dumpExpr(s.File) + "["
 		}
-		return "PRINT[" + strings.Join(items, " ") + "]"
+		return prefix + dumpItems(s.Items) + "]"
+	case *ast.CmdStmt:
+		return "CMD " + dumpExpr(s.File) + "[" + dumpItems(s.Items) + "]"
+	case *ast.OpenStmt:
+		out := "OPEN"
+		for _, e := range []ast.Expr{s.File, s.Device, s.Secondary, s.Name} {
+			if e != nil {
+				out += " " + dumpExpr(e)
+			}
+		}
+		return out
+	case *ast.CloseStmt:
+		return "CLOSE " + dumpExpr(s.File)
 	case *ast.RemStmt:
 		return "REM(" + strconv.Quote(s.Text) + ")"
 	case *ast.LetStmt:
@@ -122,11 +140,17 @@ func dumpStmt(s ast.Stmt) string {
 		return "RETURN"
 	case *ast.InputStmt:
 		out := "INPUT "
+		if s.File != nil {
+			out = "INPUT#" + dumpExpr(s.File) + " "
+		}
 		if s.HasPrompt {
 			out += strconv.Quote(s.Prompt) + ";"
 		}
 		return out + dumpVars(s.Vars)
 	case *ast.GetStmt:
+		if s.File != nil {
+			return "GET#" + dumpExpr(s.File) + " " + dumpVars(s.Vars)
+		}
 		return "GET " + dumpVars(s.Vars)
 	case *ast.DefStmt:
 		out := "DEF FN " + dumpExpr(s.Name) + "(" + dumpExpr(s.Param) + ")="
@@ -502,7 +526,7 @@ func TestUnsupportedNames(t *testing.T) {
 		{"TI used", toks(pr, name("TI")), `PRINT[BAD(SYNTAX)]`, true},
 		{"TIME used", toks(pr, name("TIME")), `PRINT[BAD(SYNTAX)]`, true},
 		{"TI$ used", toks(pr, name("TI$")), `PRINT[BAD(SYNTAX)]`, true},
-		{"ST used", toks(pr, name("STATUS")), `PRINT[BAD(SYNTAX)]`, true},
+		{"ST is readable", toks(pr, name("STATUS")), `PRINT[$ST[STATUS]]`, false},
 		{"TI assigned", toks(name("TI"), eq, number("1")), `BADSTMT`, true},
 		{"array element", toks(pr, name("A"), lp, number("1"), rp), `PRINT[BAD(SYNTAX)]`, true},
 		{"function call", toks(pr, name("CHR$"), lp, number("65"), rp), `PRINT[BAD(SYNTAX)]`, true},
@@ -891,5 +915,79 @@ func TestFileStatementErrors(t *testing.T) {
 		{"four arguments", toks(load, str("X"), comma, number("8"), comma, number("1"), comma, number("2")), `BADSTMT`, true},
 		{"junk", toks(save, str("X"), str("Y")), `BADSTMT`, true},
 		{"comma first", toks(load, comma, number("8")), `BADSTMT`, true},
+	})
+}
+func dumpItems(items []ast.PrintItem) string {
+	var out []string
+	for _, it := range items {
+		out = append(out, dumpItem(it))
+	}
+	return strings.Join(out, " ")
+}
+
+// @spec PARSER-057
+func TestOpen(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"file only", toks(openk, number("1")), `OPEN #1`, false},
+		{"all four", toks(openk, number("2"), comma, number("8"), comma, number("2"), comma, str("F,S,W")), `OPEN #2 #8 #2 "F,S,W"`, false},
+	})
+}
+
+// @spec PARSER-058
+func TestClose(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"CLOSE", toks(close, number("2")), `CLOSE #2`, false},
+		{"no file", toks(close), `BADSTMT`, true},
+		{"two files", toks(close, number("2"), comma, number("3")), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-059
+func TestPrintFileAndCmd(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"PRINT# alone", toks(prf, number("1")), `PRINT##1[]`, false},
+		{"PRINT# items", toks(prf, number("1"), comma, str("A"), semi, name("B")), `PRINT##1["A" ; $B[B]]`, false},
+		{"PRINT# comma then nothing", toks(prf, number("1"), comma), `PRINT##1[]`, false},
+		{"CMD alone", toks(cmdk, number("4")), `CMD #4[]`, false},
+		{"CMD items", toks(cmdk, number("4"), comma, str("X")), `CMD #4["X"]`, false},
+	})
+}
+
+// @spec PARSER-060
+func TestInputFile(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"INPUT#", toks(inf, number("2"), comma, name("A$"), comma, name("B")), `INPUT##2 $A$[A$],$B[B]`, false},
+	})
+}
+
+// @spec PARSER-061
+func TestGetFile(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"GET#", toks(getk, hash, number("2"), comma, name("A$")), `GET##2 $A$[A$]`, false},
+	})
+}
+
+// @spec PARSER-062
+func TestDataFileSyntaxErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"OPEN alone", toks(openk), `BADSTMT`, true},
+		{"OPEN five", toks(openk, number("1"), comma, number("2"), comma, number("3"), comma, str("N"), comma, number("5")), `BADSTMT`, true},
+		{"PRINT# no comma", toks(prf, number("1"), str("A")), `BADSTMT`, true},
+		{"PRINT# no file", toks(prf), `BADSTMT`, true},
+		{"PRINT space hash", toks(pr, hash, number("1")), `PRINT[BAD(SYNTAX)]`, true},
+		{"INPUT# no comma", toks(inf, number("1"), name("A")), `BADSTMT`, true},
+		{"INPUT# no variable", toks(inf, number("1"), comma), `BADSTMT`, true},
+		{"GET# no comma", toks(getk, hash, number("1"), name("A$")), `BADSTMT`, true},
+		{"CMD no file", toks(cmdk), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-063, PARSER-024
+func TestStatusVariable(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"read ST", toks(pr, name("ST")), `PRINT[$ST[ST]]`, false},
+		{"assign ST", toks(name("ST"), eq, number("1")), `BADSTMT`, true},
+		{"LET ST", toks(let, name("STATUS"), eq, number("1")), `BADSTMT`, true},
+		{"TI still reserved", toks(pr, name("TI")), `PRINT[BAD(SYNTAX)]`, true},
 	})
 }

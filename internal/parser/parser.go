@@ -29,6 +29,7 @@ import (
 // @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
 // @spec PARSER-048, PARSER-049, PARSER-050, PARSER-051, PARSER-052, PARSER-053, PARSER-054
 // @spec PARSER-055, PARSER-056
+// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -115,7 +116,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -170,6 +171,14 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return stmt, nil
 	case token.Load, token.Save, token.Verify:
 		return p.parseFileStatement()
+	case token.Open:
+		return p.parseOpenStatement()
+	case token.Close:
+		return p.parseCloseStatement()
+	case token.PrintFile, token.Cmd:
+		return p.parseFilePrint()
+	case token.InputFile:
+		return p.parseInputFileStatement()
 	case token.Def:
 		stmt, err := p.parseDefStatement()
 		if err != nil {
@@ -223,7 +232,7 @@ func (p *parser) parseForStatement() (*ast.ForStmt, error) {
 	if p.peek() != token.Name {
 		return nil, syntaxError()
 	}
-	v, err := p.parseVariable()
+	v, err := p.parseAssignable()
 	if err != nil {
 		return nil, err
 	}
@@ -297,14 +306,26 @@ func (p *parser) parseInputStatement() (*ast.InputStmt, error) {
 	return s, nil
 }
 
-// GetStatement = get Variable { "," Variable } .
+// GetStatement = get [ "#" Expression "," ] Variable { "," Variable } .
 func (p *parser) parseGetStatement() (*ast.GetStmt, error) {
 	p.next() // GET
+	s := &ast.GetStmt{}
+	if p.accept(token.Hash) {
+		file, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+		if !p.accept(token.Comma) {
+			return nil, syntaxError()
+		}
+		s.File = file
+	}
 	vars, err := p.parseVariableList()
 	if err != nil {
 		return nil, err
 	}
-	return &ast.GetStmt{Vars: vars}, nil
+	s.Vars = vars
+	return s, nil
 }
 
 // parseVariableList parses Variable { "," Variable }, which must end the
@@ -315,7 +336,7 @@ func (p *parser) parseVariableList() ([]*ast.VarRef, error) {
 		if p.peek() != token.Name {
 			return nil, syntaxError()
 		}
-		v, err := p.parseVariable()
+		v, err := p.parseAssignable()
 		if err != nil {
 			return nil, err
 		}
@@ -507,7 +528,7 @@ func (p *parser) parseLetStatement() (*ast.LetStmt, error) {
 	if p.peek() != token.Name {
 		return nil, syntaxError()
 	}
-	v, err := p.parseVariable()
+	v, err := p.parseAssignable()
 	if err != nil {
 		return nil, err
 	}
@@ -523,18 +544,28 @@ func (p *parser) parseLetStatement() (*ast.LetStmt, error) {
 
 // Variable = name .
 //
-// The C64's system variables (TI, TI$, ST), and a name followed by "(" (an
-// array element or function call), are not supported and are SYNTAX errors.
+// The C64's clock (TI, TI$), and a name followed by "(" (an array element
+// or function call), are not supported and are SYNTAX errors.
 func (p *parser) parseVariable() (*ast.VarRef, error) {
 	text := p.next().Value
 	v := &ast.VarRef{Name: variableIdentity(text), Text: text}
 	switch {
-	case v.Name == "TI" || v.Name == "TI$" || v.Name == "ST":
+	case v.Name == "TI" || v.Name == "TI$":
 		return nil, syntaxError()
 	case p.peek() == token.LParen:
 		return nil, syntaxError()
 	}
 	return v, nil
+}
+
+// parseAssignable parses a variable that is assigned to, which cannot be
+// ST, the read-only I/O status.
+func (p *parser) parseAssignable() (*ast.VarRef, error) {
+	v, err := p.parseVariable()
+	if err == nil && v.Name == "ST" {
+		return nil, syntaxError()
+	}
+	return v, err
 }
 
 // variableIdentity returns the part of a variable name that identifies the
@@ -565,15 +596,95 @@ func (p *parser) parseRemStatement() (*ast.RemStmt, error) {
 func (p *parser) parsePrintStatement() (*ast.PrintStmt, error) {
 	p.next() // print
 	stmt := &ast.PrintStmt{}
+	var err error
+	stmt.Items, err = p.parsePrintItems()
+	return stmt, err
+}
+
+// parsePrintItems parses print items up to the end of the statement. If an
+// item fails, the items end with a BadItem holding the error.
+func (p *parser) parsePrintItems() ([]ast.PrintItem, error) {
+	var items []ast.PrintItem
 	for k := p.peek(); k != token.Colon && k != token.EOL; k = p.peek() {
 		item, err := p.parsePrintItem()
 		if err != nil {
-			stmt.Items = append(stmt.Items, &ast.BadItem{Err: err})
-			return stmt, err
+			return append(items, &ast.BadItem{Err: err}), err
 		}
-		stmt.Items = append(stmt.Items, item)
+		items = append(items, item)
 	}
-	return stmt, nil
+	return items, nil
+}
+
+// PrintFileStatement = printfile Expression [ "," { PrintItem } ] .
+// CmdStatement       = cmd Expression [ "," { PrintItem } ] .
+//
+// Without a comma after the file number, the statement must end ($AA86).
+func (p *parser) parseFilePrint() (ast.Stmt, error) {
+	kind := p.next().Kind
+	file, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+	var items []ast.PrintItem
+	if p.accept(token.Comma) {
+		items, err = p.parsePrintItems()
+	} else if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	if kind == token.Cmd {
+		return &ast.CmdStmt{File: file, Items: items}, err
+	}
+	return &ast.PrintStmt{File: file, Items: items}, err
+}
+
+// OpenStatement = open Expression [ "," Expression [ "," Expression [ "," Expression ] ] ] .
+func (p *parser) parseOpenStatement() (ast.Stmt, error) {
+	p.next() // OPEN
+	s := &ast.OpenStmt{}
+	for i, slot := range []*ast.Expr{&s.File, &s.Device, &s.Secondary, &s.Name} {
+		e, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+		*slot = e
+		if i == 3 || !p.accept(token.Comma) {
+			break
+		}
+	}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return s, nil
+}
+
+// CloseStatement = close Expression .
+func (p *parser) parseCloseStatement() (ast.Stmt, error) {
+	p.next() // CLOSE
+	file, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return &ast.CloseStmt{File: file}, nil
+}
+
+// InputFileStatement = inputfile Expression "," Variable { "," Variable } .
+func (p *parser) parseInputFileStatement() (ast.Stmt, error) {
+	p.next() // INPUT#
+	file, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+	if !p.accept(token.Comma) {
+		return nil, syntaxError()
+	}
+	vars, err := p.parseVariableList()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.InputStmt{File: file, Vars: vars}, nil
 }
 
 // PrintItem = Expression | ";" | "," .

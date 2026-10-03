@@ -124,7 +124,7 @@ func (in *Interp) execList() error {
 		buf.WriteString("\n" + strconv.Itoa(l.number) + " " + listText(l.text))
 	}
 	buf.WriteString("\n")
-	if err := in.write(buf.String()); err != nil {
+	if err := in.emit(in.cmdFile(), buf.String()); err != nil {
 		return err
 	}
 	return errEnd

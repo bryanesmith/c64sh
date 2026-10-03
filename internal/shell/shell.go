@@ -88,7 +88,7 @@ func isTerminal(r io.Reader) bool {
 // Interactive selects the behavior; File, or stdin when File is empty,
 // selects the input.
 //
-// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002
+// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004
 func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	input, name := stdin, "stdin"
 	if cfg.File != "" {
@@ -116,7 +116,15 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 		tty := stdin.(*os.File)
 		lines = newEditorReader(tty, stderr, terminalRawMode(tty), terminalSize(tty), cfg.HistoryFile, stderr)
 	}
-	return s.run(lines, name)
+	status := s.run(lines, name)
+	// Data files a program left open are written now.
+	if se, ok := errors.AsType[*interp.StorageError](s.interp.CloseFiles()); ok {
+		s.reportStorage(se)
+		if status == 0 {
+			status = 1
+		}
+	}
+	return status
 }
 
 // inputError reports that the named input could not be read.
@@ -296,14 +304,7 @@ func (s *session) reportStorage(err *interp.StorageError) {
 		reason = pathErr.Err.Error()
 	}
 	if errors.Is(err.Err, fs.ErrExist) {
-		name := err.Name
-		for _, prefix := range []string{"@0:", "@:", "0:"} {
-			if rest, ok := strings.CutPrefix(name, prefix); ok {
-				name = rest
-				break
-			}
-		}
-		reason = fmt.Sprintf("file exists (use SAVE \"@0:%s\" to replace it)", name)
+		reason = fmt.Sprintf("file exists (use %s to replace it)", err.Replace)
 	}
 	fmt.Fprintf(s.stderr, "c64sh: %s: %s\n", err.File, reason)
 }

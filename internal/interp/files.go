@@ -27,9 +27,9 @@ type Storage interface {
 // or write a file. It is not a BASIC error: a C64 reports these only
 // through the disk drive's light and error channel.
 type StorageError struct {
-	File string // the file's name in storage, such as HELLO.bas
-	Name string // the name the program used, such as @0:HELLO
-	Err  error  // fs.ErrExist for a disk file that may not be replaced
+	File    string // the file's name in storage, such as HELLO.bas
+	Err     error  // fs.ErrExist for a disk file that may not be replaced
+	Replace string // for fs.ErrExist: what to write to replace the file, such as SAVE "@0:HELLO"
 }
 
 func (e *StorageError) Error() string { return e.File + ": " + e.Err.Error() }
@@ -158,7 +158,11 @@ func (in *Interp) execSave(s *ast.SaveStmt) error {
 		b.WriteString(strconv.Itoa(l.number) + " " + l.text + "\n")
 	}
 	if err := in.storage.WriteFile(t.file(), []byte(b.String()), t.replace); err != nil {
-		return &StorageError{File: t.file(), Name: t.name, Err: err}
+		se := &StorageError{File: t.file(), Err: err}
+		if errors.Is(err, fs.ErrExist) {
+			se.Replace = `SAVE "@0:` + t.base + `"`
+		}
+		return se
 	}
 	return nil
 }
@@ -188,7 +192,7 @@ func (in *Interp) readProgram(t target, action string) ([]progLine, error) {
 			break
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
-			return nil, &StorageError{File: name, Name: t.name, Err: err}
+			return nil, &StorageError{File: name, Err: err}
 		}
 	}
 	if err != nil {

@@ -95,10 +95,14 @@ func (in *Interp) SetMessages(w io.Writer)
 // or write a file. It is not a BASIC error: a C64 reports these only
 // through the disk drive's light and error channel.
 type StorageError struct {
-    File string // the file's name in storage, such as HELLO.bas
-    Name string // the name the program used, such as @0:HELLO
-    Err  error  // fs.ErrExist for a disk file that may not be replaced
+    File    string // the file's name in storage, such as HELLO.bas
+    Err     error  // fs.ErrExist for a disk file that may not be replaced
+    Replace string // for fs.ErrExist: what to write to replace the file, such as SAVE "@0:HELLO"
 }
+
+// CloseFiles closes every open data file, writing those opened for
+// output to storage, and returns the first StorageError, if any.
+func (in *Interp) CloseFiles() error
 
 // Column returns the cursor column: the number of characters written
 // since the last newline. It is 0 at the start of a line.
@@ -140,7 +144,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
     case *ast.RunStmt, *ast.GotoStmt, *ast.ListStmt, *ast.NewStmt, *ast.EndStmt,
         *ast.ForStmt, *ast.NextStmt, *ast.GosubStmt, *ast.ReturnStmt,
         *ast.InputStmt, *ast.GetStmt, *ast.DefStmt,
-        *ast.LoadStmt, *ast.SaveStmt, *ast.VerifyStmt:
+        *ast.LoadStmt, *ast.SaveStmt, *ast.VerifyStmt,
+        *ast.OpenStmt, *ast.CloseStmt, *ast.CmdStmt:
         … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
@@ -315,7 +320,7 @@ For a disk drive, a leading `@0:` or `@:` means "replace the file if it exists",
 
 ### SAVE
 
-`SAVE` writes the program as text: the line `#!/usr/bin/env c64sh`, then each line, in order, as its number, a space, and its text exactly as stored, each ending in `\n`. Saving an empty program writes just the first line. On tape, an existing file is replaced. On a disk drive, it is replaced only with `@0:`; otherwise nothing is written and `Exec` returns a `StorageError` with `fs.ErrExist`, the 1541's `63, FILE EXISTS`, which a C64 shows only by blinking the drive's light. Any other storage failure is also a `StorageError`.
+`SAVE` writes the program as text: the line `#!/usr/bin/env c64sh`, then each line, in order, as its number, a space, and its text exactly as stored, each ending in `\n`. Saving an empty program writes just the first line. On tape, an existing file is replaced. On a disk drive, it is replaced only with `@0:`; otherwise nothing is written and `Exec` returns a `StorageError` with `fs.ErrExist`, the 1541's `63, FILE EXISTS`, which a C64 shows only by blinking the drive's light, and `Replace` set to `SAVE "@0:NAME"`, `NAME` being the name without any `0:`. Any other storage failure is also a `StorageError`.
 
 ### LOAD
 
@@ -339,6 +344,51 @@ When a writer is set with `SetMessages` and the statement runs in direct mode, t
 | `VERIFY` | as `LOAD`, with `VERIFYING` for `LOADING`, then `OK` if it matches | `SEARCHING FOR NAME`, `VERIFYING`, then `OK` if it matches |
 
 When the file is not found, the messages stop after `SEARCHING FOR NAME`. A tape never needs a key pressed: c64sh writes `PRESS PLAY ON TAPE` and carries on.
+
+## Data files
+
+`OPEN`, `CLOSE`, `PRINT#`, `INPUT#`, `GET#`, and `CMD` work with **logical files**, numbered 1 to 255, which the interpreter keeps in a table, as the C64's Kernal does.
+
+### OPEN
+
+`OPEN F, D, S, "NAME"` evaluates the file number, device (1 if omitted), and secondary address (0 if omitted) as numbers from 0 to 255, and the name as a string (empty if omitted), then follows the Kernal (`$F34A`):
+
+1. If `F` is 0, fail with `NOT INPUT FILE` (the Kernal's error for it). If `F` is open, fail with `FILE OPEN`. If 10 files are open, fail with `TOO MANY FILES`.
+2. Open by device:
+
+| Device | File |
+|---|---|
+| 0, the keyboard | Input only, read from the console as `INPUT` and `GET` read it. |
+| 3, the screen; 4 and 5, printers | Output only, written to the program output (stdout), as `PRINT` writes. |
+| 1, tape | A file in storage: read when the secondary address is 0, written (replacing any file) when it is 1 or 2. |
+| 8 to 11, disk drives | A file in storage, by the secondary address: 0 reads, 1 writes; 2 to 14 take the mode from the name, `NAME,S,W` (write) or `NAME,P,W`, `NAME,S,A` (append), or `NAME,S,R` and plain `NAME` (read); 15, the drive's command channel, is `DEVICE NOT PRESENT` (not supported yet). |
+| any other | `DEVICE NOT PRESENT`, as is any storage device when no storage is set. |
+
+For a storage file, the name is required (`MISSING FILE NAME`), and for a disk drive a leading `@0:`, `@:`, or `0:` means what it means for `SAVE`. The file in storage is the name before the first comma, as given: data files get no `.bas`. A file opened to read, or to append, must exist (`FILE NOT FOUND`; a C64's tape reports this, and c64sh reports it for disk files too, rather than through the drive's error channel). A disk file opened to write that exists, without `@0:`, is a `StorageError` with `fs.ErrExist` and `Replace` set to `"@0:NAME,S,W"`. A file opened to read is read whole when opened; one opened to write or append collects its output, which is written to storage when the file is closed.
+
+### CLOSE
+
+`CLOSE F` closes file `F`, writing an output file to storage (a `StorageError` if that fails); closing a file that is not open does nothing, as on a C64. If `CMD` was sending output to `F`, output returns to the screen. Clearing the variables (`RUN`, `NEW`, storing a line, `LOAD` in direct mode) closes every file the same way, as the C64's `CLR` closes them (`$A660`), without reporting a storage failure, since nothing is there to report it to; `CloseFiles`, which the shell calls when it ends, closes them too and returns the first failure.
+
+### PRINT# and CMD
+
+`PRINT# F, items` writes the items to file `F` exactly as `PRINT` writes them to the screen, ending with a newline unless the items end with `;` or `,` (a lone `PRINT#F` writes just a newline). The file must be open (`FILE NOT OPEN`) and not input-only (`NOT OUTPUT FILE`). Line ends are written as `\n`, the Unix convention, where a C64 writes a carriage return.
+
+A comma in `PRINT#` moves to the next print zone **of the screen's cursor column**, as on a C64, whose `PRINT` asks the screen for the cursor position even when writing to a file (`$AAE8`): since file output does not move the screen's cursor, a comma usually writes 10 spaces.
+
+`CMD F, items` checks the file as `PRINT#` does, writes the items in the same way, and then leaves the file as the destination of all output that would go to the screen through `PRINT` and `LIST`, until `PRINT#`, `INPUT#`, or `GET#` runs (each returns output to the screen when it finishes, as the ROM does, `$ABB5`), the file is closed, or an error stops execution. `CMD F` with no items writes a newline, as on a C64. Output to the screen, printer, or `CMD` file through the screen keeps the cursor column; output to a storage file does not change it.
+
+### INPUT# and GET#
+
+`INPUT# F, vars` reads values from file `F` as `INPUT` reads them, with these differences, as in the ROM (`$ABA5`): there is no prompt and nothing is echoed; empty lines before the first value are skipped; when a line runs out and variables remain, the next line supplies them without `?? `; a number that cannot be read is `FILE DATA` instead of `?REDO FROM START`; values left over are ignored without `?EXTRA IGNORED`. If the file ends before a value is read, the statement ends, leaving the remaining variables unchanged. A line ends at `\n`, `\r\n`, or `\r`. `INPUT#` works in direct mode.
+
+`GET# F, vars` reads one character per variable as `GET` reads a key: the empty string when the file has none left; a line end is `CHR$(13)`. Like `GET`, it is `ILLEGAL DIRECT` in direct mode.
+
+For both, the file must be open (`FILE NOT OPEN`) and not output-only (`NOT INPUT FILE`). From the keyboard (device 0), they read the console, as `INPUT` (without its prompt) and `GET` do.
+
+### ST
+
+`ST` is the status of the last `OPEN`, `PRINT#`, `CMD`, `INPUT#`, or `GET#`: 64 after a read that reached the end of a file (its last character was read, or there was nothing left to read), and 0 otherwise. It starts at 0.
 
 ## Keyboard input
 
@@ -466,8 +516,14 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `NEXT WITHOUT FOR` | `NEXT` with no matching `FOR` entry above the topmost non-`FOR` entry of the control stack. |
 | `OUT OF MEMORY` | A `FOR` or `GOSUB` with no room left on the C64's stack (see *Control stack*), or a 10th function call in progress. |
 | `ILLEGAL DIRECT` | `INPUT`, `GET`, or `DEF` in direct mode. |
-| `FILE NOT FOUND` | `LOAD` or `VERIFY` with no such file. |
-| `DEVICE NOT PRESENT` | `LOAD`, `SAVE`, or `VERIFY` with a device that is not storage, a keyboard, a screen, or a printer, or with no storage set. |
+| `FILE NOT FOUND` | `LOAD`, `VERIFY`, or an `OPEN` to read or append, with no such file. |
+| `FILE OPEN` | `OPEN` of a file number already open. |
+| `FILE NOT OPEN` | `PRINT#`, `CMD`, `INPUT#`, or `GET#` with a file number not open. |
+| `NOT INPUT FILE` | `INPUT#` or `GET#` with an output-only file; `OPEN` with file number 0. |
+| `NOT OUTPUT FILE` | `PRINT#` or `CMD` with an input-only file. |
+| `TOO MANY FILES` | `OPEN` with 10 files already open. |
+| `FILE DATA` | `INPUT#` reading something other than a number into a number variable. |
+| `DEVICE NOT PRESENT` | `LOAD`, `SAVE`, `VERIFY`, or `OPEN` with a device that is not storage, a keyboard, a screen, or a printer, or with no storage set; `OPEN` of a disk drive's command channel. |
 | `ILLEGAL DEVICE NUMBER` | `LOAD`, `SAVE`, or `VERIFY` with the keyboard (0), the screen (3), or a printer (4, 5). |
 | `MISSING FILE NAME` | `LOAD`, `SAVE`, or `VERIFY` with an empty or missing name. |
 | `LOAD` | `LOAD` of a file that is not a program. |
@@ -498,6 +554,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Execution model | A position (line, statement index) and a control stack of entries holding positions | Run line by line, with loops handled by re-running whole lines; a tree-walking loop construct built by the parser | A C64 resumes a loop just after its `FOR`, which can be mid-line or in the direct-mode line, and lets `NEXT` and `FOR` be anywhere, unmatched in the text. Only positions reproduce that; a parsed loop construct would reject valid programs such as one `FOR` with two `NEXT`s. |
 | Stack limit | The ROM's byte budget: 18 bytes per `FOR` and 7 per `GOSUB`, `OUT OF MEMORY` from 169 bytes in use for a `FOR` and 179 for a `GOSUB` | No limit; a fixed count of loops | It is the C64's own rule, derived from the stack check at `$A3FB`, and it stops runaway programs from growing memory without end. |
 | Function call depth | A fixed limit of 9 calls in progress | Count the stack bytes of every expression; no limit | Modeling the evaluator's stack use precisely would touch every expression for little gain; with no limit, a recursive function would exhaust the Go stack. A fixed limit near the C64's reproduces its error for runaway recursion. |
+| Data file buffering | Read a file whole at `OPEN`; collect output and write it at `CLOSE` | Stream through an open file handle | Whole-file reads and writes reuse the `Storage` interface of `LOAD` and `SAVE`, keep tests in memory, and suit C64-sized files. A C64 also completes a file only when it is closed. |
 | Storage | A `Storage` interface set by the shell, with whole-file reads and writes | `os` calls in the interpreter; an `fs.FS` | Tests use storage in memory and never touch the filesystem (HLD *Non-Goals*). `fs.FS` cannot write, and the disk-overwrite rule needs a write that refuses to replace. |
 | Keyboard source | A `Console` interface set by the shell, with line and key reads | Reading an `io.Reader` directly | The interpreter stays free of terminals: where keys come from (a terminal, a pipe, the rest of a script), how they are echoed, and how Ctrl-C reaches a waiting read are the shell's concerns, and tests supply input as a list of lines and keys. |
 | Interrupting | A flag set by `Interrupt` and checked after each statement | Cancel through a `context.Context` passed to `Exec`; the shell kills the run some other way | The C64 checks its STOP key between statements, so checking there gives the same `BREAK IN n`. A flag keeps the interpreter free of signals and goroutines; the shell decides where interrupts come from. |

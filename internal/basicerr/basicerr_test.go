@@ -24,6 +24,12 @@ func TestErrorReturnsC64Name(t *testing.T) {
 		MissingFileName:     "MISSING FILE NAME",
 		Load:                "LOAD",
 		Verify:              "VERIFY",
+		FileOpen:            "FILE OPEN",
+		FileNotOpen:         "FILE NOT OPEN",
+		NotInputFile:        "NOT INPUT FILE",
+		NotOutputFile:       "NOT OUTPUT FILE",
+		TooManyFiles:        "TOO MANY FILES",
+		FileData:            "FILE DATA",
 	}
 	for kind, want := range cases {
 		if got := (&Error{Kind: kind}).Error(); got != want {

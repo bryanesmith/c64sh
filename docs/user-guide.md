@@ -22,6 +22,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Keyboard input](#keyboard-input)
 - [User-defined functions](#user-defined-functions)
 - [Saving programs](#saving-programs)
+- [Data files](#data-files)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -526,6 +527,47 @@ A C64 refuses silently, blinking its drive light; c64sh says `c64sh: HELLO.bas: 
 
 See [`examples/021-saving-programs.bas`](../examples/021-saving-programs.bas) for every form.
 
+## Data files
+
+A program can write and read its own data files:
+
+```
+10 OPEN 2,8,2,"SCORES,S,W"
+20 PRINT#2,"ALICE";",";12
+30 CLOSE 2
+40 OPEN 2,8,2,"SCORES"
+50 INPUT#2,N$,S
+60 CLOSE 2
+70 PRINT N$;S
+```
+
+prints `ALICE 12 `, and leaves the file `SCORES` in the current directory.
+
+**`OPEN F, DEVICE, SECONDARY, "NAME"`** opens logical file `F` (1 to 255); everything after `F` is optional. As on a C64:
+
+| Device | What it is | Notes |
+|---|---|---|
+| 8 to 11 | Disk drives | A file in the current directory. The secondary address 0 reads and 1 writes; with 2 to 14, the name says: `"NAME,S,W"` writes, `"NAME,S,A"` adds to the end, and `"NAME,S,R"` or plain `"NAME"` reads. Writing replaces an existing file only with `@0:`, as for `SAVE`. |
+| 1 | Tape (the default) | A file in the current directory: the secondary address 0 (the default) reads, 1 or 2 writes. |
+| 0 | Keyboard | Read with `INPUT#` and `GET#`, as `INPUT` and `GET` read stdin. |
+| 3, 4, 5 | Screen, printers | Write with `PRINT#` or `CMD`: the output appears with the program's output. |
+
+- **`PRINT# F, items`** writes like `PRINT`, ending each line with a newline unless the items end with `;` or `,`. Note that there is no space between `PRINT` and `#`: `PRINT #2` is a `?SYNTAX  ERROR`, as on a C64.
+- **`INPUT# F, variables`** reads values like `INPUT`, without a prompt. A number it cannot read is a `?FILE DATA  ERROR`.
+- **`GET# F, variables`** reads one character at a time; a line end reads as `CHR$(13)`, and the end of the file as an empty string. (`GET #F` with a space also works.)
+- **`ST`** tells a reading loop when to stop: it is 64 once reading reaches the end of the file, and 0 otherwise.
+
+  ```
+  20 INPUT#2,A$:PRINT A$:IF ST=0 THEN 20
+  ```
+- **`CMD F`** sends everything `PRINT` and `LIST` would show to file `F`, until a `PRINT#` to any file: `OPEN 4,4:CMD 4:LIST` lists a program to the printer.
+- **`CLOSE F`** finishes the file. Output reaches the disk when the file is closed; files still open are closed when the variables are cleared (`RUN`, `NEW`, changing the program) and when c64sh ends.
+- **Commas in `PRINT#`** move to the next print zone of the *screen's* cursor, as on a C64, so `PRINT#2,"A","B"` usually puts 10 spaces between them.
+- **Files are text** with Unix line ends, so other tools can read and write them.
+- **Errors**: opening a file number already open is `?FILE OPEN  ERROR`, more than 10 open files is `?TOO MANY FILES  ERROR`, a file number not open is `?FILE NOT OPEN  ERROR`, reading an output file (or the screen) is `?NOT INPUT FILE  ERROR`, writing an input file is `?NOT OUTPUT FILE  ERROR`, and opening a missing file to read is `?FILE NOT FOUND  ERROR`.
+
+See [`examples/022-data-files.bas`](../examples/022-data-files.bas) for every form.
+
 ## Comments
 
 `REM` starts a comment. Everything after it, to the end of the line, is ignored:
@@ -564,12 +606,18 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?NEXT WITHOUT FOR  ERROR` | `NEXT` with no loop to continue. |
 | `?OUT OF MEMORY  ERROR` | More than 10 loops, 26 subroutine calls, or 9 function calls, nested. |
 | `?ILLEGAL DIRECT  ERROR` | `INPUT`, `GET`, or `DEF` typed directly; they work only in a program. |
-| `?FILE NOT FOUND  ERROR` | `LOAD` or `VERIFY` of a file that does not exist. |
+| `?FILE NOT FOUND  ERROR` | `LOAD`, `VERIFY`, or `OPEN` (to read or add to it) of a file that does not exist. |
 | `?LOAD  ERROR` | `LOAD` of a file that is not a program. |
 | `?VERIFY  ERROR` | `VERIFY` of a file that differs from the program. |
 | `?MISSING FILE NAME  ERROR` | `LOAD`, `SAVE`, or `VERIFY` without a name. |
 | `?ILLEGAL DEVICE NUMBER  ERROR` | `LOAD`, `SAVE`, or `VERIFY` with the keyboard (0), the screen (3), or a printer (4, 5). |
 | `?DEVICE NOT PRESENT  ERROR` | `LOAD`, `SAVE`, or `VERIFY` with a device other than tape (1), a disk drive (8 to 11), the keyboard, the screen, or a printer. |
+| `?FILE OPEN  ERROR` | `OPEN` with a file number already open. |
+| `?FILE NOT OPEN  ERROR` | `PRINT#`, `INPUT#`, `GET#`, or `CMD` with a file number not open. |
+| `?NOT INPUT FILE  ERROR` | `INPUT#` or `GET#` with a file opened for writing, the screen, or a printer; `OPEN 0`. |
+| `?NOT OUTPUT FILE  ERROR` | `PRINT#` or `CMD` with a file opened for reading, or the keyboard. |
+| `?TOO MANY FILES  ERROR` | `OPEN` with 10 files already open. |
+| `?FILE DATA  ERROR` | `INPUT#` reading something other than a number into a number variable. |
 | `?UNDEF'D FUNCTION  ERROR` | `FN` with a function that has not been defined. |
 | `?RETURN WITHOUT GOSUB  ERROR` | `RETURN` with no `GOSUB` to return to. |
 | `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
@@ -611,12 +659,13 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 - **Ctrl-C stops a program waiting in `INPUT`.** On a C64, the STOP key does nothing until Return is pressed.
 - **Typed input keeps lowercase letters**, where a C64 keyboard types uppercase.
 - **Programs are saved as text**, not as the C64's tokenized program files, and every device that holds programs is the current directory.
+- **Disk drives have no command channel** (`OPEN 15,8,15`) yet, so file errors are reported as BASIC errors (`?FILE NOT FOUND  ERROR` when opening) rather than through the drive's error channel; and data files use Unix line ends, where a C64 writes a carriage return.
 
 ## Not yet supported
 
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
-- Arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
+- Arrays (`DIM A(10)`), and the clock variables `TI` and `TI$`
 - Functions such as `CHR$(34)`
 - `ON … GOTO` and `ON … GOSUB`; `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands

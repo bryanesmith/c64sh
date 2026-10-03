@@ -52,6 +52,9 @@ func (e *noLine) Unwrap() error { return e.err }
 //
 // @spec INTERP-081, INTERP-082, INTERP-083, INTERP-084, INTERP-085, INTERP-086, INTERP-087
 func (in *Interp) execInput(s *ast.InputStmt) error {
+	if s.File != nil {
+		return in.execInputFile(s)
+	}
 	if in.cur.line == directLine {
 		if err := in.write(s.Prompt); err != nil {
 			return err
@@ -234,13 +237,30 @@ func (in *Interp) execGet(s *ast.GetStmt) error {
 	if in.cur.line == directLine {
 		return &basicerr.Error{Kind: basicerr.IllegalDirect}
 	}
-	for _, v := range s.Vars {
-		if in.console == nil {
-			return ErrEndOfInput
+	var f *ioFile
+	if s.File != nil {
+		var err error
+		if f, err = in.inputFile(s.File); err != nil {
+			return err
 		}
-		key, err := in.console.ReadKey(in.interrupted.Load)
+		defer in.endCmd()
+	}
+	for _, v := range s.Vars {
+		var key string
+		var err error
+		switch {
+		case f != nil:
+			key, err = in.readFileKey(f)
+		case in.console == nil:
+			err = ErrEndOfInput
+		default:
+			key, err = in.console.ReadKey(in.interrupted.Load)
+			if err != nil {
+				err = in.consoleError(err)
+			}
+		}
 		if err != nil {
-			return in.consoleError(err)
+			return err
 		}
 		val := stringValue(key)
 		if !strings.HasSuffix(v.Name, "$") {

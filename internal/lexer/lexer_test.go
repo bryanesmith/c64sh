@@ -172,8 +172,8 @@ func TestUnrecognizedCharactersAreIllegal(t *testing.T) {
 		{"lowercase letter, accented letter, non-breaking space", "xé\u00a0", []token.Token{
 			tok(token.Illegal, "x", 0), tok(token.Illegal, "é", 1), tok(token.Illegal, "\u00a0", 3), eol(5),
 		}},
-		{"symbols", `@#`, []token.Token{
-			tok(token.Illegal, "@", 0), tok(token.Illegal, "#", 1), eol(2),
+		{"symbols", `@&`, []token.Token{
+			tok(token.Illegal, "@", 0), tok(token.Illegal, "&", 1), eol(2),
 		}},
 		{"form feed", "\f", []token.Token{tok(token.Illegal, "\f", 0), eol(1)}},
 	})
@@ -477,5 +477,16 @@ func TestFileKeywords(t *testing.T) {
 		{"LOAD", `LOAD"X",8`, []token.Token{tok(token.Load, "LOAD", 0), tok(token.String, "X", 4), tok(token.Comma, ",", 7), num("8", 8), eol(9)}},
 		{"SAVE", "SAVE", []token.Token{tok(token.Save, "SAVE", 0), eol(4)}},
 		{"VERIFY", "VERIFY", []token.Token{tok(token.Verify, "VERIFY", 0), eol(6)}},
+	})
+}
+
+// @spec LEXER-036
+func TestDataFileKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"PRINT#", `PRINT#1,"X"`, []token.Token{tok(token.PrintFile, "PRINT#", 0), num("1", 6), tok(token.Comma, ",", 7), tok(token.String, "X", 8), eol(11)}},
+		{"PRINT #", "PRINT #1", []token.Token{tok(token.Print, "PRINT", 0), tok(token.Hash, "#", 6), num("1", 7), eol(8)}},
+		{"INPUT#", "INPUT#1,A", []token.Token{tok(token.InputFile, "INPUT#", 0), num("1", 6), tok(token.Comma, ",", 7), name("A", 8), eol(9)}},
+		{"GET#", "GET#1", []token.Token{tok(token.Get, "GET", 0), tok(token.Hash, "#", 3), num("1", 4), eol(5)}},
+		{"OPEN CLOSE CMD", "OPEN CLOSE CMD", []token.Token{tok(token.Open, "OPEN", 0), tok(token.Close, "CLOSE", 5), tok(token.Cmd, "CMD", 11), eol(14)}},
 	})
 }

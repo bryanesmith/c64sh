@@ -25,6 +25,12 @@ const (
 	MissingFileName                 // MISSING FILE NAME
 	Load                            // LOAD
 	Verify                          // VERIFY
+	FileOpen                        // FILE OPEN
+	FileNotOpen                     // FILE NOT OPEN
+	NotInputFile                    // NOT INPUT FILE
+	NotOutputFile                   // NOT OUTPUT FILE
+	TooManyFiles                    // TOO MANY FILES
+	FileData                        // FILE DATA
 )
 
 // names holds each kind's name as the C64 prints it.
@@ -48,6 +54,12 @@ var names = [...]string{
 	MissingFileName:     "MISSING FILE NAME",
 	Load:                "LOAD",
 	Verify:              "VERIFY",
+	FileOpen:            "FILE OPEN",
+	FileNotOpen:         "FILE NOT OPEN",
+	NotInputFile:        "NOT INPUT FILE",
+	NotOutputFile:       "NOT OUTPUT FILE",
+	TooManyFiles:        "TOO MANY FILES",
+	FileData:            "FILE DATA",
 }
 
 // Error is a BASIC error.

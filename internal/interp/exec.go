@@ -31,6 +31,9 @@ func (in *Interp) Exec(line *ast.Line) error {
 	in.interrupted.Store(false)
 	in.direct = line
 	err := in.execute(pos{directLine, 0})
+	if err != nil {
+		in.cmd = 0 // an error returns output to the screen ($A447)
+	}
 	if be, ok := errors.AsType[*basicerr.Error](err); ok && be.Kind != basicerr.Break {
 		in.stack = nil // an error flushes the stack, as on a C64 ($A462)
 	}
@@ -131,6 +134,7 @@ func (in *Interp) after() pos {
 //
 // @spec INTERP-095
 func (in *Interp) clr() {
+	in.closeAll()
 	clear(in.vars)
 	clear(in.fns)
 	in.stack = nil

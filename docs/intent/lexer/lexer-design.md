@@ -68,6 +68,12 @@ const (
     Load                  // LOAD
     Save                  // SAVE
     Verify                // VERIFY
+    PrintFile             // PRINT#
+    InputFile             // INPUT#
+    Open                  // OPEN
+    Close                 // CLOSE
+    Cmd                   // CMD
+    Hash                  // #
 )
 
 type Token struct {
@@ -91,7 +97,7 @@ At each position the lexer applies the first matching rule:
 | `REM` (see *Keywords*) | `Rem` token whose value is every byte after `REM` to the end of the line, exactly as written (including a leading space, quotes, colons, and keywords). Scanning stops; the next token is `EOL`. |
 | Other keyword text (see *Keywords*) | Keyword token (`Print`, `Let`, `If`, …). |
 | `?` | `Print` token (the C64 abbreviation for `PRINT`). |
-| `:` `;` `,` `+` `-` `*` `/` `(` `)` | `Colon`, `Semicolon`, `Comma`, `Plus`, `Minus`, `Star`, `Slash`, `LParen`, `RParen`. |
+| `:` `;` `,` `+` `-` `*` `/` `(` `)` `#` | `Colon`, `Semicolon`, `Comma`, `Plus`, `Minus`, `Star`, `Slash`, `LParen`, `RParen`, `Hash`. |
 | `^` or `↑` (U+2191) | `Caret`, whose value is the character as written. |
 | A digit, or `.` | `Number` token (see *Numbers*). |
 | An uppercase letter that does not begin a keyword | `Name` token (see *Names*). |
@@ -105,7 +111,7 @@ Inside a string literal, the bytes of the line are kept exactly as they are, inc
 
 ## Keywords
 
-The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, `THEN`, `RUN`, `LIST`, `NEW`, `END`, `GOTO`, `GO`, `TO`, `FOR`, `NEXT`, `STEP`, `GOSUB`, `RETURN`, `INPUT`, `GET`, `DEF`, `FN`, `LOAD`, `SAVE`, and `VERIFY`.
+The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, `THEN`, `RUN`, `LIST`, `NEW`, `END`, `GOTO`, `GO`, `TO`, `FOR`, `NEXT`, `STEP`, `GOSUB`, `RETURN`, `INPUT`, `GET`, `DEF`, `FN`, `LOAD`, `SAVE`, `VERIFY`, `PRINT#`, `INPUT#`, `OPEN`, `CLOSE`, and `CMD`. `PRINT#` and `INPUT#` are keywords of their own, as on a C64, so `PRINT#1` is one `PrintFile` token, while `PRINT #1`, with a space, is `Print` followed by `#` (a SYNTAX error, as on a C64).
 
 - **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`; `REMARK` is a `Rem` token with the comment `ARK`.
 - **Spaces inside a keyword break it.** `PR INT` is not `PRINT`; it scans as `Illegal(P) Illegal(R) Illegal(I) Illegal(N) Illegal(T)`.
@@ -182,6 +188,11 @@ fn        = "FN" .
 load      = "LOAD" .
 save      = "SAVE" .
 verify    = "VERIFY" .
+printfile = "PRINT#" .
+inputfile = "INPUT#" .
+open      = "OPEN" .
+close     = "CLOSE" .
+cmd       = "CMD" .
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
             [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
 digit     = "0" … "9" .

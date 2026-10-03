@@ -36,6 +36,9 @@ type Interp struct {
 	calls    int                     // user-defined function calls in progress
 	storage  Storage                 // where LOAD, SAVE, and VERIFY find files
 	messages io.Writer               // where tape and disk messages go; nil for none
+	files    map[int]*ioFile         // open logical files, by number
+	cmd      int                     // the file CMD sends output to; 0 for the screen
+	status   int                     // ST: the status of the last file operation
 
 	interrupted atomic.Bool // set by Interrupt, checked after each statement
 }
@@ -44,7 +47,7 @@ type Interp struct {
 //
 // @spec INTERP-002
 func New(out io.Writer) *Interp {
-	return &Interp{out: out, vars: map[string]value{}, fns: map[string]*ast.DefStmt{}}
+	return &Interp{out: out, vars: map[string]value{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}}
 }
 
 // Interrupt asks the interpreter to stop, as the C64's STOP key does: the
@@ -166,6 +169,12 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execSave(s)
 	case *ast.VerifyStmt:
 		return in.execVerify(s)
+	case *ast.OpenStmt:
+		return in.execOpen(s)
+	case *ast.CloseStmt:
+		return in.execClose(s)
+	case *ast.CmdStmt:
+		return in.execCmd(s)
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:
@@ -183,15 +192,34 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 //
 // @spec INTERP-004, INTERP-005, INTERP-006, INTERP-007, INTERP-008, INTERP-015
 func (in *Interp) execPrint(s *ast.PrintStmt) error {
+	if s.File == nil {
+		return in.printItems(s.Items, in.cmdFile())
+	}
+	f, err := in.outputFile(s.File)
+	if err != nil {
+		return err
+	}
+	defer in.endCmd() // PRINT# returns output to the screen ($ABB5)
+	return in.printItems(s.Items, f)
+}
+
+// printItems writes PRINT's items to f, or to the screen if f is nil. A
+// comma moves to the next print zone of the screen's cursor column, as the
+// C64 reads it even when writing to a file ($AAE8), so output to a storage
+// file does not move the zones.
+//
+// @spec INTERP-114
+func (in *Interp) printItems(items []ast.PrintItem, f *ioFile) error {
 	var buf strings.Builder
 	column := in.column // where the cursor will be once buf is written
+	screen := f == nil || f.screen
 	newline := true
-	for _, item := range s.Items {
+	for _, item := range items {
 		switch item := item.(type) {
 		case *ast.ExprItem:
 			v, err := in.eval(item.Expr)
 			if err != nil {
-				return in.fail(buf.String(), err)
+				return in.fail(f, buf.String(), err)
 			}
 			text := v.str
 			if v.isNum {
@@ -205,11 +233,14 @@ func (in *Interp) execPrint(s *ast.PrintStmt) error {
 		case *ast.Comma:
 			// Move to the next print zone; never 0 spaces, as in the C64 ROM.
 			n := zoneWidth - column%zoneWidth
+			if !screen {
+				n = zoneWidth - in.column%zoneWidth
+			}
 			buf.WriteString(strings.Repeat(" ", n))
 			column += n
 			newline = false
 		case *ast.BadItem:
-			return in.fail(buf.String(), item.Err)
+			return in.fail(f, buf.String(), item.Err)
 		default:
 			panic(fmt.Sprintf("interp: unhandled print item %T", item))
 		}
@@ -217,13 +248,13 @@ func (in *Interp) execPrint(s *ast.PrintStmt) error {
 	if newline {
 		buf.WriteByte('\n')
 	}
-	return in.write(buf.String())
+	return in.emit(f, buf.String())
 }
 
-// fail writes partial output and returns err, or the write error if the
-// write fails.
-func (in *Interp) fail(partial string, err error) error {
-	if werr := in.write(partial); werr != nil {
+// fail writes partial output to f and returns err, or the write error if
+// the write fails.
+func (in *Interp) fail(f *ioFile, partial string, err error) error {
+	if werr := in.emit(f, partial); werr != nil {
 		return werr
 	}
 	return err
@@ -258,6 +289,9 @@ func (in *Interp) eval(e ast.Expr) (value, error) {
 	case *ast.NumberLit:
 		return inRange(e.Value)
 	case *ast.VarRef:
+		if e.Name == "ST" {
+			return numberValue(float64(in.status)), nil // @spec INTERP-119
+		}
 		// @spec INTERP-033
 		if v, ok := in.vars[e.Name]; ok {
 			return v, nil

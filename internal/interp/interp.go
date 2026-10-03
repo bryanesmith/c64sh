@@ -175,6 +175,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execClose(s)
 	case *ast.CmdStmt:
 		return in.execCmd(s)
+	case *ast.OnStmt:
+		return in.execOn(s)
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:

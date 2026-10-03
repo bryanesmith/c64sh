@@ -59,6 +59,7 @@ const (
 	Close                 // CLOSE
 	Cmd                   // CMD
 	Hash                  // #
+	On                    // ON
 )
 
 var kindNames = [...]string{
@@ -113,6 +114,7 @@ var kindNames = [...]string{
 	Close:     "Close",
 	Cmd:       "Cmd",
 	Hash:      "Hash",
+	On:        "On",
 }
 
 func (k Kind) String() string {

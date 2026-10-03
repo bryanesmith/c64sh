@@ -88,3 +88,8 @@ Design: `parser-design.md`
 - [x] **PARSER-061**: When `GET` is followed by `#`, an expression, and a comma before its variables, the parser shall produce an `*ast.GetStmt` with `File` set to the expression.
 - [x] **PARSER-062**: If `OPEN` has no argument or more than four, `CLOSE` has no argument or more than one, `PRINT#`, `CMD`, or `INPUT#` lacks its file number or the comma after it (where required), `GET#` lacks its file number or comma, or any of these is followed by anything other than `:` or `EOL`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.
 - [x] **PARSER-063**: The parser shall accept the variable `ST` as an operand, and shall return a SYNTAX error for an assignment to `ST`.
+
+## Computed jumps
+
+- [x] **PARSER-064**: When a statement is `ON`, an expression, `GOTO` or `GOSUB`, and one or more `Number` tokens separated by commas, the parser shall produce an `*ast.OnStmt` holding the expression, whether it is `GOSUB`, and the line numbers, each read as PARSER-039 specifies.
+- [x] **PARSER-065**: If `ON`'s expression is not followed by `GOTO` or `GOSUB`, an element of its list is not a `Number` token or is above 63999, or the list is followed by anything other than `:` or `EOL`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.

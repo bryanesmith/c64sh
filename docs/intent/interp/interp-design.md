@@ -145,7 +145,7 @@ func (in *Interp) execStmt(s ast.Stmt) error {
         *ast.ForStmt, *ast.NextStmt, *ast.GosubStmt, *ast.ReturnStmt,
         *ast.InputStmt, *ast.GetStmt, *ast.DefStmt,
         *ast.LoadStmt, *ast.SaveStmt, *ast.VerifyStmt,
-        *ast.OpenStmt, *ast.CloseStmt, *ast.CmdStmt:
+        *ast.OpenStmt, *ast.CloseStmt, *ast.CmdStmt, *ast.OnStmt:
         … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
@@ -258,6 +258,10 @@ A false `IF` ends only its own line; the program continues with the next line. `
 ### GOTO
 
 `GOTO n` continues at line `n` without clearing the variables: in a running program it jumps there, and in direct mode it runs the program from there, which is how a C64 continues a program while keeping its variables. If there is no line `n`, it fails with `UNDEF'D STATEMENT`, carrying the line holding the `GOTO` when the program is running. Like `RUN`, it never returns to its line. `IF … THEN n` and `IF … GOTO n` are an `IfStmt` followed by a `GotoStmt`, so they jump only when the condition is true.
+
+### ON
+
+`ON X GOTO …` and `ON X GOSUB …` evaluate `X` as a number from 0 to 255, rounded down (a string is `TYPE MISMATCH`; out of range is `ILLEGAL QUANTITY`), as the ROM reads it (`$A94B`). If `X` is between 1 and the number of line numbers in the list, the statement acts as `GOTO` or `GOSUB` with the `X`th line number; a `GOSUB` entry holds the position after the `ON` statement, so `RETURN` continues after the whole statement, as on a C64. If `X` is 0 or larger than the list, execution continues with the next statement.
 
 ### BREAK
 

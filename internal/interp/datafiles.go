@@ -371,7 +371,7 @@ func (in *Interp) execInputFile(s *ast.InputStmt) error {
 		if !ok {
 			return &basicerr.Error{Kind: basicerr.FileData}
 		}
-		if err := in.assign(v.Name, val); err != nil {
+		if err := in.assign(v, val); err != nil {
 			return err
 		}
 	}

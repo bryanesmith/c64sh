@@ -60,6 +60,7 @@ var (
 	cmdk  = token.Token{Kind: token.Cmd, Value: "CMD"}
 	hash  = token.Token{Kind: token.Hash, Value: "#"}
 	onk   = token.Token{Kind: token.On, Value: "ON"}
+	dim   = token.Token{Kind: token.Dim, Value: "DIM"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -171,6 +172,8 @@ func dumpStmt(s ast.Stmt) string {
 		return "SAVE" + dumpFileArgs(s.FileArgs)
 	case *ast.VerifyStmt:
 		return "VERIFY" + dumpFileArgs(s.FileArgs)
+	case *ast.DimStmt:
+		return "DIM " + dumpVars(s.Arrays)
 	case *ast.ListStmt:
 		return "LIST"
 	case *ast.NewStmt:
@@ -226,7 +229,15 @@ func dumpExpr(e ast.Expr) string {
 	case *ast.NotExpr:
 		return "(NOT " + dumpExpr(e.X) + ")"
 	case *ast.VarRef:
-		return "$" + e.Name + "[" + e.Text + "]"
+		out := "$" + e.Name + "[" + e.Text + "]"
+		if len(e.Subs) > 0 {
+			var subs []string
+			for _, x := range e.Subs {
+				subs = append(subs, dumpExpr(x))
+			}
+			out += "(" + strings.Join(subs, ",") + ")"
+		}
+		return out
 	case *ast.CallExpr:
 		var args []string
 		for _, a := range e.Args {
@@ -545,9 +556,6 @@ func TestUnsupportedNames(t *testing.T) {
 		{"TI$ used", toks(pr, name("TI$")), `PRINT[BAD(SYNTAX)]`, true},
 		{"ST is readable", toks(pr, name("STATUS")), `PRINT[$ST[STATUS]]`, false},
 		{"TI assigned", toks(name("TI"), eq, number("1")), `BADSTMT`, true},
-		{"array element", toks(pr, name("A"), lp, number("1"), rp), `PRINT[BAD(SYNTAX)]`, true},
-		{"function call", toks(pr, name("CHR$"), lp, number("65"), rp), `PRINT[BAD(SYNTAX)]`, true},
-		{"array assigned", toks(name("A"), lp, number("1"), rp, eq, number("2")), `BADSTMT`, true},
 		{"T and I separately are fine", toks(pr, name("T"), semi, name("IT")), `PRINT[$T[T] ; $IT[IT]]`, false},
 		{"TI% is ordinary", toks(pr, name("TI%"), semi, name("ST%")), `PRINT[$TI%[TI%] ; $ST%[ST%]]`, false},
 	})
@@ -1086,5 +1094,46 @@ func TestPos(t *testing.T) {
 	runParseCases(t, []parseCase{
 		{"POS", toks(pr, fun("POS"), lp, number("0"), rp), `PRINT[POS(#0)]`, false},
 		{"two arguments", toks(pr, fun("POS"), lp, number("0"), comma, number("1"), rp), `PRINT[BAD(SYNTAX)]`, true},
+	})
+}
+
+// @spec PARSER-071
+func TestArrayElements(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"used", toks(pr, name("A"), lp, number("1"), rp), `PRINT[$A[A](#1)]`, false},
+		{"two subscripts", toks(pr, name("B$"), lp, name("I"), comma, name("J"), plus, number("1"), rp), `PRINT[$B$[B$]($I[I],($J[J]+#1))]`, false},
+		{"assigned", toks(name("A"), lp, number("1"), rp, eq, number("2")), `LET $A[A](#1)=#2`, false},
+		{"INPUT", toks(input, name("A"), lp, name("I"), rp), `INPUT $A[A]($I[I])`, false},
+		{"no )", toks(pr, name("A"), lp, number("1")), `PRINT[BAD(SYNTAX)]`, true},
+		{"empty", toks(pr, name("A"), lp, rp), `PRINT[BAD(SYNTAX)]`, true},
+	})
+}
+
+// @spec PARSER-072
+func TestArrayLoopVariable(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"FOR", toks(fork, name("A"), lp, number("1"), rp, eq, number("1"), tok, number("2")), `BADSTMT`, true},
+		{"NEXT", toks(nextk, name("A"), lp, number("1"), rp), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-073
+func TestDim(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"one", toks(dim, name("A"), lp, number("10"), rp), `DIM $A[A](#10)`, false},
+		{"several", toks(dim, name("A"), lp, number("10"), rp, comma, name("B$"), lp, number("3"), comma, number("4"), rp), `DIM $A[A](#10),$B$[B$](#3,#4)`, false},
+		{"plain variable", toks(dim, name("X")), `DIM $X[X]`, false},
+		{"nothing", toks(dim), `BADSTMT`, true},
+		{"junk", toks(dim, name("A"), lp, number("1"), rp, number("2")), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-074
+func TestReservedKeywords(t *testing.T) {
+	res := func(v string) token.Token { return token.Token{Kind: token.Reserved, Value: v} }
+	runParseCases(t, []parseCase{
+		{"statement", toks(res("POKE"), number("1"), comma, number("2")), `BADSTMT`, true},
+		{"operand", toks(pr, res("PEEK"), lp, number("1"), rp), `PRINT[BAD(SYNTAX)]`, true},
+		{"assignment", toks(name("A"), eq, res("FRE"), lp, number("0"), rp), `BADSTMT`, true},
 	})
 }

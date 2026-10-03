@@ -89,11 +89,16 @@ const (
     RelLess    Relation = 4 // <
 )
 
-// VarRef is a variable, used as a value or assigned to.
+// VarRef is a variable, or an array element when Subs is not empty,
+// used as a value or assigned to.
 type VarRef struct {
     Name string // identity: first two characters, plus "$" or "%" for a string or integer ("SC", "N$", "C%")
     Text string // the name as written, without spaces ("HEIGHT")
+    Subs []Expr // an array element's subscripts, in order; empty for a plain variable
 }
+
+// DimStmt is DIM Array {, Array}: each VarRef holds the top subscripts.
+type DimStmt struct{ Arrays []*VarRef }
 
 // IfStmt is IF Cond THEN. It guards the rest of its line: the statements
 // after it run only when Cond is true.
@@ -247,10 +252,11 @@ A statement that begins with a name, or with `LET`, is an assignment: `A=5` and 
 
 A `VarRef`'s `Name` is the variable's identity, as on a C64: the first character, the second character if there is one, and `$` for a string variable or `%` for an integer variable. `HEIGHT`, `HE`, and `HEX` are all `HE`, and `NAME$` and `NA$` are both `NA$`, while `N$` is a different variable. Number, integer, and string variables never share an identity: `A`, `A%`, and `A$` are three separate variables. `Text` keeps the name as written.
 
-These forms are valid C64 BASIC that c64sh does not support yet, so they are SYNTAX errors, following the tenet *Authentic errors over helpful ones*:
+**A name followed by `(`** is an array element: the subscripts are expressions separated by commas, up to `)` (`A(1)`, `B$(I,J+1)`), kept in `Subs`. A missing `)` or subscript is a SYNTAX error. Arrays and plain variables never share an identity: `A` and `A(1)` are unrelated. An element can be assigned (`LET`, `INPUT`, `GET`, `INPUT#`) and used as a value; it cannot be a `FOR` or `NEXT` variable, or a function's name or parameter (SYNTAX errors).
 
-- a name whose identity is `TI` or `TI$`, the C64's clock, whether used or assigned (`TI%` is an ordinary integer variable, as on a C64, whose check for system variables includes the type), and an assignment to `ST`, the I/O status, which can only be read (see *Data files*);
-- a name followed by `(`, which on a C64 is an array element (`A(1)`) or a function call (`CHR$(65)`).
+**`DIM`** is followed by one or more names separated by commas, each with or without subscripts: `DIM A(10),B$(3,4)`. A name without subscripts declares a plain variable, which does nothing, as on a C64.
+
+These are SYNTAX errors, following the tenet *Authentic errors over helpful ones*: a name whose identity is `TI` or `TI$`, the C64's clock, which is not supported yet, whether used or assigned (`TI%` is an ordinary integer variable, as on a C64, whose check for system variables includes the type); and an assignment to `ST`, the I/O status, which can only be read (see *Data files*).
 
 ### IF
 
@@ -284,6 +290,10 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 ### TAB and SPC
 
 `TAB(` and `SPC(` are print items, not functions: each is followed by an expression and `)`, becoming a `TabItem` or `SpcItem`, and they can appear only among the items of `PRINT`, `PRINT#`, and `CMD` (anywhere else, such as `A=TAB(5)`, they are SYNTAX errors, as on a C64). A missing `)` is a SYNTAX error.
+
+### Reserved keywords
+
+A `Reserved` token (a BASIC V2 keyword c64sh does not support, see the lexer design) is a SYNTAX error wherever it appears: at the start of a statement, where an operand is expected, or anywhere else.
 
 ### Built-in functions
 
@@ -330,7 +340,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OnStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OnStatement \| DimStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," \| tab Expression ")" \| spc Expression ")" .` | `parsePrintItem` | `ast.PrintItem` |
@@ -370,10 +380,11 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `NewStatement = new .` | `parseCommand` | `*ast.NewStmt` |
 | `EndStatement = end .` | `parseCommand` | `*ast.EndStmt` (`parseCommand` parses any command without arguments) |
 | `Call = function "(" Expression { "," Expression } ")" .` | `parseCall` | `*ast.CallExpr` (argument count checked) |
-| `Variable = name .` | `parseVariable` | `*ast.VarRef` |
+| `Variable = name [ "(" Expression { "," Expression } ")" ] .` | `parseVariable` | `*ast.VarRef` (with `Subs` for an array element) |
+| `DimStatement = dim Variable { "," Variable } .` | `parseDimStatement` | `*ast.DimStmt` |
 | `Operand = string \| number \| pi \| Variable \| "(" Expression ")" \| not Comparison \| fn FunctionName "(" Expression ")" \| Call .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `printfile`, `inputfile`, `open`, `close`, `cmd`, `on`, `function`, `pi`, `tab`, `spc`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `printfile`, `inputfile`, `open`, `close`, `cmd`, `on`, `function`, `pi`, `tab`, `spc`, `dim`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 
@@ -440,7 +451,7 @@ Examples:
 | Leading `+` | Dropped by the parser | A unary-plus node | The C64 ROM ignores a leading `+`, whatever follows, so there is no behavior for a node to carry. |
 | `^` associativity | Left to right: `2^3^2` is 64 | Right to left (512), as in mathematics and many languages | C64 BASIC V2 evaluates `^` left to right, like its other operators. |
 | Variable identity | Computed by the parser into `VarRef.Name` | Computed by the interpreter at each use | One place decides identity; the interpreter only stores and looks up. |
-| Unsupported names (`TI`, arrays, functions) | SYNTAX error | Treat as ordinary variables | On a C64 these read the clock, an array element, or a function result; silently treating them as plain variables would print wrong answers. |
+| Unsupported names (`TI`, `TI$`) | SYNTAX error | Treat as ordinary variables | On a C64 these read the clock; silently treating them as plain variables would print wrong answers. |
 | Comparison representation | `CompareExpr` with a `Relation` bit set | One `Op` per operator (`<`, `<=`, …) | A set of relations reproduces the C64's own rule for combining `<`, `=`, and `>` directly, including the unusual spellings, with one evaluation rule. |
 | Line number after `RUN`, `GOTO`, `THEN` | Read with the ROM's line-number routine, 0 when no digits follow | A SYNTAX error unless a plain line number follows | The C64 reads it this way, so `GOTO 20.5` goes to line 20 and `GOTO A` to line 0; reproducing it costs nothing, since the same routine reads line numbers at the start of a line. |
 | `IF … THEN n` | An `IfStmt` followed by a `GotoStmt` | A line-number field on `IfStmt` | The jump is an ordinary statement guarded by the `IF`, as in the ROM, so the interpreter needs no special case. |

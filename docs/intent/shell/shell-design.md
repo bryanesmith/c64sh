@@ -211,6 +211,8 @@ const (
     NotOutputFile             // NOT OUTPUT FILE
     TooManyFiles              // TOO MANY FILES
     FileData                  // FILE DATA
+    BadSubscript              // BAD SUBSCRIPT
+    RedimdArray               // REDIM'D ARRAY
     Break                     // BREAK: execution stopped by Ctrl-C
 )
 

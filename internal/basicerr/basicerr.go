@@ -31,6 +31,8 @@ const (
 	NotOutputFile                   // NOT OUTPUT FILE
 	TooManyFiles                    // TOO MANY FILES
 	FileData                        // FILE DATA
+	BadSubscript                    // BAD SUBSCRIPT
+	RedimdArray                     // REDIM'D ARRAY
 )
 
 // names holds each kind's name as the C64 prints it.
@@ -60,6 +62,8 @@ var names = [...]string{
 	NotOutputFile:       "NOT OUTPUT FILE",
 	TooManyFiles:        "TOO MANY FILES",
 	FileData:            "FILE DATA",
+	BadSubscript:        "BAD SUBSCRIPT",
+	RedimdArray:         "REDIM'D ARRAY",
 }
 
 // Error is a BASIC error.

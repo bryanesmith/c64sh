@@ -106,7 +106,7 @@ func (in *Interp) execFor(s *ast.ForStmt) error {
 		return err
 	}
 	name := s.Var.Name
-	if err := in.assign(name, start); err != nil {
+	if err := in.assign(s.Var, start); err != nil {
 		return err
 	}
 	if strings.HasSuffix(name, "$") {

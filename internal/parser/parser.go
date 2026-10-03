@@ -30,7 +30,7 @@ import (
 // @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
 // @spec PARSER-048, PARSER-049, PARSER-050, PARSER-051, PARSER-052, PARSER-053, PARSER-054
 // @spec PARSER-055, PARSER-056
-// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065, PARSER-066, PARSER-067, PARSER-068, PARSER-069, PARSER-070
+// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065, PARSER-066, PARSER-067, PARSER-068, PARSER-069, PARSER-070, PARSER-071, PARSER-072, PARSER-073, PARSER-074
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -117,7 +117,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OnStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OnStatement | DimStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -174,6 +174,8 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return p.parseFileStatement()
 	case token.On:
 		return p.parseOnStatement()
+	case token.Dim:
+		return p.parseDimStatement()
 	case token.Open:
 		return p.parseOpenStatement()
 	case token.Close:
@@ -239,7 +241,7 @@ func (p *parser) parseForStatement() (*ast.ForStmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	if strings.HasSuffix(v.Name, "%") || !p.accept(token.Equal) {
+	if strings.HasSuffix(v.Name, "%") || len(v.Subs) > 0 || !p.accept(token.Equal) {
 		return nil, syntaxError()
 	}
 	s := &ast.ForStmt{Var: v}
@@ -277,6 +279,9 @@ func (p *parser) parseNextStatement() (*ast.NextStmt, error) {
 		v, err := p.parseVariable()
 		if err != nil {
 			return nil, err
+		}
+		if len(v.Subs) > 0 {
+			return nil, syntaxError()
 		}
 		s.Vars = append(s.Vars, v)
 		if !p.accept(token.Comma) {
@@ -545,20 +550,55 @@ func (p *parser) parseLetStatement() (*ast.LetStmt, error) {
 	return &ast.LetStmt{Var: v, Value: value}, nil
 }
 
-// Variable = name .
+// Variable = name [ "(" Expression { "," Expression } ")" ] .
 //
-// The C64's clock (TI, TI$), and a name followed by "(" (an array element
-// or function call), are not supported and are SYNTAX errors.
+// A name followed by "(" is an array element. The C64's clock (TI, TI$)
+// is not supported and is a SYNTAX error.
 func (p *parser) parseVariable() (*ast.VarRef, error) {
 	text := p.next().Value
 	v := &ast.VarRef{Name: variableIdentity(text), Text: text}
-	switch {
-	case v.Name == "TI" || v.Name == "TI$":
-		return nil, syntaxError()
-	case p.peek() == token.LParen:
+	if v.Name == "TI" || v.Name == "TI$" {
 		return nil, syntaxError()
 	}
+	if p.accept(token.LParen) {
+		for {
+			sub, err := p.parseExpression()
+			if err != nil {
+				return nil, err
+			}
+			v.Subs = append(v.Subs, sub)
+			if !p.accept(token.Comma) {
+				break
+			}
+		}
+		if !p.accept(token.RParen) {
+			return nil, syntaxError()
+		}
+	}
 	return v, nil
+}
+
+// DimStatement = dim Variable { "," Variable } .
+func (p *parser) parseDimStatement() (ast.Stmt, error) {
+	p.next() // DIM
+	s := &ast.DimStmt{}
+	for {
+		if p.peek() != token.Name {
+			return nil, syntaxError()
+		}
+		v, err := p.parseVariable()
+		if err != nil {
+			return nil, err
+		}
+		s.Arrays = append(s.Arrays, v)
+		if !p.accept(token.Comma) {
+			break
+		}
+	}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return s, nil
 }
 
 // parseAssignable parses a variable that is assigned to, which cannot be

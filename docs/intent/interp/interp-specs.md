@@ -185,3 +185,12 @@ Design: `interp-design.md`
 - [x] **INTERP-130**: When executing a `TabItem`, the interpreter shall write `X - C` spaces if the cursor column `C` (the screen's, for a storage file) is less than `X`, and nothing otherwise; for an `SpcItem`, `X` spaces; `X` being rounded down and required to be from 0 to 255 (ILLEGAL QUANTITY otherwise, TYPE MISMATCH for a string).
 - [x] **INTERP-131**: When the last item of a `PRINT` is a `TabItem` or `SpcItem`, the interpreter shall not write the final newline.
 - [x] **INTERP-132**: When evaluating `POS(X)`, the interpreter shall evaluate `X`, of either type, and return the cursor column.
+
+## Arrays
+
+- [x] **INTERP-133**: When executing an `ast.DimStmt`, the interpreter shall create each array with subscripts, with the given tops, rounded down, and elements of 0 or the empty string; it shall fail with REDIM'D ARRAY if the array exists, and with ILLEGAL QUANTITY for a top below 0 or beyond -32768 to 32767; a variable without subscripts shall do nothing.
+- [x] **INTERP-134**: When evaluating or assigning an array element, the interpreter shall evaluate its subscripts in order, rounded down, failing with ILLEGAL QUANTITY for one below 0 or beyond -32768 to 32767, and shall create a missing array with that many dimensions, each with top 10.
+- [x] **INTERP-135**: If an array element has a different number of subscripts than its array has dimensions, or a subscript greater than its dimension's top, then the interpreter shall fail with BAD SUBSCRIPT.
+- [x] **INTERP-136**: The interpreter shall keep arrays separate from plain variables of the same identity, and shall assign to an element by the rules for a plain variable of its type.
+- [x] **INTERP-137**: If creating an array would make all arrays take more than 38911 bytes, counting 5 bytes plus 2 per dimension for each array and 5, 3, or 2 bytes per element for numbers, strings, or integers, then the interpreter shall fail with OUT OF MEMORY.
+- [x] **INTERP-138**: The interpreter shall clear all arrays whenever it clears the variables.

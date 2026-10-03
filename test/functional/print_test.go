@@ -193,7 +193,7 @@ func TestVariables(t *testing.T) {
 		{"wrong type for string", "A$=5\n", result{"", "?TYPE MISMATCH  ERROR\n", 1}},
 		{"number then variable", "A=2:PRINT 1A\n", result{" 1  2 \n", "", 0}},
 		{"TI not supported", "PRINT TI\n", result{"", "?SYNTAX  ERROR\n", 1}},
-		{"arrays not supported", "PRINT A(1)\n", result{"", "?SYNTAX  ERROR\n", 1}},
+		{"arrays", "A(1)=5:PRINT A(1)\n", result{" 5 \n", "", 0}},
 		{"lowercase", "a=1\n", result{"", "?SYNTAX  ERROR\n", 1}},
 	}
 	for _, c := range cases {

@@ -91,10 +91,12 @@ const (
 	RelLess    Relation = 4 // <
 )
 
-// VarRef is a variable, used as a value or assigned to.
+// VarRef is a variable, or an array element when Subs is not empty,
+// used as a value or assigned to.
 type VarRef struct {
-	Name string // identity: first two characters, plus "$" for a string
+	Name string // identity: first two characters, plus "$" or "%" for a string or integer
 	Text string // the name as written, without spaces
+	Subs []Expr // an array element's subscripts, in order; empty for a plain variable
 }
 
 // IfStmt is IF Cond THEN. It guards the rest of its line: the statements
@@ -269,3 +271,8 @@ type CallExpr struct {
 }
 
 func (*CallExpr) expr() {}
+
+// DimStmt is DIM Array {, Array}: each VarRef holds the top subscripts.
+type DimStmt struct{ Arrays []*VarRef }
+
+func (*DimStmt) stmt() {}

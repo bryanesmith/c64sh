@@ -64,6 +64,8 @@ const (
 	Pi                    // π
 	Tab                   // TAB(
 	Spc                   // SPC(
+	Dim                   // DIM
+	Reserved              // a BASIC V2 keyword c64sh does not support yet (Value: the keyword)
 )
 
 var kindNames = [...]string{
@@ -123,6 +125,8 @@ var kindNames = [...]string{
 	Pi:        "Pi",
 	Tab:       "Tab",
 	Spc:       "Spc",
+	Dim:       "Dim",
+	Reserved:  "Reserved",
 }
 
 func (k Kind) String() string {

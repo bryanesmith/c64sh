@@ -125,3 +125,24 @@ func (*NegExpr) expr()    {}
 func (*VarRef) expr()      {}
 func (*CompareExpr) expr() {}
 func (*NotExpr) expr()     {}
+
+// RunStmt is RUN, or RUN n when HasLine is set: clear the variables and
+// run the stored program from its first line, or from line n.
+type RunStmt struct {
+	Line    int
+	HasLine bool
+}
+
+// ListStmt is LIST: print the stored program.
+type ListStmt struct{}
+
+// NewStmt is NEW: erase the stored program and the variables.
+type NewStmt struct{}
+
+// EndStmt is END: stop.
+type EndStmt struct{}
+
+func (*RunStmt) stmt()  {}
+func (*ListStmt) stmt() {}
+func (*NewStmt) stmt()  {}
+func (*EndStmt) stmt()  {}

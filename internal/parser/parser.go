@@ -10,19 +10,22 @@ import (
 
 	"github.com/bryanesmith/c64sh/internal/ast"
 	"github.com/bryanesmith/c64sh/internal/basicerr"
+	"github.com/bryanesmith/c64sh/internal/lexer"
 	"github.com/bryanesmith/c64sh/internal/token"
 )
 
 // Parse parses the tokens of one line. It always returns a non-nil Line.
 // If err is non-nil, it is a SYNTAX error, and the Line holds the
-// statements completed before the error, followed, when the error is
-// inside a PRINT statement's items, by that statement ending in a BadItem.
+// statements completed before the error, followed by either that PRINT
+// statement ending in a BadItem (an error inside PRINT's items) or a
+// BadStmt holding the error.
 //
 // @spec PARSER-001, PARSER-002, PARSER-003, PARSER-004, PARSER-005, PARSER-006
 // @spec PARSER-007, PARSER-008, PARSER-009, PARSER-010, PARSER-011, PARSER-012, PARSER-013
 // @spec PARSER-014, PARSER-015, PARSER-016, PARSER-017, PARSER-018, PARSER-019, PARSER-020
 // @spec PARSER-021, PARSER-022, PARSER-023, PARSER-024, PARSER-025, PARSER-026, PARSER-027
-// @spec PARSER-028, PARSER-029, PARSER-030, PARSER-031, PARSER-032
+// @spec PARSER-028, PARSER-029, PARSER-030, PARSER-031, PARSER-032, PARSER-033, PARSER-034
+// @spec PARSER-035, PARSER-036, PARSER-037
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -97,7 +100,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -112,6 +115,18 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 			return nil, err
 		}
 		return stmt, nil
+	case token.Run:
+		stmt, err := p.parseRunStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	case token.List:
+		return p.parseCommand(&ast.ListStmt{})
+	case token.New:
+		return p.parseCommand(&ast.NewStmt{})
+	case token.End:
+		return p.parseCommand(&ast.EndStmt{})
 	case token.Let, token.Name:
 		stmt, err := p.parseLetStatement()
 		if err != nil {
@@ -121,6 +136,44 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 	default:
 		return nil, nil
 	}
+}
+
+// RunStatement = run [ number ] .
+//
+// Anything after RUN other than the end of the statement makes it RUN n,
+// with n read from a following number as the ROM reads a line number
+// ($A871, $A8A0): RUN 20.5 is RUN 20, and with no digits n is 0, so
+// RUN A is RUN 0. Whatever follows n is never checked, because RUN does
+// not return to its line.
+func (p *parser) parseRunStatement() (*ast.RunStmt, error) {
+	p.next() // RUN
+	switch p.peek() {
+	case token.Colon, token.EOL:
+		return &ast.RunStmt{}, nil
+	case token.Number:
+		n, _, _, err := lexer.LineNumber(p.next().Value)
+		if err != nil {
+			return nil, err
+		}
+		return &ast.RunStmt{Line: n, HasLine: true}, nil
+	default:
+		return &ast.RunStmt{Line: 0, HasLine: true}, nil
+	}
+}
+
+// ListStatement = list .
+// NewStatement  = new .
+// EndStatement  = end .
+//
+// parseCommand parses a command that takes no arguments. Anything after
+// it other than the end of the statement is a syntax error in its place,
+// so the command does not run, as on a C64 ($A642, $A69C, $A831).
+func (p *parser) parseCommand(stmt ast.Stmt) (ast.Stmt, error) {
+	p.next()
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return stmt, nil
 }
 
 // IfStatement = if Expression then Statement .

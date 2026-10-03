@@ -1,9 +1,11 @@
 package lexer
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
+	"github.com/bryanesmith/c64sh/internal/basicerr"
 	"github.com/bryanesmith/c64sh/internal/token"
 )
 
@@ -349,4 +351,69 @@ func TestIfThenKeywords(t *testing.T) {
 		{"THEN ends a name", `IF A THEN`, []token.Token{tok(token.If, "IF", 0), name("A", 3), tok(token.Then, "THEN", 5), eol(9)}},
 		{"IF inside a name", `DIFF`, []token.Token{name("D", 0), tok(token.If, "IF", 1), name("F", 3), eol(4)}},
 	})
+}
+
+// @spec LEXER-026
+func TestProgramKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"RUN", "RUN", []token.Token{tok(token.Run, "RUN", 0), eol(3)}},
+		{"RUN n", "RUN 20", []token.Token{tok(token.Run, "RUN", 0), num("20", 4), eol(6)}},
+		{"LIST", "LIST", []token.Token{tok(token.List, "LIST", 0), eol(4)}},
+		{"NEW", "NEW", []token.Token{tok(token.New, "NEW", 0), eol(3)}},
+		{"END", "END", []token.Token{tok(token.End, "END", 0), eol(3)}},
+		{"keyword in a name", "FRIEND", []token.Token{name("FRI", 0), tok(token.End, "END", 3), eol(6)}},
+		{"lowercase", "run", []token.Token{
+			tok(token.Illegal, "r", 0), tok(token.Illegal, "u", 1), tok(token.Illegal, "n", 2), eol(3),
+		}},
+	})
+}
+
+// @spec LEXER-027
+func TestLineNumber(t *testing.T) {
+	cases := []struct {
+		in   string
+		n    int
+		rest string
+	}{
+		{`10 PRINT "A"`, 10, `PRINT "A"`},
+		{`10PRINT"A"`, 10, `PRINT"A"`},
+		{"  10   PRINT", 10, "PRINT"},
+		{"\t10\tPRINT", 10, "PRINT"},
+		{"1 0X", 10, "X"},
+		{"10.5", 10, ".5"},
+		{"1E3", 1, "E3"},
+		{"5+5", 5, "+5"},
+		{"010", 10, ""},
+		{"10", 10, ""},
+		{"10   ", 10, ""},
+		{"0", 0, ""},
+		{"63999 END", 63999, "END"},
+		{`10 PRINT "A  "  `, 10, `PRINT "A  "  `},
+	}
+	for _, c := range cases {
+		n, rest, ok, err := LineNumber(c.in)
+		if n != c.n || rest != c.rest || !ok || err != nil {
+			t.Errorf("LineNumber(%q) = %d, %q, %v, %v; want %d, %q, true, nil", c.in, n, rest, ok, err, c.n, c.rest)
+		}
+	}
+}
+
+// @spec LEXER-028
+func TestNoLineNumber(t *testing.T) {
+	for _, in := range []string{"", "   ", `PRINT 10`, ".5", "-10", "A10", `"10"`} {
+		if _, _, ok, err := LineNumber(in); ok || err != nil {
+			t.Errorf("LineNumber(%q): ok %v, err %v; want false, nil", in, ok, err)
+		}
+	}
+}
+
+// @spec LEXER-029
+func TestLineNumberTooLarge(t *testing.T) {
+	for _, in := range []string{"64000 PRINT", "6400 0", "99999", "100000000000000000000000"} {
+		_, _, ok, err := LineNumber(in)
+		var be *basicerr.Error
+		if !ok || !errors.As(err, &be) || be.Kind != basicerr.Syntax {
+			t.Errorf("LineNumber(%q): ok %v, err %v; want true, a SYNTAX error", in, ok, err)
+		}
+	}
 }

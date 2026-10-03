@@ -1,0 +1,21 @@
+exit status: 1
+--- stdout ---
+HELLO
+WORLD
+HELLO
+THERE
+
+10 PRINT "HELLO":REM HELLO
+15 PRINT   "DEAR ";:REM DEAR (no newline)
+20 PRINT "THERE":REM THERE
+HELLO
+DEAR THERE
+THERE
+ 1 
+ 1 
+ 0 
+BEFORE END
+FIRST
+SECOND
+--- stderr ---
+?SYNTAX  ERROR IN 20

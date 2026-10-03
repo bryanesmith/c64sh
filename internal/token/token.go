@@ -34,6 +34,10 @@ const (
 	Not                   // NOT
 	If                    // IF
 	Then                  // THEN
+	Run                   // RUN
+	List                  // LIST
+	New                   // NEW
+	End                   // END
 )
 
 var kindNames = [...]string{
@@ -63,6 +67,10 @@ var kindNames = [...]string{
 	Not:       "Not",
 	If:        "If",
 	Then:      "Then",
+	Run:       "Run",
+	List:      "List",
+	New:       "New",
+	End:       "End",
 }
 
 func (k Kind) String() string {

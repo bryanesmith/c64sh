@@ -1,0 +1,168 @@
+package interp
+
+import (
+	"errors"
+	"slices"
+	"strconv"
+	"strings"
+
+	"github.com/bryanesmith/c64sh/internal/ast"
+	"github.com/bryanesmith/c64sh/internal/basicerr"
+	"github.com/bryanesmith/c64sh/internal/lexer"
+	"github.com/bryanesmith/c64sh/internal/parser"
+	"github.com/bryanesmith/c64sh/internal/token"
+)
+
+// progLine is one stored program line.
+type progLine struct {
+	number int
+	text   string    // as typed after the line number, for LIST
+	tree   *ast.Line // text parsed, syntax errors included where they occur
+}
+
+// errEnd is returned by END, LIST, and NEW: it ends the line, and a
+// running program, without error.
+var errEnd = errors.New("end")
+
+// runFrom is returned by RUN: it ends the line, and the program starts
+// (again) from line, or from its first line if !hasLine.
+type runFrom struct {
+	line    int
+	hasLine bool
+}
+
+func (*runFrom) Error() string { return "run" }
+
+// Store stores text as program line n (0 to 63999), replacing any line n,
+// or deletes line n if text is empty. Either way, it clears the variables,
+// as the C64 ROM does whenever the program changes ($A4ED, $A52A).
+//
+// @spec INTERP-048, INTERP-049, INTERP-050, INTERP-051
+func (in *Interp) Store(n int, text string) {
+	clear(in.vars)
+	i, found := in.find(n)
+	switch {
+	case text == "" && found:
+		in.program = slices.Delete(in.program, i, i+1)
+	case text == "":
+	default:
+		tree, _ := parser.Parse(lexer.Lex(text)) // errors are in the tree
+		l := progLine{number: n, text: text, tree: tree}
+		if found {
+			in.program[i] = l
+		} else {
+			in.program = slices.Insert(in.program, i, l)
+		}
+	}
+}
+
+// NeverRun reports whether the stored program holds lines and no RUN has
+// been executed since the Interp was created.
+//
+// @spec INTERP-062
+func (in *Interp) NeverRun() bool {
+	return len(in.program) > 0 && !in.ran
+}
+
+// find returns the index of line n in the program, or where it would go.
+func (in *Interp) find(n int) (int, bool) {
+	return slices.BinarySearchFunc(in.program, n, func(l progLine, n int) int {
+		return l.number - n
+	})
+}
+
+// execRun clears the variables and returns the request to run the
+// program, which Exec or run carries out.
+func (in *Interp) execRun(s *ast.RunStmt) error {
+	in.ran = true
+	clear(in.vars)
+	return &runFrom{line: s.Line, hasLine: s.HasLine}
+}
+
+// run runs the program as RUN asked, until it ends, and returns the first
+// error, carrying the number of the line it occurred in. from is the
+// program line holding the RUN, or -1 in direct mode.
+//
+// @spec INTERP-052, INTERP-053, INTERP-054, INTERP-055, INTERP-056, INTERP-058, INTERP-061
+func (in *Interp) run(r *runFrom, from int) error {
+	for {
+		i := 0
+		if r.hasLine {
+			found := false
+			if i, found = in.find(r.line); !found {
+				return atLine(&basicerr.Error{Kind: basicerr.UndefdStatement}, from)
+			}
+		}
+		var err error
+		for ; i < len(in.program); i++ {
+			l := in.program[i]
+			if err = in.execLine(l.tree); err != nil {
+				from = l.number
+				break
+			}
+		}
+		next, again := err.(*runFrom)
+		if !again {
+			if err == errEnd {
+				return nil
+			}
+			return atLine(err, from)
+		}
+		r = next
+	}
+}
+
+// atLine returns err with the program line it occurred in, if it is a
+// BASIC error and line is not -1 (direct mode).
+func atLine(err error, line int) error {
+	be, ok := errors.AsType[*basicerr.Error](err)
+	if !ok || line < 0 {
+		return err
+	}
+	return &basicerr.Error{Kind: be.Kind, Line: line, HasLine: true}
+}
+
+// execList writes the program as the C64 ROM lists it ($A6C9): before
+// each line a newline, then the line number, a space, and the text, with
+// "?" shown as the PRINT keyword it stands for; after the last line, the
+// newline that begins a C64's READY. message.
+//
+// @spec INTERP-059
+func (in *Interp) execList() error {
+	if len(in.program) == 0 {
+		return errEnd
+	}
+	var buf strings.Builder
+	for _, l := range in.program {
+		buf.WriteString("\n" + strconv.Itoa(l.number) + " " + listText(l.text))
+	}
+	buf.WriteString("\n")
+	if err := in.write(buf.String()); err != nil {
+		return err
+	}
+	return errEnd
+}
+
+// listText returns text with each "?" that the lexer reads as PRINT
+// written as PRINT, as a C64 stores both as the same keyword.
+func listText(text string) string {
+	var b strings.Builder
+	last := 0
+	for _, t := range lexer.Lex(text) {
+		if t.Kind == token.Print && t.Value == "?" {
+			b.WriteString(text[last:t.Pos] + "PRINT")
+			last = t.Pos + 1
+		}
+	}
+	b.WriteString(text[last:])
+	return b.String()
+}
+
+// execNew erases the program and the variables.
+//
+// @spec INTERP-060
+func (in *Interp) execNew() error {
+	in.program = nil
+	clear(in.vars)
+	return errEnd
+}

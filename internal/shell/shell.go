@@ -22,9 +22,11 @@ import (
 const usage = `usage: c64sh [FILE]
        c64sh -h | --help
 
-Runs Commodore 64 BASIC V2 in direct mode. With FILE, or when input is
-piped, each line is run in turn and c64sh stops at the first error.
-Otherwise c64sh starts an interactive session; end it with Ctrl-D.
+Runs Commodore 64 BASIC V2. With FILE, or when input is piped, each line
+is handled as if typed, and c64sh stops at the first error: numbered
+lines are stored, other lines run, and a stored program that was never
+run with RUN runs at the end. Otherwise c64sh starts an interactive
+session; end it with Ctrl-D.
 `
 
 // banner is written to stderr when an interactive session starts.
@@ -130,7 +132,7 @@ type session struct {
 //
 // @spec SHELL-MODE-004, SHELL-INT-001, SHELL-INT-004, SHELL-INT-006
 // @spec SHELL-SCRIPT-001, SHELL-SCRIPT-002, SHELL-SCRIPT-003, SHELL-SCRIPT-004
-// @spec SHELL-SCRIPT-006, SHELL-SCRIPT-007, SHELL-SCRIPT-008
+// @spec SHELL-SCRIPT-006, SHELL-SCRIPT-007, SHELL-SCRIPT-008, SHELL-SCRIPT-009
 // @spec SHELL-LINE-001, SHELL-LINE-002, SHELL-LINE-003, SHELL-LINE-004
 func (s *session) run(lines lineReader, name string) int {
 	if s.interactive {
@@ -154,6 +156,13 @@ func (s *session) run(lines lineReader, name string) int {
 	}
 	if s.interactive {
 		io.WriteString(s.stderr, "\n")
+		return 0
+	}
+	// A script that stored a program but never ran it runs it now.
+	if s.interp.NeverRun() {
+		if status, stop := s.execLine("RUN"); stop {
+			return status
+		}
 	}
 	return 0
 }
@@ -163,17 +172,26 @@ func isBlank(line string) bool {
 	return strings.Trim(line, " \t") == ""
 }
 
-// execLine runs one line in direct mode. It returns the exit status and
-// whether the session must stop.
+// execLine stores a numbered line in the program, or runs any other line
+// in direct mode. It returns the exit status and whether the session must
+// stop.
 //
-// @spec SHELL-LINE-005, SHELL-LINE-006, SHELL-LINE-007
-// @spec SHELL-INT-002, SHELL-INT-005, SHELL-SCRIPT-005
+// @spec SHELL-LINE-005, SHELL-LINE-006, SHELL-LINE-007, SHELL-MODE-004
+// @spec SHELL-INT-002, SHELL-INT-005, SHELL-SCRIPT-005, SHELL-PROG-001, SHELL-PROG-002
 func (s *session) execLine(line string) (int, bool) {
-	// A syntax error is part of the tree, where parsing failed, so it is
-	// reported only if execution reaches it: statements before it run
-	// first, and one skipped by a false IF is never reported, as on a C64.
-	tree, _ := parser.Parse(lexer.Lex(line))
-	err := s.interp.Exec(tree)
+	n, rest, numbered, err := lexer.LineNumber(line)
+	switch {
+	case numbered && err == nil:
+		s.interp.Store(n, rest)
+		return 0, false // a C64 prints no READY. after storing a line
+	case !numbered:
+		// A syntax error is part of the tree, where parsing failed, so it
+		// is reported only if execution reaches it: statements before it
+		// run first, and one skipped by a false IF is never reported, as
+		// on a C64.
+		tree, _ := parser.Parse(lexer.Lex(line))
+		err = s.interp.Exec(tree)
+	}
 
 	basicErr, isBasic := errors.AsType[*basicerr.Error](err)
 	switch {
@@ -193,11 +211,16 @@ func (s *session) execLine(line string) (int, bool) {
 	return 0, false
 }
 
-// report writes a BASIC error the way a C64 prints it, on a fresh line.
+// report writes a BASIC error the way a C64 prints it, on a fresh line,
+// naming the program line it occurred in, if any.
 //
 // @spec SHELL-ERR-001, SHELL-ERR-002
 func (s *session) report(err *basicerr.Error) {
 	s.freshLine()
+	if err.HasLine {
+		fmt.Fprintf(s.stderr, "?%s  ERROR IN %d\n", err.Error(), err.Line)
+		return
+	}
 	fmt.Fprintf(s.stderr, "?%s  ERROR\n", err.Error())
 }
 

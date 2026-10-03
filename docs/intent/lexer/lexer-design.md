@@ -49,6 +49,10 @@ const (
     Not                   // NOT
     If                    // IF
     Then                  // THEN
+    Run                   // RUN
+    List                  // LIST
+    New                   // NEW
+    End                   // END
 )
 
 type Token struct {
@@ -70,7 +74,7 @@ At each position the lexer applies the first matching rule:
 | Space or tab | Skipped. |
 | `"` | `String` token. Its value is every character up to the next `"`, or to the end of the line if there is none. The closing quote, if present, is consumed. |
 | `REM` (see *Keywords*) | `Rem` token whose value is every byte after `REM` to the end of the line, exactly as written (including a leading space, quotes, colons, and keywords). Scanning stops; the next token is `EOL`. |
-| Other keyword text (see *Keywords*) | Keyword token (`Print`). |
+| Other keyword text (see *Keywords*) | Keyword token (`Print`, `Let`, `If`, …). |
 | `?` | `Print` token (the C64 abbreviation for `PRINT`). |
 | `:` `;` `,` `+` `-` `*` `/` `(` `)` | `Colon`, `Semicolon`, `Comma`, `Plus`, `Minus`, `Star`, `Slash`, `LParen`, `RParen`. |
 | `^` or `↑` (U+2191) | `Caret`, whose value is the character as written. |
@@ -86,7 +90,7 @@ Inside a string literal, the bytes of the line are kept exactly as they are, inc
 
 ## Keywords
 
-The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, and `THEN`.
+The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, `THEN`, `RUN`, `LIST`, `NEW`, and `END`.
 
 - **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`; `REMARK` is a `Rem` token with the comment `ARK`.
 - **Spaces inside a keyword break it.** `PR INT` is not `PRINT`; it scans as `Illegal(P) Illegal(R) Illegal(I) Illegal(N) Illegal(T)`.
@@ -117,6 +121,17 @@ A variable name is read the way the C64 ROM reads one (`$B08B`), within the C64'
 
 The token's value is the full name as written, without spaces (`HEIGHT`, `N$`, `C%`). Which characters matter for identity is the parser's concern (see the parser design).
 
+## Line Numbers
+
+Whether a line is stored in the program or run at once depends on whether it starts with a line number, which the shell asks the lexer to read with `LineNumber`. The parser uses the same function for the line number after `RUN`. It reads a line number the way the C64 ROM does (`$A96B`):
+
+- After any spaces and tabs, the text must start with a digit; otherwise there is no line number.
+- Digits are read, **skipping spaces and tabs between them** (`1 0` is 10), until the first character that is neither. Leading zeros are allowed (`010` is 10).
+- **The largest line number is 63999.** A larger number is a SYNTAX error (the ROM rejects any digit that would take the number to 64000 or more).
+- The rest of the text starts after the number and any spaces and tabs after it. Nothing else is checked: `10.5 PRINT` is line 10 with the text `.5 PRINT`, and `5+5` is line 5 with the text `+5`, as on a C64.
+
+Its value comes from the characters, not from a `Number` token, because a number token reads further than a line number does (`10.5`, `1E3`).
+
 ## Token Rules
 
 The lexer's half of the grammar is its token rules. Each is written in EBNF, in the notation of the Go language specification, as a comment directly above the code in `lexer.go` that scans it:
@@ -133,9 +148,14 @@ or        = "OR" .
 not       = "NOT" .
 if        = "IF" .
 then      = "THEN" .
+run       = "RUN" .
+list      = "LIST" .
+new       = "NEW" .
+end       = "END" .
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
             [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
 digit     = "0" … "9" .
+line_number = digit { digit } .   /* spaces inside are ignored; read by LineNumber */
 character = /* any character except `"` and a line feed */ .
 ```
 
@@ -150,7 +170,15 @@ package lexer
 
 // Lex returns the tokens of line. The last token is always EOL.
 func Lex(line string) []token.Token
+
+// LineNumber reads the line number at the start of s, after any spaces
+// and tabs, as the C64 ROM reads one. ok is false if s does not begin
+// with a digit. rest is the text after the number and the spaces and
+// tabs after it. err is a SYNTAX error if the number exceeds 63999.
+func LineNumber(s string) (n int, rest string, ok bool, err error)
 ```
+
+`LineNumber` is the only lexer function that can return an error: whether a number is too large to be a line number is decided where the number is read, as in the ROM, for both of its callers.
 
 Scanning a whole line up front is sufficient: lines are short, and the parser benefits from being able to look ahead freely.
 
@@ -171,11 +199,12 @@ Scanning a whole line up front is sufficient: lines are short, and the parser be
 | Name value | The full name, without spaces | Only the first two characters | Keeping the full name leaves messages and a future `LIST` free to show it; the parser reduces it to the part that identifies the variable. |
 | Output shape | Slice of all tokens for the line | Streaming `Next()` iterator | Lines are short; a slice is simpler to test and gives the parser unlimited lookahead. |
 | Whitespace | Space and tab skipped between tokens | Space only | A tab outside a string has no meaning in BASIC V2; treating it like a space avoids surprising errors from pasted or indented scripts. |
+| Line numbers | A separate function, `LineNumber`, reading characters as the ROM does | A `LineNumber` token produced by `Lex` at the start of a line | A stored line keeps its text for `LIST`, so the caller needs the raw text after the number, not tokens; and a line number stops at characters a `Number` token would continue through (`10.5`, `1E3`). |
 
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. When program mode is added, a number at the start of a line is read as a line number.
+None.
 
 ## References
 

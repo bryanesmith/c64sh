@@ -111,6 +111,8 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `011-comparisons.bas` | Each comparison operator on numbers and strings, -1/0 results, comparisons after arithmetic, the alternative spellings (`><`, `=<`, `=>`, spaces, `<=>`), left-to-right chains, `=` as assignment then comparison, and `?TYPE MISMATCH  ERROR` |
 | `012-logic.bas` | `AND`, `OR`, `NOT` on comparisons, their order, bitwise results on whole numbers, rounding down, `NOT` taking in what follows, variables, and `?ILLEGAL QUANTITY  ERROR` |
 | `013-if-then.bas` | `IF … THEN` with true and false conditions, skipping the rest of the line, numbers and strings as conditions, `AND`/`OR`/`NOT` conditions, nested `IF`s, no `ELSE`, and a syntax error that goes unnoticed when skipped but stops the script when reached |
+| `014-program-mode.bas` | Storing numbered lines in any order, replacing and deleting them, `RUN` and `RUN n`, `LIST` (with `?` shown as `PRINT`), `NEW`, `END`, variables cleared by `RUN` and by storing a line, and a syntax error found only when its line runs (`?SYNTAX  ERROR IN 20`) |
+| `015-numbered-scripts.bas` | The script rule: numbered lines stored and unnumbered lines run at once, and the never-run program run after the last line |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

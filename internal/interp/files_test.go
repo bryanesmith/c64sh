@@ -75,7 +75,7 @@ func runFileCases(t *testing.T, cases []fileCase) {
 		}
 		var se *StorageError
 		if want, ok := c.wantErr.(*StorageError); ok {
-			if !errors.As(err, &se) || se.File != want.File || se.Name != want.Name || !errors.Is(se.Err, want.Err) {
+			if !errors.As(err, &se) || se.File != want.File || se.Replace != want.Replace || !errors.Is(se.Err, want.Err) {
 				t.Errorf("%s: error %v, want a StorageError for %s", c.name, err, want.File)
 			}
 		} else if !sameErr(err, c.wantErr) {
@@ -165,9 +165,9 @@ func TestSave(t *testing.T) {
 func TestSaveRefused(t *testing.T) {
 	s := newStorage("OLD.bas", "old")
 	runFileCases(t, []fileCase{
-		{"disk keeps existing file", s, lines(`10 REM`, `SAVE "OLD",8`), "", "-", &StorageError{File: "OLD.bas", Name: "OLD", Err: fs.ErrExist}},
-		{"drive prefix", s, lines(`10 REM`, `SAVE "0:OLD",8`), "", "-", &StorageError{File: "OLD.bas", Name: "0:OLD", Err: fs.ErrExist}},
-		{"write fails", &memStorage{files: map[string]string{}, writeErr: fs.ErrPermission}, lines(`SAVE "X"`), "", "-", &StorageError{File: "X.bas", Name: "X", Err: fs.ErrPermission}},
+		{"disk keeps existing file", s, lines(`10 REM`, `SAVE "OLD",8`), "", "-", &StorageError{File: "OLD.bas", Err: fs.ErrExist, Replace: `SAVE "@0:OLD"`}},
+		{"drive prefix", s, lines(`10 REM`, `SAVE "0:OLD",8`), "", "-", &StorageError{File: "OLD.bas", Err: fs.ErrExist, Replace: `SAVE "@0:OLD"`}},
+		{"write fails", &memStorage{files: map[string]string{}, writeErr: fs.ErrPermission}, lines(`SAVE "X"`), "", "-", &StorageError{File: "X.bas", Err: fs.ErrPermission}},
 	})
 	if s.files["OLD.bas"] != "old" {
 		t.Errorf("OLD.bas was replaced: %q", s.files["OLD.bas"])

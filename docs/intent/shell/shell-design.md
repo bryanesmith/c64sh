@@ -136,7 +136,7 @@ The shell gives the interpreter storage for `LOAD`, `SAVE`, and `VERIFY` that re
 
 In interactive mode the shell also gives the interpreter stderr for the C64's tape and disk messages (`SAVING HELLO`, `LOADING`), so they appear beside `READY.` and stay out of redirected stdout. In script mode there are no messages.
 
-A `StorageError` from executing a line is reported as `c64sh: ` and the file, then: for a disk file that may not be replaced, `file exists (use SAVE "@0:NAME" to replace it)`, with the name the program used without any `0:`; otherwise the reason. In interactive mode the shell then writes `READY.` and continues; in script mode it stops with exit status 1, like a BASIC error.
+A `StorageError` from executing a line is reported as `c64sh: ` and the file, then: for a disk file that may not be replaced, `file exists (use REPLACE to replace it)`, with the error's `Replace` (such as `SAVE "@0:HELLO"`); otherwise the reason. When the session ends, the shell calls the interpreter's `CloseFiles`, so that data files a program left open are written, and reports any `StorageError` from it the same way. In interactive mode the shell then writes `READY.` and continues; in script mode it stops with exit status 1, like a BASIC error.
 
 ## Keyboard Input
 
@@ -201,6 +201,12 @@ const (
     MissingFileName           // MISSING FILE NAME
     Load                      // LOAD
     Verify                    // VERIFY
+    FileOpen                  // FILE OPEN
+    FileNotOpen               // FILE NOT OPEN
+    NotInputFile              // NOT INPUT FILE
+    NotOutputFile             // NOT OUTPUT FILE
+    TooManyFiles              // TOO MANY FILES
+    FileData                  // FILE DATA
     Break                     // BREAK: execution stopped by Ctrl-C
 )
 

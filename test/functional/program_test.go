@@ -211,3 +211,24 @@ func TestProgramFiles(t *testing.T) {
 	check(t, "interactive messages", runInteractive(t, "10 REM\nSAVE \"TWO\",8\nLOAD \"TWO\",8\nSAVE \"TWO\",8\n"),
 		result{"", banner + "SAVING TWO\nREADY.\nSEARCHING FOR TWO\nLOADING\nREADY.\nSAVING TWO\nc64sh: TWO.bas: file exists (use SAVE \"@0:TWO\" to replace it)\nREADY.\n\n", 0})
 }
+
+// TestDataFiles checks OPEN, PRINT#, INPUT#, CMD, and CLOSE end to end,
+// in a temporary current directory.
+//
+// @spec SHELL-FILE-003, SHELL-FILE-004
+func TestDataFiles(t *testing.T) {
+	t.Chdir(t.TempDir())
+	check(t, "write", runMain(t, "OPEN 2,8,2,\"SCORES,S,W\"\nPRINT#2,\"ALICE\";\",\";12\nCLOSE 2\n"), result{"", "", 0})
+	if data, _ := os.ReadFile("SCORES"); string(data) != "ALICE, 12 \n" {
+		t.Errorf("SCORES = %q", data)
+	}
+	check(t, "read", runMain(t, "10 OPEN 2,8,2,\"SCORES\":INPUT#2,N$,S:CLOSE 2:PRINT N$;S\n"), result{"ALICE 12 \n", "", 0})
+	check(t, "left open, written at the end", runMain(t, "OPEN 3,8,3,\"OPEN,S,W\"\nPRINT#3,\"KEPT\"\n"), result{"", "", 0})
+	if data, _ := os.ReadFile("OPEN"); string(data) != "KEPT\n" {
+		t.Errorf("OPEN = %q", data)
+	}
+	check(t, "disk refuses to replace", runMain(t, "OPEN 2,8,2,\"SCORES,S,W\"\n"),
+		result{"", "c64sh: SCORES: file exists (use \"@0:SCORES,S,W\" to replace it)\n", 1})
+	check(t, "CMD to the printer", runMain(t, "10 REM HI\nOPEN 4,4:CMD 4:LIST\n"), result{"\n\n10 REM HI\n", "", 0})
+	check(t, "missing file", runMain(t, "OPEN 2,8,2,\"NONE\"\n"), result{"", "?FILE NOT FOUND  ERROR\n", 1})
+}

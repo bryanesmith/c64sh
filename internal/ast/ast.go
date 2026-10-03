@@ -17,8 +17,10 @@ type Line struct {
 	Statements []Stmt
 }
 
-// PrintStmt is PRINT followed by its items, in order.
+// PrintStmt is PRINT followed by its items, in order, or PRINT# File,
+// items, when File is not nil.
 type PrintStmt struct {
+	File  Expr
 	Items []PrintItem
 }
 
@@ -161,16 +163,22 @@ type GosubStmt struct{ Line int }
 // ReturnStmt is RETURN: return from the latest subroutine.
 type ReturnStmt struct{}
 
-// InputStmt is INPUT ["prompt";] Var {, Var}; HasPrompt is false when
-// there is no prompt.
+// InputStmt is INPUT ["prompt";] Var {, Var}, or INPUT# File, Var
+// {, Var} when File is not nil; HasPrompt is false when there is no
+// prompt.
 type InputStmt struct {
+	File      Expr
 	Prompt    string
 	HasPrompt bool
 	Vars      []*VarRef
 }
 
-// GetStmt is GET Var {, Var}.
-type GetStmt struct{ Vars []*VarRef }
+// GetStmt is GET Var {, Var}, or GET# File, Var {, Var} when File is not
+// nil.
+type GetStmt struct {
+	File Expr
+	Vars []*VarRef
+}
 
 func (*InputStmt) stmt()  {}
 func (*GetStmt) stmt()    {}
@@ -218,3 +226,20 @@ type VerifyStmt struct{ FileArgs }
 func (*LoadStmt) stmt()   {}
 func (*SaveStmt) stmt()   {}
 func (*VerifyStmt) stmt() {}
+
+// OpenStmt is OPEN File [, Device [, Secondary [, Name]]]; omitted
+// arguments are nil.
+type OpenStmt struct{ File, Device, Secondary, Name Expr }
+
+// CloseStmt is CLOSE File.
+type CloseStmt struct{ File Expr }
+
+// CmdStmt is CMD File [, items]: send PRINT output to the file.
+type CmdStmt struct {
+	File  Expr
+	Items []PrintItem
+}
+
+func (*OpenStmt) stmt()  {}
+func (*CloseStmt) stmt() {}
+func (*CmdStmt) stmt()   {}

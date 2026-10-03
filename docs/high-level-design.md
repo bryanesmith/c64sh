@@ -76,8 +76,8 @@ The language grows one feature at a time. The language currently supports `PRINT
 
 ## Non-Goals
 
-- **Emulating the C64 machine.** No screen memory, 40-column wrapping, colors, cursor control, PETSCII graphics, `PEEK`/`POKE`, or timing.
-- **Supporting the whole language at once.** Arrays, the system variables `TI`, `TI$`, and `ST`, functions, subroutines, loops, and computed jumps (`GOSUB`, `FOR`, `ON`), `LIST` ranges, `CLR`, `STOP` and `CONT`, and device commands are future features, added one at a time.
+- **Emulating the C64 machine.** No screen memory, 40-column wrapping, colors, cursor control, PETSCII graphics, or timing. The keywords that work directly on the C64's memory and processor (`PEEK`, `POKE`, `SYS`, `WAIT`, and `USR`) are never supported, because each would need an emulated machine behind it: memory, the video, sound, and I/O chips, and a 6502 processor to run machine code. They stay `?SYNTAX  ERROR`.
+- **Supporting the whole language at once.** Arrays, the system variables `TI`, `TI$`, and `ST`, functions, subroutines, loops, and computed jumps (`GOSUB`, `FOR`, `ON`), `LIST` ranges, `CLR`, `STOP` and `CONT`, and device commands are future features, added one at a time. The planned features and their order are tracked in the [roadmap issue](https://github.com/bryanesmith/c64sh/issues/34).
 - **Advanced line editing**: tab completion and history search. The interactive prompt offers history and basic editing only.
 - **Extensions beyond BASIC V2.** No keywords from BASIC 3.5/7.0 or third-party extensions.
 - **Real device I/O.** When `LOAD`/`SAVE` are added, the storage behind them will be replaceable, so tests never touch the real filesystem.

@@ -37,6 +37,11 @@ func TestUnsupportedInputIsSyntaxError(t *testing.T) {
 		{`PRINT CHR$(34)`, result{"", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT (1+2`, result{"", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT "HELLO"@`, result{"HELLO\n", "?SYNTAX  ERROR\n", 1}},
+		{`PRINT PEEK(197)`, result{"", "?SYNTAX  ERROR\n", 1}},
+		{`POKE 53280,0`, result{"", "?SYNTAX  ERROR\n", 1}},
+		{`SYS 64738`, result{"", "?SYNTAX  ERROR\n", 1}},
+		{`WAIT 198,1`, result{"", "?SYNTAX  ERROR\n", 1}},
+		{`PRINT USR(1)`, result{"", "?SYNTAX  ERROR\n", 1}},
 	}
 	for _, c := range cases {
 		check(t, c.input, runMain(t, c.input+"\n"), c.want)

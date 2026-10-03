@@ -135,6 +135,17 @@ type GosubStmt struct{ Line int }
 
 // ReturnStmt is RETURN: return from the latest subroutine.
 type ReturnStmt struct{}
+
+// InputStmt is INPUT ["prompt";] Var {, Var}; HasPrompt is false when
+// there is no prompt.
+type InputStmt struct {
+    Prompt    string
+    HasPrompt bool
+    Vars      []*VarRef
+}
+
+// GetStmt is GET Var {, Var}.
+type GetStmt struct{ Vars []*VarRef }
 ```
 
 Binary operators are left-associative within a precedence level: `"A"+"B"+"C"` is `BinaryExpr(Add, BinaryExpr(Add, "A", "B"), "C")`, and `8-2-1` is `(8-2)-1`. The parser does not check operand types: whether `+` joins strings, adds numbers, or is a type mismatch is decided by the interpreter from the values, as on a C64.
@@ -206,6 +217,10 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 
 `GOSUB` is followed by a line number, read exactly as for `GOTO` (see *Program commands*): `GOSUB 100`, `GOSUB 100.5` (line 100), and `GOSUB` alone (line 0). `RETURN` takes no arguments; anything after it other than `:` or the end of the line is a SYNTAX error in place of the statement, as with `END` (`$A8D2`). `GO SUB`, with a space, is not `GOSUB`: it is `GO` not followed by `TO`, a SYNTAX error.
 
+### INPUT and GET
+
+`INPUT` is followed by an optional prompt, then one or more variables separated by commas. The prompt is a string literal followed by `;`, as the ROM requires (`$ABBF`): `INPUT "NAME";N$`. An expression is not allowed as the prompt, so `INPUT "A"+"B";X` and `INPUT P$;X` are SYNTAX errors, and so is a prompt followed by `,` instead of `;`. `GET` is followed by one or more variables separated by commas. A missing variable, or anything after the list other than `:` or the end of the line, is a SYNTAX error in place of the statement.
+
 ### Items side by side
 
 An expression ends at the first token that cannot continue it, and PRINT then reads the next item. A token that can start an expression but not continue one begins a new item: `PRINT 2(3)` prints two numbers, ` 2  3 `. A `-` or `+` after an operand always continues the expression as a binary operator, as on a C64: `PRINT 1 -1` prints ` 0 `, and `PRINT "A"-1` is `TYPE MISMATCH`.
@@ -219,7 +234,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
@@ -239,6 +254,8 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `NextStatement = next [ Variable { "," Variable } ] .` | `parseNextStatement` | `*ast.NextStmt` |
 | `GosubStatement = gosub LineNumber .` | `parseGosubStatement` | `*ast.GosubStmt` |
 | `ReturnStatement = return .` | `parseCommand` | `*ast.ReturnStmt` |
+| `InputStatement = input [ string ";" ] Variable { "," Variable } .` | `parseInputStatement` | `*ast.InputStmt` |
+| `GetStatement = get Variable { "," Variable } .` | `parseGetStatement` | `*ast.GetStmt` |
 | `GotoStatement = ( goto \| go to ) LineNumber .` | `parseGotoStatement` | `*ast.GotoStmt` |
 | `LineNumber = [ number ] .` | `parseLineNumber` | `int`: the line number, 0 if there is none (see *Program commands*) |
 | `ListStatement = list .` | `parseCommand` | `*ast.ListStmt` |
@@ -247,7 +264,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
 | `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 

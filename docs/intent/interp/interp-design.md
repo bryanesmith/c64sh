@@ -45,6 +45,32 @@ func (in *Interp) NeverRun() bool
 // be called from another goroutine.
 func (in *Interp) Interrupt()
 
+// Console is where INPUT and GET read the keyboard. stop reports whether
+// the interpreter has been interrupted; a method that is waiting returns
+// ErrInterrupted when it becomes true.
+type Console interface {
+    // ReadLine reads one line, without its line terminator. echoed reports
+    // whether the console has already shown what was typed, as a terminal
+    // does; if not, the interpreter writes it. At the end of input it
+    // returns io.EOF.
+    ReadLine(stop func() bool) (line string, echoed bool, err error)
+    // ReadKey returns the next key as a one-character string, or "" if no
+    // key is waiting. At the end of input it returns io.EOF.
+    ReadKey(stop func() bool) (key string, err error)
+}
+
+// ErrInterrupted is returned by a Console that stopped waiting because
+// the interpreter was interrupted.
+var ErrInterrupted = errors.New("interrupted")
+
+// ErrEndOfInput is returned by Exec when INPUT or GET found the end of
+// the console's input. It is not a BASIC error.
+var ErrEndOfInput = errors.New("end of input")
+
+// SetConsole sets where INPUT and GET read. Without one, they find the
+// end of input.
+func (in *Interp) SetConsole(c Console)
+
 // Column returns the cursor column: the number of characters written
 // since the last newline. It is 0 at the start of a line.
 func (in *Interp) Column() int
@@ -83,7 +109,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
     case *ast.BadStmt:
         return s.Err
     case *ast.RunStmt, *ast.GotoStmt, *ast.ListStmt, *ast.NewStmt, *ast.EndStmt,
-        *ast.ForStmt, *ast.NextStmt, *ast.GosubStmt, *ast.ReturnStmt:
+        *ast.ForStmt, *ast.NextStmt, *ast.GosubStmt, *ast.ReturnStmt,
+        *ast.InputStmt, *ast.GetStmt:
         … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
@@ -217,6 +244,38 @@ Because each line starts with a newline, the listing begins with one: a blank li
 
 `NeverRun` lets the shell run a script's program when the script never ran it itself (see the shell design). It is true when the program holds at least one line and no `RUN`, `GOTO`, or `GOSUB` has been executed, successfully or not, since the `Interp` was created.
 
+## Keyboard input
+
+`INPUT` and `GET` read from the `Console` the shell sets (see the shell design). Both work only in a running program: in direct mode they fail with `ILLEGAL DIRECT` (`$B3A6`), `INPUT` after writing its prompt, as the ROM writes the prompt first (`$ABBF`).
+
+### INPUT
+
+`INPUT` follows the ROM (`$ABBF`, `$AC0D`):
+
+1. Write the prompt, if there is one, then `? `.
+2. Read a line with `ReadLine`. Spaces at the end of the line are removed, as the C64's screen editor removes them. Then end the output line: write the line if the console did not echo it, then a newline, so the column is 0.
+3. If the line is empty, the statement ends; the variables keep their values.
+4. Read a value for each variable in turn, from the current place in the line, and assign it at once:
+   - Spaces before the value are skipped.
+   - **A string variable** takes a quoted value up to the closing quote (or the end of the line), or else the text up to the next `,` or `:` or the end of the line, keeping spaces inside it.
+   - **A number variable** takes a number written as in a program: an optional sign, digits with at most one `.`, an optional exponent, with spaces inside ignored. No digits at all gives 0. A number too large is `OVERFLOW`; for an integer variable, out of range is `ILLEGAL QUANTITY`.
+   - After the value, after any spaces, the next character must be `,`, `:`, or the end of the line. Otherwise, write `?REDO FROM START` and a newline, and start the statement again from step 1. Values already assigned keep their new values.
+   - A `,` is skipped before the next value. When the line has no more values (its end, or a `:`), and variables remain, write `?? ` and read a new line as in step 2, which supplies the next values. An empty line here gives the empty string or 0.
+5. When every variable has a value, if text remains in the line (starting with `,` or `:`), write `?EXTRA IGNORED` and a newline.
+
+`?REDO FROM START` and `?EXTRA IGNORED` are not errors: they are program output, written on the screen as a C64 writes them, and execution continues.
+
+### GET
+
+`GET` reads one key for each of its variables with `ReadKey`, in turn (`$AB7B`):
+
+- **A string variable** takes the key, or the empty string if no key is waiting.
+- **A number variable** takes 0 if no key is waiting or the key is a space, `.`, `+`, `-`, or `E`, and the digit's value if it is a digit. Any other key is a `SYNTAX` error, reported **without a line number** even in a running program, as on a C64, whose `GET` marks this error as if in direct mode (`$AB53`).
+
+### Input errors
+
+If the console returns `io.EOF`, the statement stops and `Exec` returns `ErrEndOfInput`, which is not a BASIC error. If it returns `ErrInterrupted`, the statement stops with a `BREAK` error, carrying the line in a running program. On a C64 the STOP key does nothing while `INPUT` waits; c64sh lets Ctrl-C stop a program waiting for input, the usual meaning of Ctrl-C in a terminal.
+
 ## REM
 
 Executing a `RemStmt` does nothing: it writes no output and returns no error, so execution continues with the next statement. A `RemStmt` is always the last statement of a line, because its comment runs to the end of the line.
@@ -310,6 +369,7 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `SYNTAX` | A `BadItem` reached while executing `PRINT`, or a `BadStmt` reached; the error is the one the parser stored in it. |
 | `NEXT WITHOUT FOR` | `NEXT` with no matching `FOR` entry above the topmost non-`FOR` entry of the control stack. |
 | `OUT OF MEMORY` | A `FOR` or `GOSUB` with no room left on the C64's stack (see *Control stack*). |
+| `ILLEGAL DIRECT` | `INPUT` or `GET` in direct mode. |
 | `RETURN WITHOUT GOSUB` | `RETURN` with no `GOSUB` entry on the control stack, other than `FOR` entries above it. |
 | `UNDEF'D STATEMENT` | `RUN n` or `GOTO n` where the program has no line `n`. |
 | `BREAK` | `Interrupt` was called (see *BREAK*). |
@@ -334,6 +394,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | State | `Interp` value created once per session | Stateless function | Variables and the stored program need a home that persists across lines. |
 | Execution model | A position (line, statement index) and a control stack of entries holding positions | Run line by line, with loops handled by re-running whole lines; a tree-walking loop construct built by the parser | A C64 resumes a loop just after its `FOR`, which can be mid-line or in the direct-mode line, and lets `NEXT` and `FOR` be anywhere, unmatched in the text. Only positions reproduce that; a parsed loop construct would reject valid programs such as one `FOR` with two `NEXT`s. |
 | Stack limit | The ROM's byte budget: 18 bytes per `FOR` and 7 per `GOSUB`, `OUT OF MEMORY` from 169 bytes in use for a `FOR` and 179 for a `GOSUB` | No limit; a fixed count of loops | It is the C64's own rule, derived from the stack check at `$A3FB`, and it stops runaway programs from growing memory without end. |
+| Keyboard source | A `Console` interface set by the shell, with line and key reads | Reading an `io.Reader` directly | The interpreter stays free of terminals: where keys come from (a terminal, a pipe, the rest of a script), how they are echoed, and how Ctrl-C reaches a waiting read are the shell's concerns, and tests supply input as a list of lines and keys. |
 | Interrupting | A flag set by `Interrupt` and checked after each statement | Cancel through a `context.Context` passed to `Exec`; the shell kills the run some other way | The C64 checks its STOP key between statements, so checking there gives the same `BREAK IN n`. A flag keeps the interpreter free of signals and goroutines; the shell decides where interrupts come from. |
 | Stored line form | Text and parsed tree, parsed once when stored | Text only, parsed each time the line runs, as the C64 does; tree only | The tree runs a line many times without parsing again; syntax errors are in the tree, so they are still reported only when reached. `LIST` needs the text as typed, which the tree does not keep (spaces, `?`). |
 | Ending execution | `END`, `LIST`, `NEW`, `RUN`, and `GOTO` end the line or program through internal sentinel values returned like errors | Flags on the `Interp` checked after every statement | The same path already ends a line for a false `IF`; returning a value keeps the control flow visible in each statement's code. |

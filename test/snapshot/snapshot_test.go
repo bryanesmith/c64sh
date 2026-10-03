@@ -143,7 +143,7 @@ func firstDifference(got, want string) (int, string, string) {
 	}
 }
 
-// @spec SNAPSHOT-001
+// @spec SNAPSHOT-001, SNAPSHOT-008, SNAPSHOT-009
 func TestExamples(t *testing.T) {
 	files := examples(t)
 	want := map[string]bool{}
@@ -152,7 +152,8 @@ func TestExamples(t *testing.T) {
 		want[snapshotFile(name)] = true
 		t.Run(name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			status := shell.Main([]string{filepath.Join(examplesDir, file)}, strings.NewReader(""), &stdout, &stderr)
+			stdin, _ := os.ReadFile(filepath.Join(snapshotDir, name+".input")) // none: empty stdin
+			status := shell.Main([]string{filepath.Join(examplesDir, file)}, bytes.NewReader(stdin), &stdout, &stderr)
 			matchSnapshot(t, name, snapshotFile(name), format(status, stdout.String(), stderr.String()))
 		})
 	}
@@ -173,6 +174,17 @@ func TestExamples(t *testing.T) {
 			continue
 		}
 		t.Errorf("snapshot %s has no example in examples/; run `make update-snapshots` to delete it", path)
+	}
+
+	// Input files, written by hand, whose example no longer exists.
+	inputs, err := filepath.Glob(filepath.Join(snapshotDir, "*.input"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range inputs {
+		if !want[strings.TrimSuffix(filepath.Base(path), ".input")+".snap"] {
+			t.Errorf("input file %s has no example in examples/; delete it", path)
+		}
 	}
 }
 

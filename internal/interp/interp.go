@@ -31,6 +31,7 @@ type Interp struct {
 	direct  *ast.Line        // the line Exec is running, in direct mode
 	stack   []frame          // the control stack: FOR and GOSUB entries
 	cur     pos              // the position of the statement executing
+	console Console          // where INPUT and GET read
 
 	interrupted atomic.Bool // set by Interrupt, checked after each statement
 }
@@ -149,6 +150,10 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execGosub(s)
 	case *ast.ReturnStmt:
 		return in.execReturn()
+	case *ast.InputStmt:
+		return in.execInput(s)
+	case *ast.GetStmt:
+		return in.execGet(s)
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:

@@ -161,6 +161,19 @@ type GosubStmt struct{ Line int }
 // ReturnStmt is RETURN: return from the latest subroutine.
 type ReturnStmt struct{}
 
+// InputStmt is INPUT ["prompt";] Var {, Var}; HasPrompt is false when
+// there is no prompt.
+type InputStmt struct {
+	Prompt    string
+	HasPrompt bool
+	Vars      []*VarRef
+}
+
+// GetStmt is GET Var {, Var}.
+type GetStmt struct{ Vars []*VarRef }
+
+func (*InputStmt) stmt()  {}
+func (*GetStmt) stmt()    {}
 func (*GosubStmt) stmt()  {}
 func (*ReturnStmt) stmt() {}
 func (*ForStmt) stmt()    {}

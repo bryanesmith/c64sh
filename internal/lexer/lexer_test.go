@@ -449,3 +449,14 @@ func TestSubroutineKeywords(t *testing.T) {
 		{"GO SUB", "GO SUB", []token.Token{tok(token.Go, "GO", 0), name("SUB", 3), eol(6)}},
 	})
 }
+
+// @spec LEXER-033
+func TestInputKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"INPUT", `INPUT"N";A`, []token.Token{
+			tok(token.Input, "INPUT", 0), tok(token.String, "N", 5), tok(token.Semicolon, ";", 8), name("A", 9), eol(10),
+		}},
+		{"GET", "GET K$", []token.Token{tok(token.Get, "GET", 0), name("K$", 4), eol(6)}},
+		{"GET in a name", "TARGET", []token.Token{name("TAR", 0), tok(token.Get, "GET", 3), eol(6)}},
+	})
+}

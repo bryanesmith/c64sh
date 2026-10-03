@@ -14,6 +14,7 @@ Example scripts follow these conventions (the snapshot tests enforce them):
 - Executable (`chmod +x`), with `#!/usr/bin/env c64sh` as the first line and a `REM` comment explaining the file as the second.
 - Show the feature in many forms: they are documentation for users learning how the language is read.
 - End every line containing a `PRINT` with a comment saying what it prints, with spaces exactly as printed (write a missing newline as `(no newline)`). To make print-zone columns easy to check, an example may print a ruler line such as `0123456789012345678901234567890`. The comment needs a colon before `REM`, because `PRINT` only ends at `:` or the end of the line: `PRINT "HI":REM HI`, not `PRINT "HI" REM HI` (a syntax error, as on a C64). Where an end-of-line comment is impossible, such as after an unclosed string (`PRINT "HI`, which runs to the end of the line), put the comment on its own `REM` line immediately before.
+- A script that reads input (`INPUT`, `GET`) gets its stdin from `test/snapshot/testdata/NNN-lowercase-words.input`, written by hand; its comments name the answers the snapshot uses, and its `PRINT` comments describe the output for them.
 - A script may show an error. Scripts stop at their first error, so lines after it do not run; the snapshot records exactly what happens.
 - Hidden files such as `.DS_Store` are ignored; nothing else but example scripts belongs in `examples/`.
 

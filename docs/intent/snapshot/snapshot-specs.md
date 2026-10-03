@@ -5,6 +5,8 @@ Design: `snapshot-design.md`
 ## Running examples
 
 - [x] **SNAPSHOT-001**: The snapshot tests in `test/snapshot/` shall run every example script in `examples/`, as `c64sh FILE` runs it, and fail unless the example's exit status, stdout, and stderr exactly match its recorded snapshot, `test/snapshot/testdata/<example name>.snap`.
+- [x] **SNAPSHOT-008**: When `test/snapshot/testdata/<example name>.input` exists, the snapshot tests shall run the example with that file's contents as its stdin; otherwise with an empty stdin.
+- [x] **SNAPSHOT-009**: The snapshot tests shall fail, naming the file, for any `.input` file in `test/snapshot/testdata/` whose example does not exist, and `make update-snapshots` shall neither create nor delete `.input` files.
 
 ## Example conventions
 

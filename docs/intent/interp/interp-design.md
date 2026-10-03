@@ -149,7 +149,7 @@ func (in *Interp) execStmt(s ast.Stmt) error {
         *ast.ForStmt, *ast.NextStmt, *ast.GosubStmt, *ast.ReturnStmt,
         *ast.InputStmt, *ast.GetStmt, *ast.DefStmt,
         *ast.LoadStmt, *ast.SaveStmt, *ast.VerifyStmt,
-        *ast.OpenStmt, *ast.CloseStmt, *ast.CmdStmt, *ast.OnStmt:
+        *ast.OpenStmt, *ast.CloseStmt, *ast.CmdStmt, *ast.OnStmt, *ast.DimStmt:
         … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
@@ -481,6 +481,15 @@ Variables are kept in a map from a `VarRef`'s `Name` (its identity, such as `SC`
 - **An integer variable** (a name ending in `%`) stores the value rounded down to a whole number, as the C64 ROM's conversion does (`$BC9B`): `C%=3.7` stores 3 and `C%=-3.7` stores -4. A value whose size is 32768 or more, other than exactly -32768, is `ILLEGAL QUANTITY` (`$B1BF`); the range is checked before rounding, so -32768.5 is out of range while -32767.5 stores -32768. Integer variables are otherwise ordinary numbers in expressions. A string longer than 255 characters is `STRING TOO LONG`, the limit on any string a C64 stores. On any error the variable keeps its old value.
 - **A reference** (`VarRef`) evaluates to the stored value, or, for a variable never assigned, to 0 or the empty string, as on a C64.
 
+## Arrays
+
+Arrays are kept apart from plain variables, by identity: `A`, `A(…)`, `A%(…)`, and `A$(…)` are four separate things. Each array has a number of dimensions and a top subscript for each, and its elements start as 0 or the empty string.
+
+- **`DIM`** creates each array it names with the given tops, evaluated in order, each rounded down to a whole number from -32768 to 32767 (`ILLEGAL QUANTITY` otherwise, and for a negative top). If the array exists, it fails with `REDIM'D ARRAY`. A name without subscripts does nothing.
+- **An element** evaluates its subscripts in order, each rounded down like a top (`ILLEGAL QUANTITY` for a negative or out-of-range subscript). If the array does not exist, it is created with as many dimensions as there are subscripts, each with top 10, as the ROM does (`$B1D1`). If the number of subscripts differs from the array's dimensions, or a subscript exceeds its top, it fails with `BAD SUBSCRIPT`. Reading gives the element's value; assigning follows the rules of a plain variable of the same type (an integer element rounds down, and so on).
+- **Memory.** An array takes, as on a C64, 5 bytes plus 2 per dimension, plus 5 bytes per element for numbers, 3 for strings, and 2 for integers. Creating an array (with `DIM` or by use) that would make all arrays together take more than 38911 bytes, the memory free on a C64 when it starts, fails with `OUT OF MEMORY`. The program, the variables, and the strings themselves are not counted, so a C64 runs out of memory sooner.
+- Arrays are cleared with the variables (`RUN`, `NEW`, storing a line).
+
 ## Values
 
 Every expression evaluates to a value that is either a **string** or a **number**. Numbers are Go `float64`s kept within the C64's range:
@@ -561,7 +570,7 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `ILLEGAL QUANTITY` | An operand of `AND`, `OR`, or `NOT` whose size is 32768 or more (other than -32768); `^` with a negative left operand and a right operand that is not a whole number; a value whose size is 32768 or more (other than -32768) assigned to an integer variable. |
 | `SYNTAX` | A `BadItem` reached while executing `PRINT`, or a `BadStmt` reached; the error is the one the parser stored in it. |
 | `NEXT WITHOUT FOR` | `NEXT` with no matching `FOR` entry above the topmost non-`FOR` entry of the control stack. |
-| `OUT OF MEMORY` | A `FOR` or `GOSUB` with no room left on the C64's stack (see *Control stack*), or a 10th function call in progress. |
+| `OUT OF MEMORY` | A `FOR` or `GOSUB` with no room left on the C64's stack (see *Control stack*), a 10th function call in progress, or arrays taking more than 38911 bytes. |
 | `ILLEGAL DIRECT` | `INPUT`, `GET`, or `DEF` in direct mode. |
 | `FILE NOT FOUND` | `LOAD`, `VERIFY`, or an `OPEN` to read or append, with no such file. |
 | `FILE OPEN` | `OPEN` of a file number already open. |
@@ -576,6 +585,8 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `LOAD` | `LOAD` of a file that is not a program. |
 | `VERIFY` | `VERIFY` of a file that differs from the program. |
 | `UNDEF'D FUNCTION` | `FN` calling a function that has not been defined. |
+| `BAD SUBSCRIPT` | An element with the wrong number of subscripts, or a subscript past the top. |
+| `REDIM'D ARRAY` | `DIM` of an array that exists, including one created by use. |
 | `RETURN WITHOUT GOSUB` | `RETURN` with no `GOSUB` entry on the control stack, other than `FOR` entries above it. |
 | `UNDEF'D STATEMENT` | `RUN n` or `GOTO n` where the program has no line `n`. |
 | `BREAK` | `Interrupt` was called (see *BREAK*). |

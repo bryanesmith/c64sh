@@ -108,7 +108,7 @@ func (in *Interp) inputValues(vars []*ast.VarRef, line string) (redo bool, err e
 		if !ok {
 			return true, nil
 		}
-		if err := in.assign(v.Name, val); err != nil {
+		if err := in.assign(v, val); err != nil {
 			return false, err
 		}
 	}
@@ -274,7 +274,7 @@ func (in *Interp) execGet(s *ast.GetStmt) error {
 				return &noLine{&basicerr.Error{Kind: basicerr.Syntax}}
 			}
 		}
-		if err := in.assign(v.Name, val); err != nil {
+		if err := in.assign(v, val); err != nil {
 			return err
 		}
 	}

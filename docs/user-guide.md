@@ -18,6 +18,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Logic](#logic)
 - [IF … THEN](#if--then)
 - [Variables](#variables)
+- [Arrays](#arrays)
 - [Programs](#programs)
 - [Loops](#loops)
 - [Subroutines](#subroutines)
@@ -381,12 +382,35 @@ prints `B IS 11 ` and `HELLO, ALICE`.
 - **Three kinds**: a name ending in `$` holds a string (`N$`); a name ending in `%` holds a whole number (`C%`); any other name holds a number (`A`, `HEIGHT`). `A`, `A%`, and `A$` are different variables. Putting a string in a number variable, or a number in a string variable, is a `?TYPE MISMATCH  ERROR`.
 - **Integer variables** (`%`) round down what is stored in them: `C%=3.7` stores 3, and `C%=-3.7` stores -4. They hold -32768 to 32767; storing a number outside that range is an `?ILLEGAL QUANTITY  ERROR`. In calculations they are ordinary numbers.
 - **Names** start with an uppercase letter, followed by letters and digits. **Only the first two characters count**, so `HEIGHT` and `HE` are the same variable.
-- **A name cannot contain a keyword**, because the C64 finds keywords anywhere: `PREMIUM=1` is a `?SYNTAX  ERROR` (it contains `REM`), and so is `SCORE=1` (it contains `OR`). It also means `PRINTER` prints the variable `ER`, and `LETTER=1` sets `TE`.
+- **A name cannot contain a keyword**, including keywords c64sh does not support yet (`READY` contains `READ`, `FREE` contains `FRE`), because the C64 finds keywords anywhere: `PREMIUM=1` is a `?SYNTAX  ERROR` (it contains `REM`), and so is `SCORE=1` (it contains `OR`). It also means `PRINTER` prints the variable `ER`, and `LETTER=1` sets `TE`.
 - **Spaces inside a name are ignored**: `A B` is the variable `AB`.
 - **A variable never set** is 0, or the empty string.
 - **Values last** from line to line, for the whole session or script.
 
 See [`examples/009-variables.bas`](../examples/009-variables.bas) and [`examples/010-integer-variables.bas`](../examples/010-integer-variables.bas) for every form.
+
+## Arrays
+
+An array holds many values under one name, picked out by a subscript in parentheses:
+
+```
+DIM S(4)
+FOR I=0 TO 4:S(I)=I*I:NEXT
+PRINT S(3)
+```
+
+prints ` 9 `.
+
+- **`DIM S(4)` makes five elements**, `S(0)` to `S(4)`, starting at 0 (or the empty string for a string array, `DIM N$(9)`). One `DIM` can make several: `DIM A(10),B$(5)`.
+- **Several dimensions** make a grid: `DIM T(3,3)`, then `T(2,1)=5`.
+- **An array used without `DIM`** has 10 as the top of each dimension, so `A(5)=1` works by itself, but `A(11)` does not.
+- **Arrays are separate from plain variables**: `S` and `S(1)` are unrelated. Integer arrays (`C%(…)`) round down what is stored, like integer variables.
+- **Subscripts** are rounded down. A subscript past the top, or the wrong number of subscripts, is a `?BAD SUBSCRIPT  ERROR`; a negative one is an `?ILLEGAL QUANTITY  ERROR`.
+- **`DIM` of an array that already exists**, including one made by using it, is a `?REDIM'D ARRAY  ERROR`. Put `DIM` at the start of a program.
+- **Memory**: as on a C64, all arrays together must fit in 38911 bytes (5 bytes per number, 3 per string, 2 per integer), or it is an `?OUT OF MEMORY  ERROR`. `DIM A(7000)` fits; `DIM A(8000)` does not.
+- **Arrays are cleared** with the variables (`RUN`, `NEW`, changing the program). Elements can be read with `INPUT`, `GET`, and `INPUT#`, but cannot be loop counters.
+
+See [`examples/027-arrays.bas`](../examples/027-arrays.bas) for every form.
 
 ## Programs
 
@@ -681,7 +705,7 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
 | `?UNDEF'D STATEMENT  ERROR` | `RUN`, `GOTO`, or `IF … THEN` with a line number that is not in the program. |
 | `?NEXT WITHOUT FOR  ERROR` | `NEXT` with no loop to continue. |
-| `?OUT OF MEMORY  ERROR` | More than 10 loops, 26 subroutine calls, or 9 function calls, nested. |
+| `?OUT OF MEMORY  ERROR` | More than 10 loops, 26 subroutine calls, or 9 function calls, nested, or arrays larger than a C64's memory. |
 | `?ILLEGAL DIRECT  ERROR` | `INPUT`, `GET`, or `DEF` typed directly; they work only in a program. |
 | `?FILE NOT FOUND  ERROR` | `LOAD`, `VERIFY`, or `OPEN` (to read or add to it) of a file that does not exist. |
 | `?LOAD  ERROR` | `LOAD` of a file that is not a program. |
@@ -696,6 +720,8 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?TOO MANY FILES  ERROR` | `OPEN` with 10 files already open. |
 | `?FILE DATA  ERROR` | `INPUT#` reading something other than a number into a number variable. |
 | `?UNDEF'D FUNCTION  ERROR` | `FN` with a function that has not been defined. |
+| `?BAD SUBSCRIPT  ERROR` | An array subscript past the top, or the wrong number of subscripts. |
+| `?REDIM'D ARRAY  ERROR` | `DIM` of an array that already exists. |
 | `?RETURN WITHOUT GOSUB  ERROR` | `RETURN` with no `GOSUB` to return to. |
 | `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
 
@@ -742,7 +768,8 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
-- Arrays (`DIM A(10)`), and the clock variables `TI` and `TI$`
+- The clock variables `TI` and `TI$`
+- `DATA`, `READ`, and `RESTORE`; `FRE`
 - `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 

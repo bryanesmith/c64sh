@@ -40,6 +40,7 @@ type Interp struct {
 	files       map[int]*ioFile         // open logical files, by number
 	cmd         int                     // the file CMD sends output to; 0 for the screen
 	status      int                     // ST: the status of the last file operation
+	arrays      map[string]*array       // arrays, by identity
 	printing    bool                    // a PRINT to the screen is evaluating an item
 	printColumn int                     // while printing: the column its output so far reaches
 	seed        uint64                  // the RND seed
@@ -52,7 +53,7 @@ type Interp struct {
 //
 // @spec INTERP-002
 func New(out io.Writer) *Interp {
-	return &Interp{out: out, vars: map[string]value{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed}
+	return &Interp{out: out, vars: map[string]value{}, arrays: map[string]*array{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed}
 }
 
 // Interrupt asks the interpreter to stop, as the C64's STOP key does: the
@@ -88,17 +89,25 @@ func (in *Interp) execLet(s *ast.LetStmt) error {
 	if err != nil {
 		return err
 	}
-	return in.assign(s.Var.Name, v)
+	return in.assign(s.Var, v)
 }
 
-// assign stores v in the variable with identity name. A string variable
-// (a name ending in "$") takes only strings, up to 255 characters; number
+// assign stores v in a variable or array element. A string variable (a
+// name ending in "$") takes only strings, up to 255 characters; number
 // and integer variables take only numbers, and an integer variable (a name
 // ending in "%") stores the number rounded down, within -32768..32767. On
 // any error the variable keeps its old value.
 //
-// @spec INTERP-032, INTERP-034, INTERP-035, INTERP-036, INTERP-037, INTERP-038
-func (in *Interp) assign(name string, v value) error {
+// @spec INTERP-032, INTERP-034, INTERP-035, INTERP-036, INTERP-037, INTERP-038, INTERP-136
+func (in *Interp) assign(ref *ast.VarRef, v value) error {
+	name := ref.Name
+	var elem *value
+	if len(ref.Subs) > 0 {
+		var err error
+		if elem, err = in.element(ref); err != nil {
+			return err
+		}
+	}
 	isString := strings.HasSuffix(name, "$")
 	if isString == v.isNum {
 		return &basicerr.Error{Kind: basicerr.TypeMismatch}
@@ -112,6 +121,10 @@ func (in *Interp) assign(name string, v value) error {
 			return err
 		}
 		v = numberValue(float64(n))
+	}
+	if elem != nil {
+		*elem = v
+		return nil
 	}
 	in.vars[name] = v
 	return nil
@@ -182,6 +195,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execCmd(s)
 	case *ast.OnStmt:
 		return in.execOn(s)
+	case *ast.DimStmt:
+		return in.execDim(s)
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:
@@ -323,6 +338,13 @@ func (in *Interp) eval(e ast.Expr) (value, error) {
 	case *ast.NumberLit:
 		return inRange(e.Value)
 	case *ast.VarRef:
+		if len(e.Subs) > 0 {
+			elem, err := in.element(e)
+			if err != nil {
+				return value{}, err
+			}
+			return *elem, nil
+		}
 		if e.Name == "ST" {
 			return numberValue(float64(in.status)), nil // @spec INTERP-119
 		}

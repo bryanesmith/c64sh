@@ -130,6 +130,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `024-number-functions.bas` | `ABS`, `SGN`, `INT` (and rounding with it), `SQR`, `EXP`, `LOG`, the trigonometric functions and `π`, a function in `DEF FN`, `RND` with a negative seed and dice rolls, and `?ILLEGAL QUANTITY  ERROR` |
 | `025-string-functions.bas` | `LEN`, `LEFT$`, `RIGHT$`, `MID$` (with and without a length, and past the end), `CHR$`, `ASC`, `STR$`, `VAL`, and idioms: reversing a string, checking a first letter, building a string; `?ILLEGAL QUANTITY  ERROR` |
 | `026-print-formatting.bas` | `TAB` columns with a ruler, `TAB` past its column, `SPC`, a bar chart, a line left open by `TAB`, `POS(0)`, and `?ILLEGAL QUANTITY  ERROR` |
+| `027-arrays.bas` | `DIM` of number, string, and integer arrays, arrays separate from plain variables, a two-dimensional multiplication table, an array used without `DIM`, the largest-value and swap idioms, and `?REDIM'D ARRAY  ERROR IN 60` |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

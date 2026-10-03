@@ -534,3 +534,18 @@ func TestPrintFormattingKeywords(t *testing.T) {
 		{"POS", "POS(0)", []token.Token{tok(token.Function, "POS", 0), tok(token.LParen, "(", 3), num("0", 4), tok(token.RParen, ")", 5), eol(6)}},
 	})
 }
+
+// @spec LEXER-041
+func TestDimKeyword(t *testing.T) {
+	runLexCases(t, []lexCase{{"DIM", "DIM A(9)", []token.Token{
+		tok(token.Dim, "DIM", 0), name("A", 4), tok(token.LParen, "(", 5), num("9", 6), tok(token.RParen, ")", 7), eol(8),
+	}}})
+}
+
+// @spec LEXER-042
+func TestReservedKeywords(t *testing.T) {
+	for _, k := range []string{"DATA", "READ", "RESTORE", "STOP", "CONT", "CLR", "FRE", "PEEK", "POKE", "SYS", "WAIT", "USR"} {
+		runLexCases(t, []lexCase{{k, k, []token.Token{tok(token.Reserved, k, 0), eol(len(k))}}})
+	}
+	runLexCases(t, []lexCase{{"in a name", "READY", []token.Token{tok(token.Reserved, "READ", 0), name("Y", 4), eol(5)}}})
+}

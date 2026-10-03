@@ -98,3 +98,4 @@ Design: `parser-design.md`
 
 - [x] **PARSER-066**: When a `Function` token appears where an operand is expected, followed by `(`, the number of expressions the function takes separated by commas, and `)`, the parser shall produce an `*ast.CallExpr` holding the function's name and the expressions; with a missing `(` or `)`, or a different number of arguments, it shall return a SYNTAX error.
 - [x] **PARSER-067**: When a `Pi` token appears where an operand is expected, the parser shall produce an `*ast.NumberLit` whose value is pi.
+- [x] **PARSER-068**: The parser shall accept one argument for `LEN`, `CHR$`, `ASC`, `STR$`, and `VAL`, two for `LEFT$` and `RIGHT$`, and two or three for `MID$`, and return a SYNTAX error for any other number.

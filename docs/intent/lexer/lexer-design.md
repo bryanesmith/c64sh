@@ -75,7 +75,7 @@ const (
     Cmd                   // CMD
     Hash                  // #
     On                    // ON
-    Function              // ABS, INT, SGN, SQR, RND, LOG, EXP, SIN, COS, TAN, ATN (Value: the name)
+    Function              // ABS, INT, …, ATN, LEN, LEFT$, …, VAL (Value: the name)
     Pi                    // π
 )
 
@@ -114,7 +114,7 @@ Inside a string literal, the bytes of the line are kept exactly as they are, inc
 
 ## Keywords
 
-The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, `THEN`, `RUN`, `LIST`, `NEW`, `END`, `GOTO`, `GO`, `TO`, `FOR`, `NEXT`, `STEP`, `GOSUB`, `RETURN`, `INPUT`, `GET`, `DEF`, `FN`, `LOAD`, `SAVE`, `VERIFY`, `PRINT#`, `INPUT#`, `OPEN`, `CLOSE`, `CMD`, `ON`, and the names of the built-in functions, which all produce a `Function` token whose value is the name: `ABS`, `INT`, `SGN`, `SQR`, `RND`, `LOG`, `EXP`, `SIN`, `COS`, `TAN`, and `ATN`. They break names that contain them, as every keyword does: `POINT` contains `INT`, and `COST` contains `COS`. The character `π` (U+03C0), the C64's pi key, is a `Pi` token. `PRINT#` and `INPUT#` are keywords of their own, as on a C64, so `PRINT#1` is one `PrintFile` token, while `PRINT #1`, with a space, is `Print` followed by `#` (a SYNTAX error, as on a C64).
+The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, `THEN`, `RUN`, `LIST`, `NEW`, `END`, `GOTO`, `GO`, `TO`, `FOR`, `NEXT`, `STEP`, `GOSUB`, `RETURN`, `INPUT`, `GET`, `DEF`, `FN`, `LOAD`, `SAVE`, `VERIFY`, `PRINT#`, `INPUT#`, `OPEN`, `CLOSE`, `CMD`, `ON`, and the names of the built-in functions, which all produce a `Function` token whose value is the name: `ABS`, `INT`, `SGN`, `SQR`, `RND`, `LOG`, `EXP`, `SIN`, `COS`, `TAN`, `ATN`, `LEN`, `LEFT$`, `RIGHT$`, `MID$`, `CHR$`, `ASC`, `STR$`, and `VAL` (the `$` is part of the name, so `LEFT` alone is an ordinary name). They break names that contain them, as every keyword does: `POINT` contains `INT`, and `COST` contains `COS`. The character `π` (U+03C0), the C64's pi key, is a `Pi` token. `PRINT#` and `INPUT#` are keywords of their own, as on a C64, so `PRINT#1` is one `PrintFile` token, while `PRINT #1`, with a space, is `Print` followed by `#` (a SYNTAX error, as on a C64).
 
 - **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`; `REMARK` is a `Rem` token with the comment `ARK`.
 - **Spaces inside a keyword break it.** `PRI NT` is not `PRINT`; it scans as the name `PRINT`, since spaces inside a name are skipped.
@@ -197,7 +197,8 @@ open      = "OPEN" .
 close     = "CLOSE" .
 cmd       = "CMD" .
 on        = "ON" .
-function  = "ABS" | "INT" | "SGN" | "SQR" | "RND" | "LOG" | "EXP" | "SIN" | "COS" | "TAN" | "ATN" .
+function  = "ABS" | "INT" | "SGN" | "SQR" | "RND" | "LOG" | "EXP" | "SIN" | "COS" | "TAN" | "ATN"
+          | "LEN" | "LEFT$" | "RIGHT$" | "MID$" | "CHR$" | "ASC" | "STR$" | "VAL" .
 pi        = "π" .
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
             [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */

@@ -281,7 +281,7 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 
 ### Built-in functions
 
-A `Function` token where an operand is expected is a call: the function's name, `(`, its arguments separated by commas, and `)`, becoming a `CallExpr`. Each function takes a fixed number of arguments, checked by the parser (every number function takes one), so `SIN(1,2)` and `SIN 1` are SYNTAX errors, as on a C64, which requires the parentheses (`$AEF1`). Argument types are checked when the call is evaluated. `π` is an operand whose value is pi, 3.14159265.
+A `Function` token where an operand is expected is a call: the function's name, `(`, its arguments separated by commas, and `)`, becoming a `CallExpr`. Each function takes a fixed number of arguments, checked by the parser: one for the number functions and `LEN`, `CHR$`, `ASC`, `STR$`, and `VAL`; two for `LEFT$` and `RIGHT$`; two or three for `MID$`; so `SIN(1,2)` and `SIN 1` are SYNTAX errors, as on a C64, which requires the parentheses (`$AEF1`). Argument types are checked when the call is evaluated. `π` is an operand whose value is pi, 3.14159265.
 
 ### DEF FN
 

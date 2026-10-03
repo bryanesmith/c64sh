@@ -453,6 +453,21 @@ Results are limited to the C64's range like any other number (see *Values*).
 
 **`RND`** keeps a seed, as the C64 does (`$E097`). A negative `X` replaces the seed with one computed from `X`, so `RND(-7)` always gives the same number and starts the same sequence. A positive `X` (whatever its size) advances the seed and gives the next number. An `X` of 0 replaces the seed with one computed from the clock (see `SetClock`), the counterpart of the C64 reading its timers, and gives a number from it. The seed starts at the same value in every interpreter, so a program that never reseeds gets the same numbers every run, as a C64 does after power-on. The generator is c64sh's own (a 64-bit mixing function), so its numbers differ from a C64's; programs that relied on a C64's exact sequence will see different values.
 
+## String functions
+
+String functions evaluate their arguments in order; each must have its type (a string or a number, below, else `TYPE MISMATCH`), and each number marked *byte* is rounded down and must be from 0 to 255 (else `ILLEGAL QUANTITY`), as the ROM reads them (`$B79E`). Characters are Unicode characters, counted as for the 255-character limit.
+
+| Function | Value |
+|---|---|
+| `LEN(S$)` | The number of characters in `S$`. |
+| `LEFT$(S$, N)` | The first `N` (byte) characters, or all of `S$` if it is shorter. |
+| `RIGHT$(S$, N)` | The last `N` (byte) characters, or all of `S$`. |
+| `MID$(S$, P [, N])` | `N` (byte; all if omitted) characters from position `P` (byte, counting from 1); `P` of 0 is `ILLEGAL QUANTITY`; past the end, the empty string. |
+| `CHR$(N)` | The character with code `N` (byte): the Unicode character `N`, which for 32 to 126 is the same as the C64's. |
+| `ASC(S$)` | The code of the first character (its Unicode code point); `ILLEGAL QUANTITY` for the empty string (`$B78B`). |
+| `STR$(X)` | `X` formatted as `PRINT` formats it, without the space after: `STR$(5)` is `" 5"`. |
+| `VAL(S$)` | The number `S$` starts with, read as `INPUT` reads a number (spaces skipped, stopping at the first character that cannot continue it); 0 if there is none; `OVERFLOW` if too large (`$B7AD`). |
+
 ## Variables
 
 Variables are kept in a map from a `VarRef`'s `Name` (its identity, such as `SC` or `N$`) to a value.

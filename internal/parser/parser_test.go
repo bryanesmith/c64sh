@@ -1050,3 +1050,16 @@ func TestPi(t *testing.T) {
 		{"pi", toks(pr, token.Token{Kind: token.Pi, Value: "π"}), `PRINT[#3.141592653589793]`, false},
 	})
 }
+
+// @spec PARSER-068
+func TestStringFunctionArity(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"LEN", toks(pr, fun("LEN"), lp, name("A$"), rp), `PRINT[LEN($A$[A$])]`, false},
+		{"LEFT$", toks(pr, fun("LEFT$"), lp, name("A$"), comma, number("2"), rp), `PRINT[LEFT$($A$[A$],#2)]`, false},
+		{"MID$ 2", toks(pr, fun("MID$"), lp, name("A$"), comma, number("2"), rp), `PRINT[MID$($A$[A$],#2)]`, false},
+		{"MID$ 3", toks(pr, fun("MID$"), lp, name("A$"), comma, number("2"), comma, number("1"), rp), `PRINT[MID$($A$[A$],#2,#1)]`, false},
+		{"MID$ 1", toks(pr, fun("MID$"), lp, name("A$"), rp), `PRINT[BAD(SYNTAX)]`, true},
+		{"LEFT$ 1", toks(pr, fun("LEFT$"), lp, name("A$"), rp), `PRINT[BAD(SYNTAX)]`, true},
+		{"CHR$ 2", toks(pr, fun("CHR$"), lp, number("65"), comma, number("1"), rp), `PRINT[BAD(SYNTAX)]`, true},
+	})
+}

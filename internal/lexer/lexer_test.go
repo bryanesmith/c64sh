@@ -513,3 +513,14 @@ func TestNumberFunctionKeywords(t *testing.T) {
 		{"INT in a name", "POINT", []token.Token{name("PO", 0), tok(token.Function, "INT", 2), eol(5)}},
 	})
 }
+
+// @spec LEXER-039
+func TestStringFunctionKeywords(t *testing.T) {
+	for _, f := range []string{"LEN", "LEFT$", "RIGHT$", "MID$", "CHR$", "ASC", "STR$", "VAL"} {
+		runLexCases(t, []lexCase{{f, f + "(", []token.Token{tok(token.Function, f, 0), tok(token.LParen, "(", len(f)), eol(len(f) + 1)}}})
+	}
+	runLexCases(t, []lexCase{
+		{"LEFT without $", "LEFT", []token.Token{name("LEFT", 0), eol(4)}},
+		{"VAL in a name", "VALUE", []token.Token{tok(token.Function, "VAL", 0), name("UE", 3), eol(5)}},
+	})
+}

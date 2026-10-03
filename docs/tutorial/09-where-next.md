@@ -30,4 +30,4 @@ The Lost Amulet is complete, and it is yours to grow. Some ideas, each using wha
 | Comparisons as numbers in arithmetic | Chapter 7 |
 | Data files with `OPEN`, `PRINT#`, `INPUT#`, and `ST` | Chapter 8 |
 
-The [user guide](../user-guide.md) describes every statement in full.
+Two shorter [projects](index.md#projects), Hammurabi and Battleship, show the same idioms in different games. The [user guide](../user-guide.md) describes every statement in full.

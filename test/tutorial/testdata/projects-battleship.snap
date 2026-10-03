@@ -1,0 +1,172 @@
+exit status: 0
+--- stdout ---
+              BATTLESHIP
+THREE SHIPS HIDE ON AN 8 BY 8 SEA. SINK
+THEM ALL. AIM WITH A LETTER AND A NUMBER,
+LIKE C4.
+
+PRESS ANY KEY.
+
+   A B C D E F G H
+ 1 . . . . . . . . 
+ 2 . . . . . . . . 
+ 3 . . . . . . . . 
+ 4 . . . . . . . . 
+ 5 . . . . . . . . 
+ 6 . . . . . . . . 
+ 7 . . . . . . . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? D4
+SPLASH! A MISS.
+
+   A B C D E F G H
+ 1 . . . . . . . . 
+ 2 . . . . . . . . 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . . . . 
+ 6 . . . . . . . . 
+ 7 . . . . . . . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? Z9
+AIM WITH A LETTER FROM A TO H AND A
+NUMBER FROM 1 TO 8, LIKE C4.
+
+YOUR SHOT? B2
+HIT!
+
+   A B C D E F G H
+ 1 . . . . . . . . 
+ 2 . X . . . . . . 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . . . . 
+ 6 . . . . . . . . 
+ 7 . . . . . . . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? B2
+YOU HAVE ALREADY FIRED THERE.
+
+YOUR SHOT? C2
+HIT!
+
+   A B C D E F G H
+ 1 . . . . . . . . 
+ 2 . X X . . . . . 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . . . . 
+ 6 . . . . . . . . 
+ 7 . . . . . . . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? A1
+SPLASH! A MISS.
+
+   A B C D E F G H
+ 1 O . . . . . . . 
+ 2 . X X . . . . . 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . . . . 
+ 6 . . . . . . . . 
+ 7 . . . . . . . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? F2
+HIT!
+
+   A B C D E F G H
+ 1 O . . . . . . . 
+ 2 . X X . . X . . 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . . . . 
+ 6 . . . . . . . . 
+ 7 . . . . . . . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? G2
+HIT!
+
+   A B C D E F G H
+ 1 O . . . . . . . 
+ 2 . X X . . X X . 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . . . . 
+ 6 . . . . . . . . 
+ 7 . . . . . . . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? H2
+HIT!
+
+   A B C D E F G H
+ 1 O . . . . . . . 
+ 2 . X X . . X X X 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . . . . 
+ 6 . . . . . . . . 
+ 7 . . . . . . . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? F5
+HIT!
+
+   A B C D E F G H
+ 1 O . . . . . . . 
+ 2 . X X . . X X X 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . X . . 
+ 6 . . . . . . . . 
+ 7 . . . . . . . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? F6
+HIT!
+
+   A B C D E F G H
+ 1 O . . . . . . . 
+ 2 . X X . . X X X 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . X . . 
+ 6 . . . . . X . . 
+ 7 . . . . . . . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? F7
+HIT!
+
+   A B C D E F G H
+ 1 O . . . . . . . 
+ 2 . X X . . X X X 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . X . . 
+ 6 . . . . . X . . 
+ 7 . . . . . X . . 
+ 8 . . . . . . . . 
+
+YOUR SHOT? F8
+HIT!
+
+   A B C D E F G H
+ 1 O . . . . . . . 
+ 2 . X X . . X X X 
+ 3 . . . . . . . . 
+ 4 . . . O . . . . 
+ 5 . . . . . X . . 
+ 6 . . . . . X . . 
+ 7 . . . . . X . . 
+ 8 . . . . . X . . 
+
+YOU SANK EVERY SHIP IN 11 SHOTS!
+
+--- stderr ---

@@ -33,6 +33,15 @@ type Semicolon struct{}
 // Comma is the , print separator.
 type Comma struct{}
 
+// TabItem is TAB(X): move to column X.
+type TabItem struct{ X Expr }
+
+// SpcItem is SPC(X): move right X columns.
+type SpcItem struct{ X Expr }
+
+func (*TabItem) printItem() {}
+func (*SpcItem) printItem() {}
+
 // BadItem marks where a syntax error occurred inside a PRINT statement.
 // It is always the statement's last item.
 type BadItem struct{ Err error }

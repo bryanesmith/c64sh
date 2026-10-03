@@ -38,6 +38,8 @@ type PrintStmt struct {
 type ExprItem struct{ Expr Expr } // a value to print
 type Semicolon struct{}           // ;
 type Comma struct{}               // ,
+type TabItem struct{ X Expr }     // TAB(X): move to column X
+type SpcItem struct{ X Expr }     // SPC(X): move right X columns
 type BadItem struct{ Err error }  // where parsing failed; always the last item
 
 // RemStmt is REM and its comment, exactly as written after REM.
@@ -279,9 +281,13 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 
 `INPUT` is followed by an optional prompt, then one or more variables separated by commas. The prompt is a string literal followed by `;`, as the ROM requires (`$ABBF`): `INPUT "NAME";N$`. An expression is not allowed as the prompt, so `INPUT "A"+"B";X` and `INPUT P$;X` are SYNTAX errors, and so is a prompt followed by `,` instead of `;`. `GET` is followed by one or more variables separated by commas. A missing variable, or anything after the list other than `:` or the end of the line, is a SYNTAX error in place of the statement.
 
+### TAB and SPC
+
+`TAB(` and `SPC(` are print items, not functions: each is followed by an expression and `)`, becoming a `TabItem` or `SpcItem`, and they can appear only among the items of `PRINT`, `PRINT#`, and `CMD` (anywhere else, such as `A=TAB(5)`, they are SYNTAX errors, as on a C64). A missing `)` is a SYNTAX error.
+
 ### Built-in functions
 
-A `Function` token where an operand is expected is a call: the function's name, `(`, its arguments separated by commas, and `)`, becoming a `CallExpr`. Each function takes a fixed number of arguments, checked by the parser: one for the number functions and `LEN`, `CHR$`, `ASC`, `STR$`, and `VAL`; two for `LEFT$` and `RIGHT$`; two or three for `MID$`; so `SIN(1,2)` and `SIN 1` are SYNTAX errors, as on a C64, which requires the parentheses (`$AEF1`). Argument types are checked when the call is evaluated. `π` is an operand whose value is pi, 3.14159265.
+A `Function` token where an operand is expected is a call: the function's name, `(`, its arguments separated by commas, and `)`, becoming a `CallExpr`. Each function takes a fixed number of arguments, checked by the parser: one for `POS`, the number functions, and `LEN`, `CHR$`, `ASC`, `STR$`, and `VAL`; two for `LEFT$` and `RIGHT$`; two or three for `MID$`; so `SIN(1,2)` and `SIN 1` are SYNTAX errors, as on a C64, which requires the parentheses (`$AEF1`). Argument types are checked when the call is evaluated. `π` is an operand whose value is pi, 3.14159265.
 
 ### DEF FN
 
@@ -327,7 +333,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OnStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
-| `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
+| `PrintItem = Expression \| ";" \| "," \| tab Expression ")" \| spc Expression ")" .` | `parsePrintItem` | `ast.PrintItem` |
 | `Expression = Conjunction { or Conjunction } .` | `parseExpression` | `ast.Expr` |
 | `Conjunction = Comparison { and Comparison } .` | `parseConjunction` | `ast.Expr` |
 | `Comparison = Sum { Relation Sum } .` | `parseComparison` | `ast.Expr` |
@@ -367,7 +373,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
 | `Operand = string \| number \| pi \| Variable \| "(" Expression ")" \| not Comparison \| fn FunctionName "(" Expression ")" \| Call .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `printfile`, `inputfile`, `open`, `close`, `cmd`, `on`, `function`, `pi`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `printfile`, `inputfile`, `open`, `close`, `cmd`, `on`, `function`, `pi`, `tab`, `spc`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 

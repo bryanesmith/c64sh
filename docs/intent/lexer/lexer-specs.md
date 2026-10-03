@@ -29,6 +29,7 @@ Design: `lexer-design.md`
 - [x] **LEXER-037**: When the lexer encounters `ON` in uppercase outside a string literal, it shall produce an `On` token.
 - [x] **LEXER-038**: When the lexer encounters `ABS`, `INT`, `SGN`, `SQR`, `RND`, `LOG`, `EXP`, `SIN`, `COS`, `TAN`, or `ATN` in uppercase outside a string literal, it shall produce a `Function` token whose value is the name, and for `π` (U+03C0), a `Pi` token.
 - [x] **LEXER-039**: When the lexer encounters `LEN`, `LEFT$`, `RIGHT$`, `MID$`, `CHR$`, `ASC`, `STR$`, or `VAL` in uppercase outside a string literal, it shall produce a `Function` token whose value is the name.
+- [x] **LEXER-040**: When the lexer encounters `TAB(` or `SPC(` in uppercase outside a string literal, it shall produce a `Tab` or `Spc` token, and for `POS`, a `Function` token with value `POS`.
 
 ## Punctuation and illegal input
 

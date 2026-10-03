@@ -24,24 +24,26 @@ const zoneWidth = 10
 
 // Interp executes lines, writing program output to its writer.
 type Interp struct {
-	out      io.Writer
-	column   int                     // cursor column: characters written since the last newline
-	vars     map[string]value        // variables, by identity (ast.VarRef.Name)
-	program  []progLine              // stored lines, in ascending order of number
-	ran      bool                    // whether RUN or GOTO has been executed
-	direct   *ast.Line               // the line Exec is running, in direct mode
-	stack    []frame                 // the control stack: FOR and GOSUB entries
-	cur      pos                     // the position of the statement executing
-	console  Console                 // where INPUT and GET read
-	fns      map[string]*ast.DefStmt // user-defined functions, by name identity
-	calls    int                     // user-defined function calls in progress
-	storage  Storage                 // where LOAD, SAVE, and VERIFY find files
-	messages io.Writer               // where tape and disk messages go; nil for none
-	files    map[int]*ioFile         // open logical files, by number
-	cmd      int                     // the file CMD sends output to; 0 for the screen
-	status   int                     // ST: the status of the last file operation
-	seed     uint64                  // the RND seed
-	clock    func() time.Time        // the clock RND(0) reads; nil: the system clock
+	out         io.Writer
+	column      int                     // cursor column: characters written since the last newline
+	vars        map[string]value        // variables, by identity (ast.VarRef.Name)
+	program     []progLine              // stored lines, in ascending order of number
+	ran         bool                    // whether RUN or GOTO has been executed
+	direct      *ast.Line               // the line Exec is running, in direct mode
+	stack       []frame                 // the control stack: FOR and GOSUB entries
+	cur         pos                     // the position of the statement executing
+	console     Console                 // where INPUT and GET read
+	fns         map[string]*ast.DefStmt // user-defined functions, by name identity
+	calls       int                     // user-defined function calls in progress
+	storage     Storage                 // where LOAD, SAVE, and VERIFY find files
+	messages    io.Writer               // where tape and disk messages go; nil for none
+	files       map[int]*ioFile         // open logical files, by number
+	cmd         int                     // the file CMD sends output to; 0 for the screen
+	status      int                     // ST: the status of the last file operation
+	printing    bool                    // a PRINT to the screen is evaluating an item
+	printColumn int                     // while printing: the column its output so far reaches
+	seed        uint64                  // the RND seed
+	clock       func() time.Time        // the clock RND(0) reads; nil: the system clock
 
 	interrupted atomic.Bool // set by Interrupt, checked after each statement
 }
@@ -222,7 +224,12 @@ func (in *Interp) printItems(items []ast.PrintItem, f *ioFile) error {
 	for _, item := range items {
 		switch item := item.(type) {
 		case *ast.ExprItem:
+			if screen {
+				// POS sees the column the items so far have reached.
+				in.printColumn, in.printing = column, true
+			}
 			v, err := in.eval(item.Expr)
+			in.printing = false
 			if err != nil {
 				return in.fail(f, buf.String(), err)
 			}
@@ -240,6 +247,28 @@ func (in *Interp) printItems(items []ast.PrintItem, f *ioFile) error {
 			n := zoneWidth - column%zoneWidth
 			if !screen {
 				n = zoneWidth - in.column%zoneWidth
+			}
+			buf.WriteString(strings.Repeat(" ", n))
+			column += n
+			newline = false
+		case *ast.TabItem, *ast.SpcItem:
+			// @spec INTERP-130, INTERP-131
+			var x ast.Expr
+			if tab, ok := item.(*ast.TabItem); ok {
+				x = tab.X
+			} else {
+				x = item.(*ast.SpcItem).X
+			}
+			n, err := in.evalByte(x)
+			if err != nil {
+				return in.fail(f, buf.String(), err)
+			}
+			if _, ok := item.(*ast.TabItem); ok {
+				from := column
+				if !screen {
+					from = in.column
+				}
+				n = max(n-from, 0)
 			}
 			buf.WriteString(strings.Repeat(" ", n))
 			column += n

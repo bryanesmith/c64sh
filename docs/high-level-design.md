@@ -84,6 +84,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 - The lexer, parser, and interpreter each have unit tests; functional tests run the whole shell on given input and assert on captured stdout and stderr.
 - `examples/` holds numbered, executable BASIC scripts (`001-hello-world.bas`, …) that show each language feature in many forms, commented for readers. Snapshot tests run every example and compare its stdout, stderr, and exit status with a recorded snapshot, so any change in behavior appears as a reviewable diff.
 - `make build`, `make run`, and `make install` build the binary, build and start the shell, and install `c64sh` into `~/bin`.
+- A tutorial in `docs/tutorial/` teaches the language by building a text adventure, chapter by chapter, with the idioms experienced BASIC programmers used; it grows with the language, and tests run every listing in it.
 - `README.md` gives a short description, build and run instructions, and one example, and links to a user guide at `docs/user-guide.md`.
 
 ## Non-Goals
@@ -133,6 +134,7 @@ A BASIC error (such as `SYNTAX`) is an ordinary Go error value that carries the 
 
 - **Unit tests** live beside the code in each package (`lexer_test.go`, `parser_test.go`, …).
 - **Functional tests** in `test/functional/` run the shell in-process with given input, capture stdout and stderr, and assert on them. One test builds the real `c64sh` binary and runs a script through its `#!/usr/bin/env c64sh` line.
+- **Tutorial tests** in `test/tutorial/` run the complete program of each tutorial chapter and project with recorded input, compare its output with a recorded snapshot, and check that the excerpts in each chapter are lines of its program.
 - **Snapshot tests** in `test/snapshot/` run each script in `examples/` through the shell, as `c64sh FILE` does, and compare the result with a recorded snapshot in `test/snapshot/testdata/`. `make update-snapshots` rewrites the snapshots from current behavior; the resulting diff is reviewed like code. The same tests check that the examples follow their conventions (numbered names, `#!` line, a leading `REM` comment).
 
 ### Build and installation
@@ -165,8 +167,9 @@ internal/interp/
 internal/shell/
 test/functional/     end-to-end tests
 test/snapshot/       snapshot tests of examples/ (snapshots in testdata/)
+test/tutorial/       tests of the tutorial's programs (snapshots in testdata/)
 examples/            numbered example scripts, one or more per feature
-docs/                design docs (HLD, docs/intent/) and user-guide.md
+docs/                design docs (HLD, docs/intent/), user-guide.md, and tutorial/
 README.md
 ```
 

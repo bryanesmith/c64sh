@@ -1,0 +1,151 @@
+# 4. Understanding words
+
+[Tutorial](index.md) · Previous: [Getting around](03-getting-around.md) · Next: [Things to carry](05-things-to-carry.md)
+
+Players type commands like `GO NORTH` or `TAKE LAMP`: a **verb** and a **noun**. In this chapter the game learns to split a command into the two, and to look the verb up in a table of words.
+
+## Splitting a command
+
+```basic
+2010 VB$=C$:NN$="":P=0
+2020 FOR I=1 TO LEN(C$)
+2030 IF P=0 AND MID$(C$,I,1)=" " THEN P=I
+2040 NEXT
+2050 IF P THEN VB$=LEFT$(C$,P-1):NN$=MID$(C$,P+1)
+```
+
+The loop goes through the command one character at a time: `LEN(C$)` is its length, and `MID$(C$,I,1)` its `I`th character. `P` remembers where the first space is. Then, if there was a space, the verb `VB$` is everything before it (`LEFT$`) and the noun `NN$` everything after it (`MID$` without a length runs to the end). `TAKE LAMP` becomes `TAKE` and `LAMP`.
+
+## A table of words
+
+```basic
+10200 REM WORDS: FIRST THREE LETTERS, ACTION
+10210 DATA 19,N,1,S,1,E,1,W,1,NOR,1,SOU,1,EAS,1,WES,1,GO,1
+10220 DATA LOO,2,TAK,3,GET,3,DRO,4,INV,5,I,5,SAV,6,LOA,7,QUI,8,HEL,9
+```
+
+Each word is stored as its first three letters, with an action number: 1 is moving, 2 looking, 3 taking, and so on. Comparing only three letters means `LOOK`, `LOO`, and `LOOKING` all work, a classic trick that also saved memory. Several words can share an action: `TAKE` and `GET` both take. (`GET` here is just text in a `DATA` line, not the keyword: `DATA` items are never read as keywords.)
+
+```basic
+2060 A=0:FOR I=1 TO NV
+2070 IF LEFT$(VB$,3)=VW$(I) THEN A=VA(I)
+2080 NEXT
+```
+
+After the loop, `A` is the verb's action, or 0 if it is not in the table.
+
+## Dispatching with ON … GOSUB
+
+```basic
+140 IF A=0 THEN PRINT "I DON'T KNOW HOW TO ";VB$;".":GOTO 110
+160 ON A GOSUB 3000,3100,3200,3300,3400,3500,3600,3700,3800
+180 IF DN THEN 7000
+```
+
+`ON A GOSUB` calls the `A`th subroutine in the list: action 1 calls 3000 (moving), 2 calls 3100 (looking), and so on. One line replaces a whole chain of `IF`s, and adding a verb means adding a word to the table and a subroutine to the list.
+
+The actions we have not written yet are **stubs** that say so, a good way to build a program a piece at a time:
+
+```basic
+3200 PRINT "YOU CAN'T DO THAT YET.":RETURN
+```
+
+## Quitting
+
+`QUIT` asks to be sure, using the `GET` loop from chapter 1:
+
+```basic
+3710 PRINT "DO YOU REALLY WANT TO QUIT (Y/N)?"
+3720 GET K$:IF K$="" THEN 3720
+3730 IF K$="Y" THEN DN=3
+```
+
+`DN` is a flag that means "the game is done", and line 180 checks it after every command. Delete line 125, the old `Q` check, since `QUIT` replaces it. When `DN` is set, the game goes to line 7000, which says farewell and ends; chapter 6 adds more endings.
+
+## The program so far
+
+```basic
+10 REM THE LOST AMULET
+20 GOSUB 9000:REM READ THE WORLD
+30 GOSUB 8000:REM TITLE SCREEN
+40 GOSUB 1000:REM DESCRIBE THE ROOM
+100 REM MAIN LOOP
+110 PRINT:INPUT "WHAT NOW";C$
+120 IF C$="" THEN 110
+130 GOSUB 2000:REM FIND THE VERB
+140 IF A=0 THEN PRINT "I DON'T KNOW HOW TO ";VB$;".":GOTO 110
+160 ON A GOSUB 3000,3100,3200,3300,3400,3500,3600,3700,3800
+180 IF DN THEN 7000
+200 GOTO 110
+1000 REM DESCRIBE ROOM R
+1020 PRINT:PRINT RN$(R):PRINT RD$(R)
+1030 E$="":FOR D=1 TO 4
+1040 IF EX(R,D) THEN E$=E$+" "+MID$("NSEW",D,1)
+1050 NEXT:PRINT "EXITS:";E$
+1099 RETURN
+2000 REM SPLIT C$ INTO VERB AND NOUN, FIND ACTION A
+2010 VB$=C$:NN$="":P=0
+2020 FOR I=1 TO LEN(C$)
+2030 IF P=0 AND MID$(C$,I,1)=" " THEN P=I
+2040 NEXT
+2050 IF P THEN VB$=LEFT$(C$,P-1):NN$=MID$(C$,P+1)
+2060 A=0:FOR I=1 TO NV
+2070 IF LEFT$(VB$,3)=VW$(I) THEN A=VA(I)
+2080 NEXT
+2090 RETURN
+3000 REM GO
+3010 D$=LEFT$(VB$,1):IF D$="G" THEN D$=LEFT$(NN$,1)
+3020 D=0:FOR I=1 TO 4
+3030 IF MID$("NSEW",I,1)=D$ THEN D=I
+3040 NEXT
+3050 IF D=0 THEN PRINT "GO WHERE?":RETURN
+3060 IF EX(R,D)=0 THEN PRINT "YOU CAN'T GO THAT WAY.":RETURN
+3080 R=EX(R,D):GOSUB 1000:RETURN
+3100 REM LOOK
+3110 GOSUB 1000:RETURN
+3200 PRINT "YOU CAN'T DO THAT YET.":RETURN
+3300 PRINT "YOU CAN'T DO THAT YET.":RETURN
+3400 PRINT "YOU CAN'T DO THAT YET.":RETURN
+3500 PRINT "YOU CAN'T DO THAT YET.":RETURN
+3600 PRINT "YOU CAN'T DO THAT YET.":RETURN
+3700 REM QUIT
+3710 PRINT "DO YOU REALLY WANT TO QUIT (Y/N)?"
+3720 GET K$:IF K$="" THEN 3720
+3730 IF K$="Y" THEN DN=3
+3740 RETURN
+3800 REM HELP
+3810 PRINT "TRY: N S E W, GO NORTH, LOOK, TAKE LAMP, DROP LAMP,"
+3820 PRINT "INVENTORY, SAVE, LOAD, QUIT, OR HELP."
+3830 RETURN
+7000 REM THE END
+7010 PRINT:PRINT "FAREWELL, ADVENTURER."
+7040 END
+8000 REM TITLE SCREEN
+8010 PRINT TAB(12);"THE LOST AMULET"
+8020 PRINT TAB(12);"---------------"
+8030 PRINT "THE AMULET OF DAWN LIES SOMEWHERE IN THE"
+8040 PRINT "RUINED CASTLE. FIND IT AND CARRY IT BACK"
+8050 PRINT "TO THE GATEHOUSE. TYPE HELP FOR COMMANDS."
+8060 PRINT:PRINT "PRESS ANY KEY TO BEGIN."
+8070 GET K$:IF K$="" THEN 8070
+8080 RETURN
+9000 REM READ THE WORLD FROM DATA
+9010 READ NR:DIM RN$(NR),RD$(NR),DK(NR),EX(NR,4)
+9020 FOR I=1 TO NR:READ RN$(I),RD$(I),DK(I)
+9030 FOR D=1 TO 4:READ EX(I,D):NEXT D,I
+9060 READ NV:DIM VW$(NV),VA(NV)
+9070 FOR I=1 TO NV:READ VW$(I),VA(I):NEXT
+9110 R=1:RETURN
+10000 REM ROOMS: NAME, DESCRIPTION, DARK, EXITS N S E W
+10010 DATA 7
+10020 DATA GATEHOUSE,"A CRUMBLING GATEHOUSE. A PATH LEADS NORTH.",0,2,0,0,0
+10030 DATA COURTYARD,"A WEEDY COURTYARD WITH DOORS ALL AROUND.",0,5,1,3,4
+10040 DATA WELL,"AN OLD WELL. SOMETHING GLINTS BELOW.",0,0,0,0,2
+10050 DATA STABLES,"EMPTY STABLES THAT SMELL OF OLD HAY.",0,0,0,2,0
+10060 DATA GREAT HALL,"A VAST HALL. STAIRS GO DOWN TO THE NORTH.",0,6,2,7,0
+10070 DATA CRYPT,"A COLD CRYPT FULL OF DUSTY TOMBS.",1,0,5,0,0
+10080 DATA KITCHEN,"A KITCHEN WITH A CRACKED OVEN.",0,0,0,0,5
+10200 REM WORDS: FIRST THREE LETTERS, ACTION
+10210 DATA 19,N,1,S,1,E,1,W,1,NOR,1,SOU,1,EAS,1,WES,1,GO,1
+10220 DATA LOO,2,TAK,3,GET,3,DRO,4,INV,5,I,5,SAV,6,LOA,7,QUI,8,HEL,9
+```

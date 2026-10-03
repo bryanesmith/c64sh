@@ -1,0 +1,193 @@
+# 6. Darkness and danger
+
+[Tutorial](index.md) · Previous: [Things to carry](05-things-to-carry.md) · Next: [Keeping score](07-keeping-score.md)
+
+Now the castle gets dangerous. The crypt, where the amulet lies, is dark, and a giant bat flits from room to room.
+
+## Darkness, with logic and a function
+
+A room is too dark to see in when it is dark, and the lamp is neither carried nor in the room. That is a job for `AND`, `OR`, and `NOT`, packaged as a function:
+
+```basic
+9080 DEF FN NL(X)=DK(X) AND NOT (OL(1)=0 OR OL(1)=X)
+```
+
+`DEF FN` defines a one-line function: `FN NL(R)` is "no light in room `R`". Comparisons in BASIC are numbers, -1 for true and 0 for false, and `AND`, `OR`, and `NOT` combine them, so the whole expression is true (non-zero) exactly when the room is dark and the lamp (object 1) is not here. Now every part of the game can ask `IF FN NL(R)`:
+
+```basic
+1010 IF FN NL(R) THEN PRINT:PRINT "IT IS PITCH DARK HERE.":RETURN
+3240 IF OL(O)<>R OR FN NL(R) THEN PRINT "I SEE NO ";OB$(O);" HERE.":RETURN
+3070 IF FN NL(R) AND RND(1)<.3 THEN PRINT "YOU TRIP AND FALL INTO A PIT!":DN=2:RETURN
+```
+
+In the dark you see nothing and can take nothing, and moving is risky: `RND(1)` is a random number from 0 up to 1, so `RND(1)<.3` is true three times in ten.
+
+## Random numbers and seeding
+
+`RND` gives the same sequence every time a program runs, unless it is **seeded**. The title screen does that as soon as the player presses a key:
+
+```basic
+8080 X=RND(-TI):RETURN
+```
+
+`TI` is the clock, in sixtieths of a second, and `RND` with a negative number starts a new sequence determined by it. Because the moment the player presses the key is different every time, so is every game. This was the standard C64 way to seed, and the reason so many games began with "PRESS ANY KEY".
+
+## The bat
+
+```basic
+9090 DEF FN RR(X)=INT(RND(1)*NR)+1
+```
+
+`FN RR(0)` is a random room: `RND(1)*NR` is from 0 up to (not including) 7, `INT` rounds it down to 0–6, and adding 1 gives 1–7. (A function needs a parameter, even one it ignores.) Each turn the bat may fly to another room, and if it reaches the player, it strikes:
+
+```basic
+4010 IF RND(1)<.4 THEN BR=FN RR(0)
+4020 IF BR<>R THEN RETURN
+4040 IF OL(3)=0 THEN PRINT "IT SNATCHES YOUR BREAD AND FLIES OFF.":OL(3)=-1:GOTO 4070
+4060 R=FN RR(0):IF DK(R) THEN 4060
+```
+
+Bread distracts it: the bread's location becomes -1, a place that is no room, so it is gone for good. Otherwise the bat carries the player to a random room, and line 4060 picks again until it finds one that is not dark, a small **retry loop** that keeps the bat from dropping you in the dark.
+
+## Endings
+
+```basic
+170 IF R=1 AND OL(2)=0 THEN DN=1
+7010 PRINT:ON DN GOSUB 7100,7200,7300
+```
+
+Reaching the gatehouse carrying the amulet wins: `DN=1`. Falling into the pit sets 2, and quitting 3, so `ON DN GOSUB` prints the right ending.
+
+## The program so far
+
+```basic
+10 REM THE LOST AMULET
+20 GOSUB 9000:REM READ THE WORLD
+30 GOSUB 8000:REM TITLE SCREEN
+40 GOSUB 1000:REM DESCRIBE THE ROOM
+100 REM MAIN LOOP
+110 PRINT:INPUT "WHAT NOW";C$
+120 IF C$="" THEN 110
+130 GOSUB 2000:REM FIND THE VERB
+140 IF A=0 THEN PRINT "I DON'T KNOW HOW TO ";VB$;".":GOTO 110
+160 ON A GOSUB 3000,3100,3200,3300,3400,3500,3600,3700,3800
+170 IF R=1 AND OL(2)=0 THEN DN=1
+180 IF DN THEN 7000
+190 GOSUB 4000:REM THE BAT
+200 GOTO 110
+1000 REM DESCRIBE ROOM R
+1010 IF FN NL(R) THEN PRINT:PRINT "IT IS PITCH DARK HERE.":RETURN
+1020 PRINT:PRINT RN$(R):PRINT RD$(R)
+1030 E$="":FOR D=1 TO 4
+1040 IF EX(R,D) THEN E$=E$+" "+MID$("NSEW",D,1)
+1050 NEXT:PRINT "EXITS:";E$
+1060 FOR I=1 TO NO
+1070 IF OL(I)=R THEN PRINT "THERE IS A ";OB$(I);" HERE."
+1080 NEXT
+1090 IF BR=R THEN PRINT "A GIANT BAT HANGS FROM THE CEILING."
+1099 RETURN
+2000 REM SPLIT C$ INTO VERB AND NOUN, FIND ACTION A
+2010 VB$=C$:NN$="":P=0
+2020 FOR I=1 TO LEN(C$)
+2030 IF P=0 AND MID$(C$,I,1)=" " THEN P=I
+2040 NEXT
+2050 IF P THEN VB$=LEFT$(C$,P-1):NN$=MID$(C$,P+1)
+2060 A=0:FOR I=1 TO NV
+2070 IF LEFT$(VB$,3)=VW$(I) THEN A=VA(I)
+2080 NEXT
+2090 RETURN
+3000 REM GO
+3010 D$=LEFT$(VB$,1):IF D$="G" THEN D$=LEFT$(NN$,1)
+3020 D=0:FOR I=1 TO 4
+3030 IF MID$("NSEW",I,1)=D$ THEN D=I
+3040 NEXT
+3050 IF D=0 THEN PRINT "GO WHERE?":RETURN
+3060 IF EX(R,D)=0 THEN PRINT "YOU CAN'T GO THAT WAY.":RETURN
+3070 IF FN NL(R) AND RND(1)<.3 THEN PRINT "YOU TRIP AND FALL INTO A PIT!":DN=2:RETURN
+3080 R=EX(R,D):GOSUB 1000:RETURN
+3100 REM LOOK
+3110 GOSUB 1000:RETURN
+3200 REM TAKE
+3210 IF NN$="" THEN PRINT "TAKE WHAT?":RETURN
+3220 GOSUB 3900:IF O=0 THEN PRINT "I DON'T KNOW WHAT THAT IS.":RETURN
+3230 IF OL(O)=0 THEN PRINT "YOU ALREADY HAVE IT.":RETURN
+3240 IF OL(O)<>R OR FN NL(R) THEN PRINT "I SEE NO ";OB$(O);" HERE.":RETURN
+3250 OL(O)=0:PRINT "TAKEN.":RETURN
+3300 REM DROP
+3310 IF NN$="" THEN PRINT "DROP WHAT?":RETURN
+3320 GOSUB 3900:IF O=0 THEN PRINT "I DON'T KNOW WHAT THAT IS.":RETURN
+3330 IF OL(O)<>0 THEN PRINT "YOU DON'T HAVE IT.":RETURN
+3340 OL(O)=R:PRINT "DROPPED.":RETURN
+3400 REM INVENTORY
+3410 N=0:PRINT "YOU ARE CARRYING:"
+3420 FOR I=1 TO NO
+3430 IF OL(I)=0 THEN PRINT TAB(2);OB$(I):N=N+1
+3440 NEXT
+3450 IF N=0 THEN PRINT TAB(2);"NOTHING"
+3460 RETURN
+3500 PRINT "YOU CAN'T DO THAT YET.":RETURN
+3600 PRINT "YOU CAN'T DO THAT YET.":RETURN
+3700 REM QUIT
+3710 PRINT "DO YOU REALLY WANT TO QUIT (Y/N)?"
+3720 GET K$:IF K$="" THEN 3720
+3730 IF K$="Y" THEN DN=3
+3740 RETURN
+3800 REM HELP
+3810 PRINT "TRY: N S E W, GO NORTH, LOOK, TAKE LAMP, DROP LAMP,"
+3820 PRINT "INVENTORY, SAVE, LOAD, QUIT, OR HELP."
+3830 RETURN
+3900 REM FIND OBJECT NN$, GIVING ITS NUMBER O
+3910 O=0:FOR I=1 TO NO
+3920 IF LEFT$(NN$,3)=LEFT$(OB$(I),3) THEN O=I
+3930 NEXT:RETURN
+4000 REM THE BAT FLIES ABOUT
+4010 IF RND(1)<.4 THEN BR=FN RR(0)
+4020 IF BR<>R THEN RETURN
+4030 PRINT:PRINT "A GIANT BAT SWOOPS DOWN!"
+4040 IF OL(3)=0 THEN PRINT "IT SNATCHES YOUR BREAD AND FLIES OFF.":OL(3)=-1:GOTO 4070
+4050 PRINT "IT GRABS YOU AND CARRIES YOU AWAY!"
+4060 R=FN RR(0):IF DK(R) THEN 4060
+4065 GOSUB 1000
+4070 BR=FN RR(0):RETURN
+7000 REM THE END
+7010 PRINT:ON DN GOSUB 7100,7200,7300
+7040 END
+7100 PRINT "YOU CARRY THE AMULET OUT INTO THE SUNLIGHT."
+7110 PRINT "YOU HAVE WON!":RETURN
+7200 PRINT "YOUR ADVENTURE ENDS HERE.":RETURN
+7300 PRINT "FAREWELL, ADVENTURER.":RETURN
+8000 REM TITLE SCREEN
+8010 PRINT TAB(12);"THE LOST AMULET"
+8020 PRINT TAB(12);"---------------"
+8030 PRINT "THE AMULET OF DAWN LIES SOMEWHERE IN THE"
+8040 PRINT "RUINED CASTLE. FIND IT AND CARRY IT BACK"
+8050 PRINT "TO THE GATEHOUSE. TYPE HELP FOR COMMANDS."
+8060 PRINT:PRINT "PRESS ANY KEY TO BEGIN."
+8070 GET K$:IF K$="" THEN 8070
+8080 X=RND(-TI):RETURN
+9000 REM READ THE WORLD FROM DATA
+9010 READ NR:DIM RN$(NR),RD$(NR),DK(NR),EX(NR,4)
+9020 FOR I=1 TO NR:READ RN$(I),RD$(I),DK(I)
+9030 FOR D=1 TO 4:READ EX(I,D):NEXT D,I
+9040 READ NO:DIM OB$(NO),OL(NO)
+9050 FOR I=1 TO NO:READ OB$(I),OL(I):NEXT
+9060 READ NV:DIM VW$(NV),VA(NV)
+9070 FOR I=1 TO NV:READ VW$(I),VA(I):NEXT
+9080 DEF FN NL(X)=DK(X) AND NOT (OL(1)=0 OR OL(1)=X)
+9090 DEF FN RR(X)=INT(RND(1)*NR)+1
+9110 R=1:BR=5:RETURN
+10000 REM ROOMS: NAME, DESCRIPTION, DARK, EXITS N S E W
+10010 DATA 7
+10020 DATA GATEHOUSE,"A CRUMBLING GATEHOUSE. A PATH LEADS NORTH.",0,2,0,0,0
+10030 DATA COURTYARD,"A WEEDY COURTYARD WITH DOORS ALL AROUND.",0,5,1,3,4
+10040 DATA WELL,"AN OLD WELL. SOMETHING GLINTS BELOW.",0,0,0,0,2
+10050 DATA STABLES,"EMPTY STABLES THAT SMELL OF OLD HAY.",0,0,0,2,0
+10060 DATA GREAT HALL,"A VAST HALL. STAIRS GO DOWN TO THE NORTH.",0,6,2,7,0
+10070 DATA CRYPT,"A COLD CRYPT FULL OF DUSTY TOMBS.",1,0,5,0,0
+10080 DATA KITCHEN,"A KITCHEN WITH A CRACKED OVEN.",0,0,0,0,5
+10100 REM OBJECTS: NAME, WHERE IT STARTS (0 MEANS CARRIED)
+10110 DATA 4,LAMP,4,AMULET,6,BREAD,7,COIN,3
+10200 REM WORDS: FIRST THREE LETTERS, ACTION
+10210 DATA 19,N,1,S,1,E,1,W,1,NOR,1,SOU,1,EAS,1,WES,1,GO,1
+10220 DATA LOO,2,TAK,3,GET,3,DRO,4,INV,5,I,5,SAV,6,LOA,7,QUI,8,HEL,9
+```

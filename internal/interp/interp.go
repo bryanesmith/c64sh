@@ -46,6 +46,8 @@ type Interp struct {
 	printColumn int                     // while printing: the column its output so far reaches
 	seed        uint64                  // the RND seed
 	clock       func() time.Time        // the clock RND(0) reads; nil: the system clock
+	tiStart     time.Time               // when TI counts from
+	tiBase      int                     // TI at tiStart, in jiffies, as TI$ last set it
 
 	interrupted atomic.Bool // set by Interrupt, checked after each statement
 }
@@ -54,7 +56,7 @@ type Interp struct {
 //
 // @spec INTERP-002
 func New(out io.Writer) *Interp {
-	return &Interp{out: out, vars: map[string]value{}, arrays: map[string]*array{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed}
+	return &Interp{out: out, vars: map[string]value{}, arrays: map[string]*array{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed, tiStart: time.Now()}
 }
 
 // Interrupt asks the interpreter to stop, as the C64's STOP key does: the
@@ -126,6 +128,9 @@ func (in *Interp) assign(ref *ast.VarRef, v value) error {
 	if elem != nil {
 		*elem = v
 		return nil
+	}
+	if name == "TI$" {
+		return in.setTI(v.str)
 	}
 	in.vars[name] = v
 	return nil
@@ -352,6 +357,12 @@ func (in *Interp) eval(e ast.Expr) (value, error) {
 				return value{}, err
 			}
 			return *elem, nil
+		}
+		switch e.Name {
+		case "TI":
+			return numberValue(float64(in.ti())), nil
+		case "TI$":
+			return stringValue(in.tiString()), nil
 		}
 		if e.Name == "ST" {
 			return numberValue(float64(in.status)), nil // @spec INTERP-119

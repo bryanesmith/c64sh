@@ -201,3 +201,9 @@ Design: `interp-design.md`
 - [x] **INTERP-140**: If no `DATA` item remains, then `READ` shall fail with OUT OF DATA.
 - [x] **INTERP-141**: If a `DATA` item cannot be read into its variable, or is followed by anything but a comma or the end of its text, then `READ` shall fail with a SYNTAX error carrying the number of the line holding the `DATA` statement.
 - [x] **INTERP-142**: The interpreter shall move the data pointer to the first item when executing an `ast.RestoreStmt`, when it clears the variables, and when a `LOAD` chains; executing an `ast.DataStmt` shall do nothing.
+
+## Clock
+
+- [x] **INTERP-143**: When evaluating `TI`, the interpreter shall return the whole jiffies (sixtieths of a second) of clock time since the interpreter was created or its clock was last set, plus the jiffies `TI$` was last set to, modulo 5184000.
+- [x] **INTERP-144**: When evaluating `TI$`, the interpreter shall return the value of `TI` as hours, minutes, and seconds, each as two digits.
+- [x] **INTERP-145**: When assigning to `TI$`, the interpreter shall fail with ILLEGAL QUANTITY unless the value is six characters, all digits, and otherwise read them as `HHMMSS` and make `TI` count on from that many jiffies.

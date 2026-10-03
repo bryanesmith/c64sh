@@ -265,7 +265,7 @@ A `VarRef`'s `Name` is the variable's identity, as on a C64: the first character
 
 **`DIM`** is followed by one or more names separated by commas, each with or without subscripts: `DIM A(10),B$(3,4)`. A name without subscripts declares a plain variable, which does nothing, as on a C64.
 
-These are SYNTAX errors, following the tenet *Authentic errors over helpful ones*: a name whose identity is `TI` or `TI$`, the C64's clock, which is not supported yet, whether used or assigned (`TI%` is an ordinary integer variable, as on a C64, whose check for system variables includes the type); and an assignment to `ST`, the I/O status, which can only be read (see *Data files*).
+**System variables.** `ST` (the I/O status) and `TI` (the clock in jiffies) can be read but not assigned: an assignment to either (`LET`, `FOR`, `INPUT`, `GET`, `READ`) is a SYNTAX error, as on a C64. `TI$`, the clock as `HHMMSS`, can be both read and assigned. `ST%`, `ST$`, and `TI%` are ordinary variables, as on a C64, whose check for system variables includes the type.
 
 ### IF
 
@@ -467,7 +467,6 @@ Examples:
 | Leading `+` | Dropped by the parser | A unary-plus node | The C64 ROM ignores a leading `+`, whatever follows, so there is no behavior for a node to carry. |
 | `^` associativity | Left to right: `2^3^2` is 64 | Right to left (512), as in mathematics and many languages | C64 BASIC V2 evaluates `^` left to right, like its other operators. |
 | Variable identity | Computed by the parser into `VarRef.Name` | Computed by the interpreter at each use | One place decides identity; the interpreter only stores and looks up. |
-| Unsupported names (`TI`, `TI$`) | SYNTAX error | Treat as ordinary variables | On a C64 these read the clock; silently treating them as plain variables would print wrong answers. |
 | Comparison representation | `CompareExpr` with a `Relation` bit set | One `Op` per operator (`<`, `<=`, …) | A set of relations reproduces the C64's own rule for combining `<`, `=`, and `>` directly, including the unusual spellings, with one evaluation rule. |
 | Line number after `RUN`, `GOTO`, `THEN` | Read with the ROM's line-number routine, 0 when no digits follow | A SYNTAX error unless a plain line number follows | The C64 reads it this way, so `GOTO 20.5` goes to line 20 and `GOTO A` to line 0; reproducing it costs nothing, since the same routine reads line numbers at the start of a line. |
 | `IF … THEN n` | An `IfStmt` followed by a `GotoStmt` | A line-number field on `IfStmt` | The jump is an ordinary statement guarded by the `IF`, as in the ROM, so the interpreter needs no special case. |

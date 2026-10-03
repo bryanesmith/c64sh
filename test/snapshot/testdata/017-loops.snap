@@ -1,0 +1,16 @@
+exit status: 1
+--- stdout ---
+ 1  2  3  4  5 
+ 0  5  10 
+ 3  2  1 
+ 1  1.5  2 
+ 4 
+ONCE
+ 1  2 
+*
+**
+***
+ 1  1  1  2  2  1  2  2 
+ 1  4  9 
+--- stderr ---
+?NEXT WITHOUT FOR  ERROR

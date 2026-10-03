@@ -120,6 +120,15 @@ type GotoStmt struct{ Line int }
 type ListStmt struct{} // LIST: print the stored program
 type NewStmt struct{}  // NEW: erase the stored program and the variables
 type EndStmt struct{}  // END: stop
+
+// ForStmt is FOR Var = From TO To [STEP Step]; Step is nil when omitted.
+type ForStmt struct {
+    Var            *VarRef
+    From, To, Step Expr
+}
+
+// NextStmt is NEXT [Var {, Var}]; Vars is empty for a bare NEXT.
+type NextStmt struct{ Vars []*VarRef }
 ```
 
 Binary operators are left-associative within a precedence level: `"A"+"B"+"C"` is `BinaryExpr(Add, BinaryExpr(Add, "A", "B"), "C")`, and `8-2-1` is `(8-2)-1`. The parser does not check operand types: whether `+` joins strings, adds numbers, or is a type mismatch is decided by the interpreter from the values, as on a C64.
@@ -181,6 +190,12 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 - **`GOTO` is always followed by a line number**, read from the following `Number` token's text by `lexer.LineNumber`, as the ROM reads it (`$A8A0`): `GOTO 20` and `GOTO 20.5` both go to line 20. When no `Number` follows, or its text does not begin with a digit, the line number is 0, so `GOTO` alone and `GOTO A` are `GOTO 0`, as on a C64. A line number above 63999 is a SYNTAX error in place of the statement. What follows the line number is never checked, because a jump does not return to its line.
 - **`GO TO`** is the keyword `GO` followed by the keyword `TO`, then a line number as for `GOTO`, giving the same `GotoStmt` (`$A80E`). `GO` followed by anything other than `TO` is a SYNTAX error in place of the statement.
 
+### FOR and NEXT
+
+`FOR` is followed by a variable, `=`, the start value, `TO`, the end value, and optionally `STEP` and the step. The variable must be a plain number or string variable: an integer variable (`FOR I%=…`) is a SYNTAX error, as on a C64, whose `FOR` refuses integer counters; a string variable parses, and is a `TYPE MISMATCH` when it runs, as the ROM finds it then (`$A772`). A missing `TO`, or an expression missing where one is required, is a SYNTAX error in place of the statement.
+
+`NEXT` is followed by nothing, or by one or more variables separated by commas. A variable list that does not end at `:` or the end of the line (`NEXT I J`, `NEXT I,`) is a SYNTAX error in place of the statement.
+
 ### Items side by side
 
 An expression ends at the first token that cannot continue it, and PRINT then reads the next item. A token that can start an expression but not continue one begins a new item: `PRINT 2(3)` prints two numbers, ` 2  3 `. A `-` or `+` after an operand always continues the expression as a binary operator, as on a C64: `PRINT 1 -1` prints ` 0 `, and `PRINT "A"-1` is `TYPE MISMATCH`.
@@ -194,7 +209,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
@@ -210,6 +225,8 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `LetStatement = [ let ] Variable "=" Expression .` | `parseLetStatement` | `*ast.LetStmt` |
 | `IfStatement = if Expression ( then [ LineNumber ] \| /* goto, parsed as the next statement */ ) .` | `parseIfStatement` | `*ast.IfStmt`, and a `*ast.GotoStmt` for `THEN n` (see *IF*) |
 | `RunStatement = run [ LineNumber ] .` | `parseRunStatement` | `*ast.RunStmt` (see *Program commands*) |
+| `ForStatement = for Variable "=" Expression to Expression [ step Expression ] .` | `parseForStatement` | `*ast.ForStmt` |
+| `NextStatement = next [ Variable { "," Variable } ] .` | `parseNextStatement` | `*ast.NextStmt` |
 | `GotoStatement = ( goto \| go to ) LineNumber .` | `parseGotoStatement` | `*ast.GotoStmt` |
 | `LineNumber = [ number ] .` | `parseLineNumber` | `int`: the line number, 0 if there is none (see *Program commands*) |
 | `ListStatement = list .` | `parseCommand` | `*ast.ListStmt` |
@@ -218,7 +235,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
 | `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 

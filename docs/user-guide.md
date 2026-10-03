@@ -17,6 +17,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [IF … THEN](#if--then)
 - [Variables](#variables)
 - [Programs](#programs)
+- [Loops](#loops)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -371,6 +372,28 @@ prints `HELLO` and `WORLD`.
 
 See [`examples/014-program-mode.bas`](../examples/014-program-mode.bas) and [`examples/016-goto.bas`](../examples/016-goto.bas) for every form.
 
+## Loops
+
+`FOR` and `NEXT` repeat the statements between them, counting a variable from a start value to an end value:
+
+```
+FOR I=1 TO 5:PRINT I;:NEXT
+```
+
+prints ` 1  2  3  4  5 `.
+
+- **`STEP`** sets how much the variable changes each time; it is 1 if left out, and can be negative or a fraction: `FOR I=10 TO 0 STEP -5` counts 10, 5, 0.
+- **The loop ends when the variable passes the end value.** The test is made at `NEXT`, so the body always runs at least once, even in `FOR I=5 TO 1`. Afterwards the variable is one step past the end: after `FOR I=1 TO 3:NEXT`, `I` is 4.
+- **The end and the step are worked out once**, when `FOR` runs; changing a variable used in them does not change the loop.
+- **`NEXT` with no variable** continues the innermost loop. `NEXT I` names the loop, and `NEXT J,I` closes two nested loops at once.
+- **Loops can be nested** and can span many lines of a program, or fit on one line, in a program or typed directly.
+- **The counter must be a number variable**: `FOR I%=…` is a `?SYNTAX  ERROR`, and a string variable is a `?TYPE MISMATCH  ERROR`.
+- **`NEXT` with no matching `FOR`** is a `?NEXT WITHOUT FOR  ERROR`. Starting a loop with a variable that is already counting another loop ends the old loop, and any loops inside it.
+- **At most 10 loops can be nested**, as on a C64; the 11th is an `?OUT OF MEMORY  ERROR`.
+- **The keywords break names that contain them**: `FORM` and `STEPS` cannot be variable names.
+
+See [`examples/017-loops.bas`](../examples/017-loops.bas) for every form.
+
 ## Comments
 
 `REM` starts a comment. Everything after it, to the end of the line, is ignored:
@@ -406,6 +429,8 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?OVERFLOW  ERROR` | A number, or the result of a calculation, is larger than 1.70141183E+38. |
 | `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
 | `?UNDEF'D STATEMENT  ERROR` | `RUN`, `GOTO`, or `IF … THEN` with a line number that is not in the program. |
+| `?NEXT WITHOUT FOR  ERROR` | `NEXT` with no loop to continue. |
+| `?OUT OF MEMORY  ERROR` | More than 10 loops nested. |
 | `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
 
 An error stops the rest of its line. Anything printed before the error stays printed, as on a C64:
@@ -440,7 +465,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 - **`,` fills print zones with spaces.** A C64 moves its cursor right on screen instead, leaving whatever was there; in a terminal, output only ever appears after the cursor, so spaces look the same.
 - **Errors go to stderr** and set a non-zero exit status in scripts.
 - **No screen emulation**: no 40-column wrapping, colors, or graphics characters. So a print zone past column 40 stays on the same line: `PRINT 2,3,4,5,6` prints ` 6 ` at column 40, where a C64 would start a new screen line.
-- **Arithmetic uses standard 64-bit floating point**, rounded to the C64's 9 digits when printed. Results match a C64 in nearly every case; a C64's own rounding occasionally differs in the last digit.
+- **Arithmetic uses standard 64-bit floating point**, rounded to the C64's 9 digits when printed. Results match a C64 in nearly every case; a C64's own rounding occasionally differs in the last digit. Rarely, a loop with a fractional `STEP`, such as `FOR I=0 TO 1 STEP .1`, runs a different number of times than on a C64.
 - **The banner** reads `C64SH BASIC V2`.
 
 ## Not yet supported
@@ -449,7 +474,7 @@ These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 - Arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
 - Functions such as `CHR$(34)`
-- `GOSUB`, `FOR`, `ON`, and the other ways to call or loop in a program; `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
+- `GOSUB`, `ON`, and the other ways to call or jump in a program; `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 
 These are planned; the [roadmap](https://github.com/bryanesmith/c64sh/issues/34) lists them in the order they will be added.

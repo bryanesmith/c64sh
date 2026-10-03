@@ -26,6 +26,7 @@ import (
 // @spec PARSER-021, PARSER-022, PARSER-023, PARSER-024, PARSER-025, PARSER-026, PARSER-027
 // @spec PARSER-028, PARSER-029, PARSER-030, PARSER-031, PARSER-032, PARSER-033, PARSER-034
 // @spec PARSER-035, PARSER-036, PARSER-037, PARSER-038, PARSER-039, PARSER-040, PARSER-041
+// @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -112,7 +113,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -135,6 +136,18 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return stmt, nil
 	case token.Goto, token.Go:
 		stmt, err := p.parseGotoStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	case token.For:
+		stmt, err := p.parseForStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	case token.Next:
+		stmt, err := p.parseNextStatement()
 		if err != nil {
 			return nil, err
 		}
@@ -170,6 +183,68 @@ func (p *parser) parseRunStatement() (*ast.RunStmt, error) {
 		return nil, err
 	}
 	return &ast.RunStmt{Line: n, HasLine: true}, nil
+}
+
+// ForStatement = for Variable "=" Expression to Expression [ step Expression ] .
+//
+// The variable cannot be an integer variable, as on a C64.
+func (p *parser) parseForStatement() (*ast.ForStmt, error) {
+	p.next() // FOR
+	if p.peek() != token.Name {
+		return nil, syntaxError()
+	}
+	v, err := p.parseVariable()
+	if err != nil {
+		return nil, err
+	}
+	if strings.HasSuffix(v.Name, "%") || !p.accept(token.Equal) {
+		return nil, syntaxError()
+	}
+	s := &ast.ForStmt{Var: v}
+	if s.From, err = p.parseExpression(); err != nil {
+		return nil, err
+	}
+	if !p.accept(token.To) {
+		return nil, syntaxError()
+	}
+	if s.To, err = p.parseExpression(); err != nil {
+		return nil, err
+	}
+	if p.accept(token.Step) {
+		if s.Step, err = p.parseExpression(); err != nil {
+			return nil, err
+		}
+	}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return s, nil
+}
+
+// NextStatement = next [ Variable { "," Variable } ] .
+func (p *parser) parseNextStatement() (*ast.NextStmt, error) {
+	p.next() // NEXT
+	s := &ast.NextStmt{}
+	if k := p.peek(); k == token.Colon || k == token.EOL {
+		return s, nil
+	}
+	for {
+		if p.peek() != token.Name {
+			return nil, syntaxError()
+		}
+		v, err := p.parseVariable()
+		if err != nil {
+			return nil, err
+		}
+		s.Vars = append(s.Vars, v)
+		if !p.accept(token.Comma) {
+			break
+		}
+	}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return s, nil
 }
 
 // GotoStatement = ( goto | go to ) LineNumber .

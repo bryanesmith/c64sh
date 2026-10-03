@@ -146,6 +146,17 @@ type NewStmt struct{}
 // EndStmt is END: stop.
 type EndStmt struct{}
 
+// ForStmt is FOR Var = From TO To [STEP Step]; Step is nil when omitted.
+type ForStmt struct {
+	Var            *VarRef
+	From, To, Step Expr
+}
+
+// NextStmt is NEXT [Var {, Var}]; Vars is empty for a bare NEXT.
+type NextStmt struct{ Vars []*VarRef }
+
+func (*ForStmt) stmt()  {}
+func (*NextStmt) stmt() {}
 func (*RunStmt) stmt()  {}
 func (*GotoStmt) stmt() {}
 func (*ListStmt) stmt() {}

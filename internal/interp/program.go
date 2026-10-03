@@ -39,7 +39,7 @@ func (*jump) Error() string { return "jump" }
 //
 // @spec INTERP-048, INTERP-049, INTERP-050, INTERP-051
 func (in *Interp) Store(n int, text string) {
-	clear(in.vars)
+	in.clr()
 	i, found := in.find(n)
 	switch {
 	case text == "" && found:
@@ -72,54 +72,20 @@ func (in *Interp) find(n int) (int, bool) {
 }
 
 // execRun clears the variables and returns the request to run the
-// program, which Exec or run carries out.
+// program, which execute carries out.
 func (in *Interp) execRun(s *ast.RunStmt) error {
 	in.ran = true
-	clear(in.vars)
+	in.clr()
 	return &jump{line: s.Line, hasLine: s.HasLine}
 }
 
 // execGoto returns the request to continue the program at a line, which
-// Exec or run carries out, keeping the variables.
+// execute carries out, keeping the variables.
 //
 // @spec INTERP-063, INTERP-064
 func (in *Interp) execGoto(s *ast.GotoStmt) error {
 	in.ran = true
 	return &jump{line: s.Line, hasLine: true}
-}
-
-// run runs the program from where RUN or GOTO asked, until it ends, and
-// returns the first error, carrying the number of the line it occurred
-// in. from is the program line holding the RUN or GOTO, or -1 in direct
-// mode.
-//
-// @spec INTERP-052, INTERP-053, INTERP-054, INTERP-055, INTERP-056, INTERP-058, INTERP-061
-func (in *Interp) run(r *jump, from int) error {
-	for {
-		i := 0
-		if r.hasLine {
-			found := false
-			if i, found = in.find(r.line); !found {
-				return atLine(&basicerr.Error{Kind: basicerr.UndefdStatement}, from)
-			}
-		}
-		var err error
-		for ; i < len(in.program); i++ {
-			l := in.program[i]
-			if err = in.execLine(l.tree); err != nil {
-				from = l.number
-				break
-			}
-		}
-		next, again := err.(*jump)
-		if !again {
-			if err == errEnd {
-				return nil
-			}
-			return atLine(err, from)
-		}
-		r = next
-	}
 }
 
 // atLine returns err with the program line it occurred in, if it is a
@@ -173,6 +139,6 @@ func listText(text string) string {
 // @spec INTERP-060
 func (in *Interp) execNew() error {
 	in.program = nil
-	clear(in.vars)
+	in.clr()
 	return errEnd
 }

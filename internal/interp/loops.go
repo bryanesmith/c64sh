@@ -1,0 +1,124 @@
+package interp
+
+import (
+	"strings"
+
+	"github.com/bryanesmith/c64sh/internal/ast"
+	"github.com/bryanesmith/c64sh/internal/basicerr"
+)
+
+// frame is an entry of the control stack.
+type frame struct {
+	name        string  // the FOR variable's identity
+	limit, step float64 // the end value and the step
+	resume      pos     // where the loop continues: just after its FOR
+}
+
+// forBytes is the C64 stack space a FOR entry takes, and forRoom the
+// space in use at which a FOR finds no room: the ROM's check at $A3FB,
+// with the stack depth of a running program.
+const (
+	forBytes = 18
+	forRoom  = 169
+)
+
+// stackBytes returns the C64 stack space the control stack takes.
+func (in *Interp) stackBytes() int {
+	return len(in.stack) * forBytes
+}
+
+// findFor searches the control stack from the top for the FOR entry of
+// the variable name, or the topmost FOR entry if name is empty, stopping
+// at the first entry that is not a FOR ($A38A).
+func (in *Interp) findFor(name string) (int, bool) {
+	for i := len(in.stack) - 1; i >= 0; i-- {
+		if name == "" || in.stack[i].name == name {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// execFor starts a loop as the ROM does ($A742): assign the start value,
+// drop any loop already using the variable, check for stack room, then
+// evaluate the end value and step once and push the entry.
+//
+// @spec INTERP-068, INTERP-069, INTERP-070, INTERP-075
+func (in *Interp) execFor(s *ast.ForStmt) error {
+	start, err := in.eval(s.From)
+	if err != nil {
+		return err
+	}
+	name := s.Var.Name
+	if err := in.assign(name, start); err != nil {
+		return err
+	}
+	if strings.HasSuffix(name, "$") {
+		return &basicerr.Error{Kind: basicerr.TypeMismatch}
+	}
+	if i, found := in.findFor(name); found {
+		in.stack = in.stack[:i]
+	}
+	if in.stackBytes() >= forRoom {
+		return &basicerr.Error{Kind: basicerr.OutOfMemory}
+	}
+	limit, err := in.evalNumber(s.To)
+	if err != nil {
+		return err
+	}
+	step := 1.0
+	if s.Step != nil {
+		if step, err = in.evalNumber(s.Step); err != nil {
+			return err
+		}
+	}
+	in.stack = append(in.stack, frame{name: name, limit: limit, step: step, resume: in.after()})
+	return nil
+}
+
+// execNext steps the loop of each of its variables, innermost first
+// ($AD1E): it continues a loop that is not complete, and moves on to the
+// next variable when one is.
+//
+// @spec INTERP-071, INTERP-072, INTERP-073
+func (in *Interp) execNext(s *ast.NextStmt) error {
+	names := []string{""}
+	if len(s.Vars) > 0 {
+		names = names[:0]
+		for _, v := range s.Vars {
+			names = append(names, v.Name)
+		}
+	}
+	for _, name := range names {
+		i, found := in.findFor(name)
+		if !found {
+			return &basicerr.Error{Kind: basicerr.NextWithoutFor}
+		}
+		in.stack = in.stack[:i+1] // loops left unfinished inside this one
+		f := in.stack[i]
+		v, err := inRange(in.vars[f.name].num + f.step)
+		if err != nil {
+			return err
+		}
+		in.vars[f.name] = v
+		n := v.num
+		done := (f.step > 0 && n > f.limit) || (f.step < 0 && n < f.limit) || (f.step == 0 && n == f.limit)
+		if !done {
+			return &resume{at: f.resume}
+		}
+		in.stack = in.stack[:i]
+	}
+	return nil
+}
+
+// evalNumber evaluates e, which must be a number.
+func (in *Interp) evalNumber(e ast.Expr) (float64, error) {
+	v, err := in.eval(e)
+	if err != nil {
+		return 0, err
+	}
+	if !v.isNum {
+		return 0, &basicerr.Error{Kind: basicerr.TypeMismatch}
+	}
+	return v.num, nil
+}

@@ -28,6 +28,9 @@ type Interp struct {
 	vars    map[string]value // variables, by identity (ast.VarRef.Name)
 	program []progLine       // stored lines, in ascending order of number
 	ran     bool             // whether RUN or GOTO has been executed
+	direct  *ast.Line        // the line Exec is running, in direct mode
+	stack   []frame          // the control stack: FOR entries
+	cur     pos              // the position of the statement executing
 
 	interrupted atomic.Bool // set by Interrupt, checked after each statement
 }
@@ -39,25 +42,6 @@ func New(out io.Writer) *Interp {
 	return &Interp{out: out, vars: map[string]value{}}
 }
 
-// Exec runs the statements of line in order, in direct mode. It stops at
-// the first statement that fails and returns that error; statements after
-// it do not run. Output from statements before the failure has already
-// been written. A RUN among the statements runs the stored program, and
-// an error in it is returned with its line number.
-//
-// @spec INTERP-001, INTERP-013, INTERP-057, INTERP-066
-func (in *Interp) Exec(line *ast.Line) error {
-	in.interrupted.Store(false)
-	err := in.execLine(line)
-	if r, ok := err.(*jump); ok {
-		err = in.run(r, -1)
-	}
-	if err == errEnd {
-		return nil
-	}
-	return err
-}
-
 // Interrupt asks the interpreter to stop, as the C64's STOP key does: the
 // statement running now finishes, and Exec returns a BREAK error. It may
 // be called from another goroutine.
@@ -65,30 +49,6 @@ func (in *Interp) Exec(line *ast.Line) error {
 // @spec INTERP-067
 func (in *Interp) Interrupt() {
 	in.interrupted.Store(true)
-}
-
-// execLine runs the statements of one line, in direct mode or in the
-// program. A false IF ends the line without error; END, LIST, NEW, RUN,
-// and GOTO end it with errEnd or a *jump for the caller to act on. After
-// each statement that finishes normally (including a false IF, and a RUN
-// or GOTO before its jump), it checks for an interrupt, as the C64 checks
-// its STOP key between statements ($A7AE, $A82C).
-//
-// @spec INTERP-065
-func (in *Interp) execLine(line *ast.Line) error {
-	for _, s := range line.Statements {
-		err := in.execStmt(s)
-		if _, isJump := err.(*jump); (err == nil || err == errSkipLine || isJump) && in.interrupted.Swap(false) {
-			return &basicerr.Error{Kind: basicerr.Break}
-		}
-		if err == errSkipLine {
-			return nil // a false IF: the rest of the line does not run
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // Column returns the cursor column: the number of characters written since
@@ -109,33 +69,38 @@ func (in *Interp) FreshLine() error {
 	return in.write("\n")
 }
 
-// execLet assigns a value to a variable. A string variable (a name ending
-// in "$") takes only strings, up to 255 characters; number and integer
-// variables take only numbers, and an integer variable (a name ending in
-// "%") stores the number rounded down, within -32768..32767. On any error
-// the variable keeps its old value.
-//
-// @spec INTERP-032, INTERP-034, INTERP-035, INTERP-036, INTERP-037, INTERP-038
+// execLet assigns a value to a variable.
 func (in *Interp) execLet(s *ast.LetStmt) error {
 	v, err := in.eval(s.Value)
 	if err != nil {
 		return err
 	}
-	isString := strings.HasSuffix(s.Var.Name, "$")
+	return in.assign(s.Var.Name, v)
+}
+
+// assign stores v in the variable with identity name. A string variable
+// (a name ending in "$") takes only strings, up to 255 characters; number
+// and integer variables take only numbers, and an integer variable (a name
+// ending in "%") stores the number rounded down, within -32768..32767. On
+// any error the variable keeps its old value.
+//
+// @spec INTERP-032, INTERP-034, INTERP-035, INTERP-036, INTERP-037, INTERP-038
+func (in *Interp) assign(name string, v value) error {
+	isString := strings.HasSuffix(name, "$")
 	if isString == v.isNum {
 		return &basicerr.Error{Kind: basicerr.TypeMismatch}
 	}
 	if isString && utf8.RuneCountInString(v.str) > maxStringLen {
 		return &basicerr.Error{Kind: basicerr.StringTooLong}
 	}
-	if strings.HasSuffix(s.Var.Name, "%") {
+	if strings.HasSuffix(name, "%") {
 		n, err := toInt16(v)
 		if err != nil {
 			return err
 		}
 		v = numberValue(float64(n))
 	}
-	in.vars[s.Var.Name] = v
+	in.vars[name] = v
 	return nil
 }
 
@@ -176,6 +141,10 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execRun(s)
 	case *ast.GotoStmt:
 		return in.execGoto(s)
+	case *ast.ForStmt:
+		return in.execFor(s)
+	case *ast.NextStmt:
+		return in.execNext(s)
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:

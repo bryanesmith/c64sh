@@ -13,6 +13,8 @@ func TestErrorReturnsC64Name(t *testing.T) {
 		IllegalQuantity: "ILLEGAL QUANTITY",
 		UndefdStatement: "UNDEF'D STATEMENT",
 		Break:           "BREAK",
+		NextWithoutFor:  "NEXT WITHOUT FOR",
+		OutOfMemory:     "OUT OF MEMORY",
 	}
 	for kind, want := range cases {
 		if got := (&Error{Kind: kind}).Error(); got != want {

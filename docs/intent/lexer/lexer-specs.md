@@ -20,6 +20,7 @@ Design: `lexer-design.md`
 - [x] **LEXER-008**: When the lexer encounters `?` outside a string literal, it shall produce a `Print` token.
 - [x] **LEXER-009**: The lexer shall recognize keywords only in uppercase; lowercase letters outside a string literal (such as those of `print` or `Print`) shall each produce an `Illegal` token (so `Print` is `Name(P)` followed by four `Illegal` tokens).
 - [x] **LEXER-010**: If a keyword's letters are separated by whitespace outside a string literal (such as `PR INT`), then the lexer shall not produce the keyword token, and shall read the letters as a name (so `PR INT` is `Name(PRINT)`).
+- [x] **LEXER-031**: When the lexer encounters `FOR`, `NEXT`, or `STEP` in uppercase outside a string literal, it shall produce a `For`, `Next`, or `Step` token respectively.
 
 ## Punctuation and illegal input
 

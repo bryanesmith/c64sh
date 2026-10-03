@@ -44,6 +44,8 @@ var (
 	fork  = token.Token{Kind: token.For, Value: "FOR"}
 	nextk = token.Token{Kind: token.Next, Value: "NEXT"}
 	stepk = token.Token{Kind: token.Step, Value: "STEP"}
+	gosub = token.Token{Kind: token.Gosub, Value: "GOSUB"}
+	retk  = token.Token{Kind: token.Return, Value: "RETURN"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -107,6 +109,10 @@ func dumpStmt(s ast.Stmt) string {
 			vars = append(vars, dumpExpr(v))
 		}
 		return strings.TrimSpace("NEXT " + strings.Join(vars, ","))
+	case *ast.GosubStmt:
+		return fmt.Sprintf("GOSUB %d", s.Line)
+	case *ast.ReturnStmt:
+		return "RETURN"
 	case *ast.ListStmt:
 		return "LIST"
 	case *ast.NewStmt:
@@ -721,5 +727,25 @@ func TestNextSyntaxErrors(t *testing.T) {
 		{"no comma", toks(nextk, name("I"), name("J")), `BADSTMT`, true},
 		{"trailing comma", toks(nextk, name("I"), comma), `BADSTMT`, true},
 		{"not a variable", toks(nextk, number("1")), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-046
+func TestGosub(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"GOSUB n", toks(gosub, number("100")), `GOSUB 100`, false},
+		{"fraction", toks(gosub, number("100.5")), `GOSUB 100`, false},
+		{"alone", toks(gosub), `GOSUB 0`, false},
+		{"after THEN", toks(iff, name("A"), then, gosub, number("100"), colon, pr, str("X")), `IF $A[A] : GOSUB 100 : PRINT["X"]`, false},
+	})
+}
+
+// @spec PARSER-047
+func TestReturn(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"RETURN", toks(retk), `RETURN`, false},
+		{"then a statement", toks(retk, colon, pr, str("X")), `RETURN : PRINT["X"]`, false},
+		{"junk", toks(retk, number("10")), `BADSTMT`, true},
+		{"GOSUB too large", toks(gosub, number("64000")), `BADSTMT`, true},
 	})
 }

@@ -59,6 +59,8 @@ const (
     For                   // FOR
     Next                  // NEXT
     Step                  // STEP
+    Gosub                 // GOSUB
+    Return                // RETURN
 )
 
 type Token struct {
@@ -96,13 +98,13 @@ Inside a string literal, the bytes of the line are kept exactly as they are, inc
 
 ## Keywords
 
-The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, `THEN`, `RUN`, `LIST`, `NEW`, `END`, `GOTO`, `GO`, `TO`, `FOR`, `NEXT`, and `STEP`.
+The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, `THEN`, `RUN`, `LIST`, `NEW`, `END`, `GOTO`, `GO`, `TO`, `FOR`, `NEXT`, `STEP`, `GOSUB`, and `RETURN`.
 
 - **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`; `REMARK` is a `Rem` token with the comment `ARK`.
 - **Spaces inside a keyword break it.** `PR INT` is not `PRINT`; it scans as `Illegal(P) Illegal(R) Illegal(I) Illegal(N) Illegal(T)`.
 - **Case-sensitive.** Keywords are recognized only in uppercase, exactly as written in their token rules. `print` and `Print` are not keywords; their letters scan as `Illegal` tokens, so `print "HI"` is a syntax error, as it is on a C64, where lowercase letters are different characters from uppercase ones.
 
-Keywords are kept in a table, so future keywords are added by extending the table. When more than one keyword could match at a position, the longest match wins: `GOTO` is one `Goto` token, while `GO TO`, with a space, is `Go` then `To`. As on a C64, `GO` and `TO` also end names that contain them (`GOLD`, `TOTAL`), whether or not they are followed by `TO` or used with `FOR`.
+Keywords are kept in a table, so future keywords are added by extending the table. When more than one keyword could match at a position, the longest match wins: `GOTO` is one `Goto` token and `GOSUB` one `Gosub` token, while `GO TO`, with a space, is `Go` then `To`. As on a C64, `GO` and `TO` also end names that contain them (`GOLD`, `TOTAL`), whether or not they are followed by `TO` or used with `FOR`.
 
 ## Numbers
 
@@ -164,6 +166,8 @@ to        = "TO" .
 for       = "FOR" .
 next      = "NEXT" .
 step      = "STEP" .
+gosub     = "GOSUB" .
+return    = "RETURN" .
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
             [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
 digit     = "0" … "9" .

@@ -440,3 +440,12 @@ func TestLoopKeywords(t *testing.T) {
 		{"FOR in a name", "FORM", []token.Token{tok(token.For, "FOR", 0), name("M", 3), eol(4)}},
 	})
 }
+
+// @spec LEXER-032
+func TestSubroutineKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"GOSUB", "GOSUB 100", []token.Token{tok(token.Gosub, "GOSUB", 0), num("100", 6), eol(9)}},
+		{"RETURN", "RETURN", []token.Token{tok(token.Return, "RETURN", 0), eol(6)}},
+		{"GO SUB", "GO SUB", []token.Token{tok(token.Go, "GO", 0), name("SUB", 3), eol(6)}},
+	})
+}

@@ -127,3 +127,21 @@ func TestLoops(t *testing.T) {
 		check(t, c.name, runMain(t, c.input), c.want)
 	}
 }
+
+// TestSubroutines checks GOSUB and RETURN end to end.
+//
+// @spec INTERP-077, INTERP-079
+func TestSubroutines(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  result
+	}{
+		{"program", "10 GOSUB 100\n20 PRINT \"BACK\"\n30 END\n100 PRINT \"SUB\"\n110 RETURN\n", result{"SUB\nBACK\n", "", 0}},
+		{"direct GOSUB runs the program", "100 PRINT \"SUB\":RETURN\nGOSUB 100\n", result{"SUB\n", "", 0}},
+		{"RETURN WITHOUT GOSUB", "10 RETURN\n", result{"", "?RETURN WITHOUT GOSUB  ERROR IN 10\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.name, runMain(t, c.input), c.want)
+	}
+}

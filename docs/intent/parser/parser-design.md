@@ -129,6 +129,12 @@ type ForStmt struct {
 
 // NextStmt is NEXT [Var {, Var}]; Vars is empty for a bare NEXT.
 type NextStmt struct{ Vars []*VarRef }
+
+// GosubStmt is GOSUB n: call the subroutine at line n.
+type GosubStmt struct{ Line int }
+
+// ReturnStmt is RETURN: return from the latest subroutine.
+type ReturnStmt struct{}
 ```
 
 Binary operators are left-associative within a precedence level: `"A"+"B"+"C"` is `BinaryExpr(Add, BinaryExpr(Add, "A", "B"), "C")`, and `8-2-1` is `(8-2)-1`. The parser does not check operand types: whether `+` joins strings, adds numbers, or is a type mismatch is decided by the interpreter from the values, as on a C64.
@@ -196,6 +202,10 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 
 `NEXT` is followed by nothing, or by one or more variables separated by commas. A variable list that does not end at `:` or the end of the line (`NEXT I J`, `NEXT I,`) is a SYNTAX error in place of the statement.
 
+### GOSUB and RETURN
+
+`GOSUB` is followed by a line number, read exactly as for `GOTO` (see *Program commands*): `GOSUB 100`, `GOSUB 100.5` (line 100), and `GOSUB` alone (line 0). `RETURN` takes no arguments; anything after it other than `:` or the end of the line is a SYNTAX error in place of the statement, as with `END` (`$A8D2`). `GO SUB`, with a space, is not `GOSUB`: it is `GO` not followed by `TO`, a SYNTAX error.
+
 ### Items side by side
 
 An expression ends at the first token that cannot continue it, and PRINT then reads the next item. A token that can start an expression but not continue one begins a new item: `PRINT 2(3)` prints two numbers, ` 2  3 `. A `-` or `+` after an operand always continues the expression as a binary operator, as on a C64: `PRINT 1 -1` prints ` 0 `, and `PRINT "A"-1` is `TYPE MISMATCH`.
@@ -209,7 +219,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
@@ -227,6 +237,8 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `RunStatement = run [ LineNumber ] .` | `parseRunStatement` | `*ast.RunStmt` (see *Program commands*) |
 | `ForStatement = for Variable "=" Expression to Expression [ step Expression ] .` | `parseForStatement` | `*ast.ForStmt` |
 | `NextStatement = next [ Variable { "," Variable } ] .` | `parseNextStatement` | `*ast.NextStmt` |
+| `GosubStatement = gosub LineNumber .` | `parseGosubStatement` | `*ast.GosubStmt` |
+| `ReturnStatement = return .` | `parseCommand` | `*ast.ReturnStmt` |
 | `GotoStatement = ( goto \| go to ) LineNumber .` | `parseGotoStatement` | `*ast.GotoStmt` |
 | `LineNumber = [ number ] .` | `parseLineNumber` | `int`: the line number, 0 if there is none (see *Program commands*) |
 | `ListStatement = list .` | `parseCommand` | `*ast.ListStmt` |
@@ -235,7 +247,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
 | `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 
@@ -244,7 +256,7 @@ Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`,
 The parser reports one error kind, `SYNTAX` (see the shell design for the error type and how it is printed). It is returned when:
 
 - a statement begins with a token that cannot start a statement (for example `Illegal`, `String`, `;`), or an assignment lacks its variable, its `=`, or its value, or
-- `LIST`, `NEW`, or `END` is followed by anything other than `:` or `EOL`, `GO` is not followed by `TO`, or the line number after `RUN`, `GOTO`, or `THEN` exceeds 63999, or
+- `LIST`, `NEW`, `END`, or `RETURN` is followed by anything other than `:` or `EOL`, `GO` is not followed by `TO`, or the line number after `RUN`, `GOTO`, `GOSUB`, or `THEN` exceeds 63999, or
 - inside a statement, the next token is not one the rule allows (for example `Illegal`, an operator with no operand after it, a `(` without its `)`, or a `)` without its `(`), or
 - after a statement, the next token is neither `:` nor `EOL`.
 

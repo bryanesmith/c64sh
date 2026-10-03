@@ -476,3 +476,54 @@ func TestControlStackClearing(t *testing.T) {
 		{"direct loop removed after its line", lines(`FOR I=1 TO 3`, "NEXT"), "", &basicerr.Error{Kind: basicerr.NextWithoutFor}},
 	})
 }
+
+// @spec INTERP-077
+func TestGosub(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"call and return", lines(`10 GOSUB 100:PRINT "BACK"`, `20 END`, `100 PRINT "SUB"`, `110 RETURN`, "RUN"), "SUB\nBACK\n", nil},
+		{"returns mid-line", lines(`10 PRINT "A";:GOSUB 100:PRINT "C"`, `20 END`, `100 PRINT "B";:RETURN`, "RUN"), "ABC\n", nil},
+		{"nested", lines(`10 GOSUB 100:PRINT "3"`, `20 END`, `100 GOSUB 200:PRINT "2";:RETURN`, `200 PRINT "1";:RETURN`, "RUN"), "123\n", nil},
+		{"direct mode", lines(`100 PRINT "SUB";:RETURN`, `GOSUB 100:PRINT "BACK"`), "SUBBACK\n", nil},
+		{"keeps variables", lines(`100 PRINT A:RETURN`, "A=5", "GOSUB 100"), " 5 \n", nil},
+		{"after THEN", lines(`10 IF 1 THEN GOSUB 100:PRINT "B"`, `20 END`, `100 PRINT "A";:RETURN`, "RUN"), "AB\n", nil},
+		{"missing line", lines(`10 GOSUB 99`, "RUN"), "", errIn(basicerr.UndefdStatement, 10)},
+	})
+}
+
+// @spec INTERP-078
+func TestReturnDropsInnerLoops(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"loop left in subroutine", lines(`10 GOSUB 100:PRINT "BACK"`, `20 NEXT`, `100 FOR I=1 TO 9:RETURN`, "RUN"), "BACK\n", errIn(basicerr.NextWithoutFor, 20)},
+		{"loop around the call survives", lines(`10 FOR I=1 TO 3:GOSUB 100:NEXT:END`, `100 PRINT I;:RETURN`, "RUN"), " 1  2  3 ", nil},
+	})
+}
+
+// @spec INTERP-079
+func TestReturnWithoutGosub(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"in a program", lines(`10 RETURN`, "RUN"), "", errIn(basicerr.ReturnWithoutGosub, 10)},
+		{"only loops", lines(`10 FOR I=1 TO 2:RETURN`, "RUN"), "", errIn(basicerr.ReturnWithoutGosub, 10)},
+		{"direct", lines("RETURN"), "", &basicerr.Error{Kind: basicerr.ReturnWithoutGosub}},
+		{"falls into subroutine", lines(`10 PRINT "A"`, `20 RETURN`, "RUN"), "A\n", errIn(basicerr.ReturnWithoutGosub, 20)},
+	})
+}
+
+// @spec INTERP-080
+func TestNextCannotLeaveSubroutine(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"NEXT in subroutine", lines(`10 FOR I=1 TO 2:GOSUB 100`, `100 NEXT`, "RUN"), "", errIn(basicerr.NextWithoutFor, 100)},
+		{"FOR reusing a variable outside", lines(`10 FOR I=1 TO 2:GOSUB 100:NEXT:END`, `100 FOR I=7 TO 8:PRINT I;:NEXT:RETURN`, "RUN"), " 7  8 ", nil},
+	})
+}
+
+// @spec INTERP-075
+func TestGosubStackLimit(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"26 nested", lines(`10 C=C+1:IF C<26 THEN GOSUB 10`, `20 RETURN`, `30 GOSUB 10:PRINT "OK";C:END`, "RUN 30"), "OK 26 \n", nil},
+		{"27 nested", lines(`10 C=C+1:IF C<27 THEN GOSUB 10`, `20 RETURN`, `30 GOSUB 10:PRINT "OK";C:END`, "RUN 30"), "", errIn(basicerr.OutOfMemory, 10)},
+		{"runaway recursion", lines(`10 GOSUB 10`, "RUN"), "", errIn(basicerr.OutOfMemory, 10)},
+		{"nine loops leave room", lines(`10 FOR A=1 TO 1:FOR B=1 TO 1:FOR C=1 TO 1:FOR D=1 TO 1:FOR E=1 TO 1:FOR F=1 TO 1:FOR G=1 TO 1:FOR H=1 TO 1:FOR I=1 TO 1:GOSUB 100`, `100 PRINT "OK"`, "RUN"), "OK\n", nil},
+		{"ten loops leave none", lines(`10 FOR A=1 TO 1:FOR B=1 TO 1:FOR C=1 TO 1:FOR D=1 TO 1:FOR E=1 TO 1:FOR F=1 TO 1:FOR G=1 TO 1:FOR H=1 TO 1:FOR I=1 TO 1:FOR J=1 TO 1:GOSUB 100`, `100 PRINT "OK"`, "RUN"), "", errIn(basicerr.OutOfMemory, 10)},
+		{"loop after calls", lines(`10 GOSUB 20`, `20 C=C+1:IF C<25 THEN GOSUB 20`, `30 FOR I=1 TO 1:PRINT "OK"`, "RUN"), "", errIn(basicerr.OutOfMemory, 30)},
+	})
+}

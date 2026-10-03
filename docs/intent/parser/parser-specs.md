@@ -55,3 +55,8 @@ Design: `parser-design.md`
 - [x] **PARSER-043**: If a `FOR` statement's variable is an integer variable, or it lacks its variable, `=`, start value, `TO`, end value, or (after `STEP`) step, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.
 - [x] **PARSER-044**: When a statement is `NEXT` followed by `:` or `EOL`, the parser shall produce an `*ast.NextStmt` with no variables; when it is `NEXT` followed by variables separated by commas, an `*ast.NextStmt` holding them in order.
 - [x] **PARSER-045**: If the variables after `NEXT` are not separated by commas, or a comma is not followed by a variable, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.
+
+## Subroutines
+
+- [x] **PARSER-046**: When a statement is `GOSUB`, the parser shall produce an `*ast.GosubStmt` whose `Line` is the line number read as PARSER-039 specifies.
+- [x] **PARSER-047**: When a statement is `RETURN` followed by `:` or `EOL`, the parser shall produce an `*ast.ReturnStmt`; if `RETURN` is followed by any other token, or the line number after `GOSUB` is above 63999, the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.

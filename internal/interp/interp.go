@@ -29,7 +29,7 @@ type Interp struct {
 	program []progLine       // stored lines, in ascending order of number
 	ran     bool             // whether RUN or GOTO has been executed
 	direct  *ast.Line        // the line Exec is running, in direct mode
-	stack   []frame          // the control stack: FOR entries
+	stack   []frame          // the control stack: FOR and GOSUB entries
 	cur     pos              // the position of the statement executing
 
 	interrupted atomic.Bool // set by Interrupt, checked after each statement
@@ -145,6 +145,10 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execFor(s)
 	case *ast.NextStmt:
 		return in.execNext(s)
+	case *ast.GosubStmt:
+		return in.execGosub(s)
+	case *ast.ReturnStmt:
+		return in.execReturn()
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:

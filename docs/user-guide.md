@@ -18,6 +18,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Variables](#variables)
 - [Programs](#programs)
 - [Loops](#loops)
+- [Subroutines](#subroutines)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -127,7 +128,7 @@ In a script:
 - c64sh **stops at the first error**, printing the error and exiting with status 1. Lines after it do not run.
 - **Ctrl-C** while a line is running stops the script, printing `BREAK` (or `BREAK IN 20` while a program runs) and exiting with status 130.
 - No banner or `READY.` is printed.
-- **If the script stored numbered lines but never ran them with `RUN` or `GOTO`, the program runs after the last line.** So a script of numbered lines is an ordinary program, with no `RUN` needed.
+- **If the script stored numbered lines but never ran them with `RUN`, `GOTO`, or `GOSUB`, the program runs after the last line.** So a script of numbered lines is an ordinary program, with no `RUN` needed.
 
 For example, this script
 
@@ -389,10 +390,33 @@ prints ` 1  2  3  4  5 `.
 - **Loops can be nested** and can span many lines of a program, or fit on one line, in a program or typed directly.
 - **The counter must be a number variable**: `FOR I%=…` is a `?SYNTAX  ERROR`, and a string variable is a `?TYPE MISMATCH  ERROR`.
 - **`NEXT` with no matching `FOR`** is a `?NEXT WITHOUT FOR  ERROR`. Starting a loop with a variable that is already counting another loop ends the old loop, and any loops inside it.
-- **At most 10 loops can be nested**, as on a C64; the 11th is an `?OUT OF MEMORY  ERROR`.
+- **At most 10 loops can be nested**, as on a C64; the 11th is an `?OUT OF MEMORY  ERROR`. Subroutine calls share the same space (see [Subroutines](#subroutines)).
 - **The keywords break names that contain them**: `FORM` and `STEPS` cannot be variable names.
 
 See [`examples/017-loops.bas`](../examples/017-loops.bas) for every form.
+
+## Subroutines
+
+`GOSUB` runs a subroutine, and `RETURN` comes back to the statement just after the `GOSUB`:
+
+```
+10 GOSUB 100
+20 PRINT "BACK"
+30 END
+100 PRINT "IN THE SUBROUTINE"
+110 RETURN
+```
+
+prints `IN THE SUBROUTINE`, then `BACK`. The `END` keeps the program from running on into the subroutine.
+
+- **`RETURN` comes back mid-line**: in `PRINT "A";:GOSUB 100:PRINT "C"`, the `PRINT "C"` runs after the subroutine.
+- **Subroutines can call subroutines**, up to 26 deep, as on a C64; deeper is an `?OUT OF MEMORY  ERROR`. Loops use the same space, so fewer calls fit inside nested loops.
+- **A subroutine has no parameters or result.** It works on the program's variables, which are shared by the whole program: set a variable before the `GOSUB`, and read the answer from another after it.
+- **Typed directly**, `GOSUB 100` runs the subroutine, then the rest of the line you typed. The variables are kept, as with `GOTO`.
+- **`RETURN` with no `GOSUB`** to return to is a `?RETURN WITHOUT GOSUB  ERROR`. This is what happens when a program runs on into its subroutines without an `END`.
+- **Loops and subroutines**: `RETURN` ends any loops begun inside the subroutine, and a `NEXT` inside a subroutine cannot continue a loop begun outside it (`?NEXT WITHOUT FOR  ERROR`).
+
+See [`examples/018-subroutines.bas`](../examples/018-subroutines.bas) for every form.
 
 ## Comments
 
@@ -430,7 +454,8 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
 | `?UNDEF'D STATEMENT  ERROR` | `RUN`, `GOTO`, or `IF … THEN` with a line number that is not in the program. |
 | `?NEXT WITHOUT FOR  ERROR` | `NEXT` with no loop to continue. |
-| `?OUT OF MEMORY  ERROR` | More than 10 loops nested. |
+| `?OUT OF MEMORY  ERROR` | More than 10 loops, or 26 subroutine calls, nested. |
+| `?RETURN WITHOUT GOSUB  ERROR` | `RETURN` with no `GOSUB` to return to. |
 | `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
 
 An error stops the rest of its line. Anything printed before the error stays printed, as on a C64:
@@ -474,7 +499,7 @@ These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 - Arrays (`DIM A(10)`), and the system variables `TI`, `TI$`, and `ST`
 - Functions such as `CHR$(34)`
-- `GOSUB`, `ON`, and the other ways to call or jump in a program; `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
+- `ON … GOTO` and `ON … GOSUB`; `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 
 These are planned; the [roadmap](https://github.com/bryanesmith/c64sh/issues/34) lists them in the order they will be added.

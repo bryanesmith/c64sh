@@ -44,6 +44,8 @@ const (
 	For                   // FOR
 	Next                  // NEXT
 	Step                  // STEP
+	Gosub                 // GOSUB
+	Return                // RETURN
 )
 
 var kindNames = [...]string{
@@ -83,6 +85,8 @@ var kindNames = [...]string{
 	For:       "For",
 	Next:      "Next",
 	Step:      "Step",
+	Gosub:     "Gosub",
+	Return:    "Return",
 }
 
 func (k Kind) String() string {

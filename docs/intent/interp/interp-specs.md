@@ -165,3 +165,10 @@ Design: `interp-design.md`
 
 - [x] **INTERP-120**: When executing an `ast.OnStmt`, the interpreter shall evaluate its index as a number from 0 to 255, rounded down (TYPE MISMATCH for a string, ILLEGAL QUANTITY out of range), and, if the index is from 1 to the number of line numbers, execute a `GOTO` or `GOSUB` to the line number at that place in the list, with a `GOSUB` entry holding the position after the `ON` statement.
 - [x] **INTERP-121**: When an `ast.OnStmt`'s index is 0 or larger than the number of line numbers, the interpreter shall continue with the next statement.
+
+## Number functions
+
+- [x] **INTERP-122**: When evaluating an `ast.CallExpr` of a number function, the interpreter shall fail with TYPE MISMATCH if its argument is a string, and otherwise return for `ABS` the argument's size, `INT` the argument rounded down, `SGN` -1, 0, or 1 by its sign, and `SQR`, `LOG`, `EXP`, `SIN`, `COS`, `TAN`, and `ATN` the square root, natural logarithm, exponential, and trigonometric functions in radians, limited to the C64's range.
+- [x] **INTERP-123**: If `SQR`'s argument is negative or `LOG`'s is 0 or less, then the interpreter shall fail with ILLEGAL QUANTITY; if `TAN`'s cosine is 0, with DIVISION BY ZERO.
+- [x] **INTERP-124**: When evaluating `RND(X)`, the interpreter shall return a number at least 0 and less than 1: for a negative `X`, after replacing the seed with one determined by `X` alone; for an `X` of 0, after replacing the seed with one determined by the clock; and for a positive `X`, after advancing the seed.
+- [x] **INTERP-125**: The interpreter shall start the `RND` seed at the same value in every interpreter, and shall read the clock set with `SetClock`, or the system clock if none is set.

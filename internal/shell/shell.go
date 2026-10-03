@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 
@@ -36,9 +37,10 @@ const banner = "\n    **** C64SH BASIC V2 ****\n\nREADY.\n"
 
 // Config selects how Run behaves.
 type Config struct {
-	Interactive bool   // banner, READY., continue after errors
-	File        string // input file; empty means stdin
-	HistoryFile string // line-editor history file; empty: none
+	Interactive bool             // banner, READY., continue after errors
+	File        string           // input file; empty means stdin
+	HistoryFile string           // line-editor history file; empty: none
+	Clock       func() time.Time // the interpreter's clock; nil: the system clock
 }
 
 // Main runs c64sh with the given command-line arguments and streams and
@@ -88,7 +90,7 @@ func isTerminal(r io.Reader) bool {
 // Interactive selects the behavior; File, or stdin when File is empty,
 // selects the input.
 //
-// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004
+// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004, SHELL-CLOCK-001
 func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	input, name := stdin, "stdin"
 	if cfg.File != "" {
@@ -108,6 +110,9 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	plain := bufio.NewReader(input)
 	var lines lineReader = &plainReader{r: plain}
 	s.setConsole(cfg, stdin, plain)
+	if cfg.Clock != nil {
+		s.interp.SetClock(cfg.Clock)
+	}
 	s.interp.SetStorage(dirStorage{})
 	if cfg.Interactive {
 		s.interp.SetMessages(stderr)

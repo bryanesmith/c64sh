@@ -12,6 +12,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [PRINT](#print)
 - [Numbers](#numbers)
 - [Arithmetic](#arithmetic)
+- [Number functions](#number-functions)
 - [Comparisons](#comparisons)
 - [Logic](#logic)
 - [IF … THEN](#if--then)
@@ -250,6 +251,29 @@ A few details:
 - **A `(` right after a number starts a new item**: `PRINT 2(3)` prints ` 2  3 `. But `-` and `+` always continue the calculation: `PRINT 1 -1` prints ` 0 `.
 
 See [`examples/007-arithmetic.bas`](../examples/007-arithmetic.bas) and [`examples/008-exponents.bas`](../examples/008-exponents.bas) for every form.
+
+## Number functions
+
+Each takes its argument in parentheses: `PRINT SQR(16)` prints ` 4 `.
+
+| Function | Gives |
+|---|---|
+| `ABS(X)` | `X` without its sign: `ABS(-7)` is 7 |
+| `INT(X)` | `X` rounded down: `INT(3.9)` is 3, and `INT(-3.1)` is -4 |
+| `SGN(X)` | -1, 0, or 1, as `X` is negative, zero, or positive |
+| `SQR(X)` | the square root |
+| `EXP(X)`, `LOG(X)` | e to the power `X`, and the natural logarithm |
+| `SIN(X)`, `COS(X)`, `TAN(X)`, `ATN(X)` | trigonometry, in radians |
+| `RND(X)` | a pseudo-random number from 0 up to (not including) 1 |
+
+- **`π`** is pi, 3.14159265, typed as the character `π`: `PRINT 2*π`.
+- **Rounding to the nearest whole number** is `INT(X+.5)`.
+- **`RND`** follows the C64's rules. `RND(1)`, or any positive number, gives the next number of a sequence. A negative number starts a new sequence determined by it, so `X=RND(-42)` at the start of a program makes it give the same numbers every run. `RND(0)` takes a number from the clock. A die roll is `INT(RND(1)*6)+1`.
+- Without reseeding, the sequence is the same in every run, as on a C64 just switched on. c64sh's numbers differ from a C64's, though: it uses its own generator.
+- **Errors**: a square root or logarithm of a number it cannot take (`SQR(-1)`, `LOG(0)`) is an `?ILLEGAL QUANTITY  ERROR`, and a string argument a `?TYPE MISMATCH  ERROR`.
+- **The function names break variable names that contain them**: `POINT` contains `INT`, and `COST` contains `COS`.
+
+See [`examples/024-number-functions.bas`](../examples/024-number-functions.bas) for every form.
 
 ## Comparisons
 
@@ -688,7 +712,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 - Arrays (`DIM A(10)`), and the clock variables `TI` and `TI$`
-- Functions such as `CHR$(34)`
+- String functions such as `CHR$(34)`
 - `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 

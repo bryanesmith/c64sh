@@ -8,6 +8,7 @@ Design: `snapshot-design.md`
 - [x] **SNAPSHOT-008**: When `test/snapshot/testdata/<example name>.input` exists, the snapshot tests shall run the example with that file's contents as its stdin; otherwise with an empty stdin.
 - [x] **SNAPSHOT-009**: The snapshot tests shall fail, naming the file, for any `.input` file in `test/snapshot/testdata/` whose example does not exist, and `make update-snapshots` shall neither create nor delete `.input` files.
 - [x] **SNAPSHOT-010**: The snapshot tests shall run each example with a new, empty temporary directory as the current directory, restoring the previous one afterwards.
+- [x] **SNAPSHOT-011**: The snapshot tests shall run each example through `shell.Run` with `File` set to the example and `Clock` set to a fixed time.
 
 ## Example conventions
 

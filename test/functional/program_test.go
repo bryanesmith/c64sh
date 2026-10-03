@@ -1,8 +1,13 @@
 package functional_test
 
 import (
+	"io"
 	"os"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/bryanesmith/c64sh/internal/shell"
 )
 
 // @spec SHELL-PROG-001, SHELL-MODE-004
@@ -248,5 +253,19 @@ func TestComputedJumps(t *testing.T) {
 	}
 	for _, c := range cases {
 		check(t, c.name, runMain(t, c.input), c.want)
+	}
+}
+
+// TestFixedClock checks that Config.Clock reaches the interpreter.
+//
+// @spec SHELL-CLOCK-001
+func TestFixedClock(t *testing.T) {
+	run := func() string {
+		var out strings.Builder
+		shell.Run(shell.Config{Clock: func() time.Time { return time.Unix(42, 0) }}, strings.NewReader("PRINT RND(0)\n"), &out, io.Discard)
+		return out.String()
+	}
+	if a, b := run(), run(); a != b {
+		t.Errorf("RND(0) with the same fixed clock: %q, then %q", a, b)
 	}
 }

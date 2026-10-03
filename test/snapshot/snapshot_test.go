@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bryanesmith/c64sh/internal/lexer"
 	"github.com/bryanesmith/c64sh/internal/shell"
@@ -143,7 +144,7 @@ func firstDifference(got, want string) (int, string, string) {
 	}
 }
 
-// @spec SNAPSHOT-001, SNAPSHOT-008, SNAPSHOT-009, SNAPSHOT-010
+// @spec SNAPSHOT-001, SNAPSHOT-008, SNAPSHOT-009, SNAPSHOT-010, SNAPSHOT-011
 func TestExamples(t *testing.T) {
 	files := examples(t)
 	want := map[string]bool{}
@@ -158,7 +159,8 @@ func TestExamples(t *testing.T) {
 				t.Fatal(err)
 			}
 			status := inTempDir(t, func() int {
-				return shell.Main([]string{path}, bytes.NewReader(stdin), &stdout, &stderr)
+				cfg := shell.Config{File: path, Clock: func() time.Time { return fixedClock }}
+				return shell.Run(cfg, bytes.NewReader(stdin), &stdout, &stderr)
 			})
 			matchSnapshot(t, name, snapshotFile(name), format(status, stdout.String(), stderr.String()))
 		})
@@ -193,6 +195,9 @@ func TestExamples(t *testing.T) {
 		}
 	}
 }
+
+// fixedClock is the time examples see, so their output does not change.
+var fixedClock = time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 
 // inTempDir runs f with a new, empty temporary directory as the current
 // directory, so that files an example saves are discarded, and returns

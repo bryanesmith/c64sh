@@ -223,6 +223,12 @@ func dumpExpr(e ast.Expr) string {
 		return "(NOT " + dumpExpr(e.X) + ")"
 	case *ast.VarRef:
 		return "$" + e.Name + "[" + e.Text + "]"
+	case *ast.CallExpr:
+		var args []string
+		for _, a := range e.Args {
+			args = append(args, dumpExpr(a))
+		}
+		return e.Name + "(" + strings.Join(args, ",") + ")"
 	case *ast.FnExpr:
 		return "FN " + dumpExpr(e.Name) + "(" + dumpExpr(e.Arg) + ")"
 	case *ast.CompareExpr:
@@ -1020,5 +1026,27 @@ func TestOnSyntaxErrors(t *testing.T) {
 		{"name element", toks(onk, name("X"), gotok, name("A")), `BADSTMT`, true},
 		{"too large", toks(onk, name("X"), gotok, number("64000")), `BADSTMT`, true},
 		{"junk", toks(onk, name("X"), gotok, number("10"), str("Y")), `BADSTMT`, true},
+	})
+}
+func fun(name string) token.Token { return token.Token{Kind: token.Function, Value: name} }
+
+// @spec PARSER-066
+func TestCall(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"call", toks(pr, fun("SIN"), lp, name("X"), rp), `PRINT[SIN($X[X])]`, false},
+		{"in an expression", toks(pr, number("1"), plus, fun("INT"), lp, number("2.5"), rp, star, number("2")), `PRINT[(#1+(INT(#2.5)*#2))]`, false},
+		{"power binds tighter", toks(pr, fun("ABS"), lp, number("2"), rp, caret, number("2")), `PRINT[(ABS(#2)^#2)]`, false},
+		{"nested", toks(pr, fun("SQR"), lp, fun("ABS"), lp, minus, number("4"), rp, rp), `PRINT[SQR(ABS((-#4)))]`, false},
+		{"no parentheses", toks(pr, fun("SIN"), number("1")), `PRINT[BAD(SYNTAX)]`, true},
+		{"two arguments", toks(pr, fun("SIN"), lp, number("1"), comma, number("2"), rp), `PRINT[BAD(SYNTAX)]`, true},
+		{"no )", toks(pr, fun("SIN"), lp, number("1")), `PRINT[BAD(SYNTAX)]`, true},
+		{"no argument", toks(pr, fun("RND"), lp, rp), `PRINT[BAD(SYNTAX)]`, true},
+	})
+}
+
+// @spec PARSER-067
+func TestPi(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"pi", toks(pr, token.Token{Kind: token.Pi, Value: "π"}), `PRINT[#3.141592653589793]`, false},
 	})
 }

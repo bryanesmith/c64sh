@@ -102,3 +102,7 @@ Design: `shell-design.md`
 - [x] **SHELL-FILE-002**: In interactive mode the shell shall set stderr as the interpreter's messages writer; in script mode it shall set none.
 - [x] **SHELL-FILE-003**: If executing a line returns an `*interp.StorageError`, then the shell shall write to stderr `c64sh: `, the file, `: `, and, for `fs.ErrExist`, `file exists (use REPLACE to replace it)` with the error's `Replace`, or else the error, then a newline; and then continue as for a BASIC error (SHELL-INT-005, SHELL-SCRIPT-005).
 - [x] **SHELL-FILE-004**: When the session ends, the shell shall call the interpreter's `CloseFiles` and report a `*interp.StorageError` it returns as SHELL-FILE-003 specifies, setting exit status 1 if it was 0.
+
+## Clock
+
+- [x] **SHELL-CLOCK-001**: When `Config.Clock` is set, the shell shall set it as the interpreter's clock.

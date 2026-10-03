@@ -5,6 +5,7 @@
 package parser
 
 import (
+	"math"
 	"strconv"
 	"strings"
 
@@ -29,7 +30,7 @@ import (
 // @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
 // @spec PARSER-048, PARSER-049, PARSER-050, PARSER-051, PARSER-052, PARSER-053, PARSER-054
 // @spec PARSER-055, PARSER-056
-// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065
+// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065, PARSER-066, PARSER-067
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -734,7 +735,7 @@ func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	case token.Comma:
 		p.next()
 		return &ast.Comma{}, nil
-	case token.String, token.Number, token.Name, token.Not, token.Fn, token.Minus, token.Plus, token.LParen:
+	case token.String, token.Number, token.Name, token.Not, token.Fn, token.Function, token.Pi, token.Minus, token.Plus, token.LParen:
 		expr, err := p.parseExpression()
 		if err != nil {
 			return nil, err
@@ -919,7 +920,7 @@ func (p *parser) parseExponent() (ast.Expr, error) {
 	return p.parseOperand()
 }
 
-// Operand = string | number | Variable | "(" Expression ")" | not Comparison | fn FunctionName "(" Expression ")" .
+// Operand = string | number | pi | Variable | "(" Expression ")" | not Comparison | fn FunctionName "(" Expression ")" | Call .
 //
 // Parentheses produce no node: the tree's shape records the grouping.
 func (p *parser) parseOperand() (ast.Expr, error) {
@@ -930,6 +931,11 @@ func (p *parser) parseOperand() (ast.Expr, error) {
 		return &ast.NumberLit{Value: numberValue(p.next().Value)}, nil
 	case token.Name:
 		return p.parseVariable()
+	case token.Pi:
+		p.next()
+		return &ast.NumberLit{Value: math.Pi}, nil
+	case token.Function:
+		return p.parseCall()
 	case token.Fn:
 		p.next()
 		name, err := p.parseFunctionName()
@@ -968,6 +974,38 @@ func (p *parser) parseOperand() (ast.Expr, error) {
 	default:
 		return nil, syntaxError()
 	}
+}
+
+// arity is the number of arguments each built-in function takes.
+var arity = map[string]int{
+	"ABS": 1, "INT": 1, "SGN": 1, "SQR": 1, "RND": 1, "LOG": 1,
+	"EXP": 1, "SIN": 1, "COS": 1, "TAN": 1, "ATN": 1,
+}
+
+// Call = function "(" Expression { "," Expression } ")" .
+//
+// The function's number of arguments is checked here; the parentheses are
+// required, as on a C64 ($AEF1).
+func (p *parser) parseCall() (ast.Expr, error) {
+	name := p.next().Value
+	if !p.accept(token.LParen) {
+		return nil, syntaxError()
+	}
+	call := &ast.CallExpr{Name: name}
+	for {
+		arg, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+		call.Args = append(call.Args, arg)
+		if !p.accept(token.Comma) {
+			break
+		}
+	}
+	if !p.accept(token.RParen) || len(call.Args) != arity[name] {
+		return nil, syntaxError()
+	}
+	return call, nil
 }
 
 // numberValue converts the text of a number token. It first normalizes the

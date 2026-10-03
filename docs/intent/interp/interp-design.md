@@ -67,6 +67,10 @@ var ErrInterrupted = errors.New("interrupted")
 // the console's input. It is not a BASIC error.
 var ErrEndOfInput = errors.New("end of input")
 
+// SetClock sets the clock that RND(0) reads. Without one, it is the
+// system clock.
+func (in *Interp) SetClock(now func() time.Time)
+
 // SetConsole sets where INPUT and GET read. Without one, they find the
 // end of input.
 func (in *Interp) SetConsole(c Console)
@@ -430,6 +434,25 @@ If the console returns `io.EOF`, the statement stops and `Exec` returns `ErrEndO
 
 Executing a `RemStmt` does nothing: it writes no output and returns no error, so execution continues with the next statement. A `RemStmt` is always the last statement of a line, because its comment runs to the end of the line.
 
+## Number functions
+
+A `CallExpr` evaluates its argument, which must be a number (else `TYPE MISMATCH`), and returns, as the C64 ROM computes them:
+
+| Function | Value |
+|---|---|
+| `ABS(X)` | The size of `X`. |
+| `INT(X)` | `X` rounded down to a whole number (`INT(-2.5)` is -3), `$BCCC`. |
+| `SGN(X)` | -1, 0, or 1 as `X` is negative, zero, or positive. |
+| `SQR(X)` | The square root; `ILLEGAL QUANTITY` for a negative `X`. |
+| `LOG(X)` | The natural logarithm; `ILLEGAL QUANTITY` for an `X` of 0 or less (`$B9EA`). |
+| `EXP(X)` | e to the power `X`; `OVERFLOW` if larger than the C64's largest number. |
+| `SIN(X)`, `COS(X)`, `TAN(X)`, `ATN(X)` | In radians; `TAN` of an angle whose cosine is exactly 0 is `DIVISION BY ZERO`, as the ROM divides the sine by the cosine (`$E2B4`). |
+| `RND(X)` | A pseudo-random number at least 0 and less than 1 (see below). |
+
+Results are limited to the C64's range like any other number (see *Values*).
+
+**`RND`** keeps a seed, as the C64 does (`$E097`). A negative `X` replaces the seed with one computed from `X`, so `RND(-7)` always gives the same number and starts the same sequence. A positive `X` (whatever its size) advances the seed and gives the next number. An `X` of 0 replaces the seed with one computed from the clock (see `SetClock`), the counterpart of the C64 reading its timers, and gives a number from it. The seed starts at the same value in every interpreter, so a program that never reseeds gets the same numbers every run, as a C64 does after power-on. The generator is c64sh's own (a 64-bit mixing function), so its numbers differ from a C64's; programs that relied on a C64's exact sequence will see different values.
+
 ## Variables
 
 Variables are kept in a map from a `VarRef`'s `Name` (its identity, such as `SC` or `N$`) to a value.
@@ -557,6 +580,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | State | `Interp` value created once per session | Stateless function | Variables and the stored program need a home that persists across lines. |
 | Execution model | A position (line, statement index) and a control stack of entries holding positions | Run line by line, with loops handled by re-running whole lines; a tree-walking loop construct built by the parser | A C64 resumes a loop just after its `FOR`, which can be mid-line or in the direct-mode line, and lets `NEXT` and `FOR` be anywhere, unmatched in the text. Only positions reproduce that; a parsed loop construct would reject valid programs such as one `FOR` with two `NEXT`s. |
 | Stack limit | The ROM's byte budget: 18 bytes per `FOR` and 7 per `GOSUB`, `OUT OF MEMORY` from 169 bytes in use for a `FOR` and 179 for a `GOSUB` | No limit; a fixed count of loops | It is the C64's own rule, derived from the stack check at `$A3FB`, and it stops runaway programs from growing memory without end. |
+| `RND` algorithm | c64sh's own generator, with the C64's rules for negative, zero, and positive arguments | Reproduce the C64's sequence | The ROM's generator works on the C64's 5-byte floating-point format; reproducing its sequence would need an exact emulation of that arithmetic (see HLD *Number representation*). The rules are what programs depend on: reseed with a negative number for a repeatable sequence, or with the clock for a fresh one. |
 | Function call depth | A fixed limit of 9 calls in progress | Count the stack bytes of every expression; no limit | Modeling the evaluator's stack use precisely would touch every expression for little gain; with no limit, a recursive function would exhaust the Go stack. A fixed limit near the C64's reproduces its error for runaway recursion. |
 | Data file buffering | Read a file whole at `OPEN`; collect output and write it at `CLOSE` | Stream through an open file handle | Whole-file reads and writes reuse the `Storage` interface of `LOAD` and `SAVE`, keep tests in memory, and suit C64-sized files. A C64 also completes a file only when it is closed. |
 | Storage | A `Storage` interface set by the shell, with whole-file reads and writes | `os` calls in the interpreter; an `fs.FS` | Tests use storage in memory and never touch the filesystem (HLD *Non-Goals*). `fs.FS` cannot write, and the disk-overwrite rule needs a write that refuses to replace. |

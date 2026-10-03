@@ -46,6 +46,8 @@ The tests live in `test/snapshot/` (package `snapshot_test`). One test function 
 
 Each example is run in-process with `shell.Main([]string{path}, stdin, stdout, stderr)`, exactly as `c64sh FILE` runs it. This makes the snapshot record what a user sees when running the file, including the skipped `#!` line and script-mode behavior.
 
+**The clock** is fixed, so an example using `RND(0)` (or, later, the time) gives the same output every run. Examples run through `shell.Run` with `File` set to the example, which runs it as `c64sh FILE` does, and `Clock` set to the fixed clock.
+
 **The current directory** is a new, empty temporary directory for each example, so an example that saves files (`SAVE`) starts with none and leaves nothing behind in the repository.
 
 **Stdin** is empty, unless the example has an input file: `test/snapshot/testdata/` holding a file named after the example with `.input` in place of `.bas` (`019-keyboard-input.input`). Its contents are then the example's stdin, which is what `INPUT` and `GET` read, as they would from `c64sh FILE < answers`. An example that reads input says in its comments which answers the snapshot uses, and its `PRINT` comments describe the output for those answers. An input file whose example no longer exists fails the tests, like a stale snapshot; unlike snapshots, input files are written by hand, so `make update-snapshots` neither creates nor deletes them.
@@ -125,6 +127,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `021-saving-programs.bas` | `SAVE`, `LOAD`, and `VERIFY` on tape and disk, `LOAD` chaining a running program with its variables, names with and without an extension, replacing on tape and with `@0:` on disk, and the disk's refusal to replace a file |
 | `022-data-files.bas` | `OPEN`, `PRINT#`, and `CLOSE` writing a disk file, an `INPUT#` loop ended by `ST`, `GET#`, `CMD`, the printer, appending with `,S,A`, and `?FILE NOT FOUND  ERROR` opening a missing file |
 | `023-computed-jumps.bas` | `ON … GOTO` in a loop, `ON … GOSUB` returning after the statement, indexes rounded down, 0 and past the list falling through, `ON` typed directly, and `?ILLEGAL QUANTITY  ERROR` |
+| `024-number-functions.bas` | `ABS`, `SGN`, `INT` (and rounding with it), `SQR`, `EXP`, `LOG`, the trigonometric functions and `π`, a function in `DEF FN`, `RND` with a negative seed and dice rolls, and `?ILLEGAL QUANTITY  ERROR` |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

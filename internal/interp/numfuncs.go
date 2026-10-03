@@ -2,6 +2,7 @@ package interp
 
 import (
 	"math"
+	"strings"
 	"time"
 
 	"github.com/bryanesmith/c64sh/internal/ast"
@@ -29,6 +30,9 @@ func (in *Interp) now() time.Time {
 //
 // @spec INTERP-122, INTERP-123
 func (in *Interp) call(e *ast.CallExpr) (value, error) {
+	if strings.HasSuffix(e.Name, "$") || e.Name == "LEN" || e.Name == "ASC" || e.Name == "VAL" {
+		return in.callString(e)
+	}
 	x, err := in.evalNumber(e.Args[0])
 	if err != nil {
 		return value{}, err

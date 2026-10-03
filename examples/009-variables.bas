@@ -25,8 +25,8 @@ HEIGHT=100
 PRINT HE:REM " 100 " (HEIGHT and HE are the same variable)
 PRINT HEX:REM " 100 " (so is HEX)
 REM Spaces inside a name are ignored
-MY VALUE=7
-PRINT MYVALUE:REM " 7 "
+MY WIDTH=7
+PRINT MYWIDTH:REM " 7 "
 REM The C64 finds keywords even inside names, which leads to surprises
 ER=4
 PRINTER:REM " 4 " (read as PRINT ER)

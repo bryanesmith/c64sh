@@ -34,7 +34,6 @@ func TestUnsupportedInputIsSyntaxError(t *testing.T) {
 		want  result
 	}{
 		{`print "hi"`, result{"", "?SYNTAX  ERROR\n", 1}},
-		{`PRINT CHR$(34)`, result{"", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT (1+2`, result{"", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT "HELLO"@`, result{"HELLO\n", "?SYNTAX  ERROR\n", 1}},
 		{`PRINT PEEK(197)`, result{"", "?SYNTAX  ERROR\n", 1}},

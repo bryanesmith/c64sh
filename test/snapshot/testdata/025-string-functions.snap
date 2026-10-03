@@ -1,0 +1,14 @@
+exit status: 1
+--- stdout ---
+ 9 
+COM DORE
+MOD ORE
+COMMODORE||
+HI 65 
+"QUOTED"
+[ 42] 7 
+ERODOMMOC
+AGREED
+*****
+--- stderr ---
+?ILLEGAL QUANTITY  ERROR

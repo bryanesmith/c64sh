@@ -172,3 +172,10 @@ Design: `interp-design.md`
 - [x] **INTERP-123**: If `SQR`'s argument is negative or `LOG`'s is 0 or less, then the interpreter shall fail with ILLEGAL QUANTITY; if `TAN`'s cosine is 0, with DIVISION BY ZERO.
 - [x] **INTERP-124**: When evaluating `RND(X)`, the interpreter shall return a number at least 0 and less than 1: for a negative `X`, after replacing the seed with one determined by `X` alone; for an `X` of 0, after replacing the seed with one determined by the clock; and for a positive `X`, after advancing the seed.
 - [x] **INTERP-125**: The interpreter shall start the `RND` seed at the same value in every interpreter, and shall read the clock set with `SetClock`, or the system clock if none is set.
+
+## String functions
+
+- [x] **INTERP-126**: When evaluating a string function, the interpreter shall fail with TYPE MISMATCH for an argument of the wrong type, and with ILLEGAL QUANTITY for a position, length, or character code that, rounded down, is below 0 or above 255.
+- [x] **INTERP-127**: The interpreter shall return for `LEN(S$)` the number of characters of `S$`; for `LEFT$(S$,N)` and `RIGHT$(S$,N)` its first or last `N` characters, or all of it if shorter; and for `MID$(S$,P,N)` the `N` characters (all, if `N` is omitted) from position `P`, counting from 1, or the empty string if `P` is past the end; `MID$` with `P` of 0 shall fail with ILLEGAL QUANTITY.
+- [x] **INTERP-128**: The interpreter shall return for `CHR$(N)` the one-character string whose code is `N`, and for `ASC(S$)` the code of the first character of `S$`, failing with ILLEGAL QUANTITY for the empty string.
+- [x] **INTERP-129**: The interpreter shall return for `STR$(X)` `X` formatted as `PRINT` formats a number, without the trailing space, and for `VAL(S$)` the number at the start of `S$`, read as `INPUT` reads a number, or 0 if there is none, failing with OVERFLOW if it is too large.

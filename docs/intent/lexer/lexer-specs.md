@@ -28,6 +28,7 @@ Design: `lexer-design.md`
 - [x] **LEXER-036**: When the lexer encounters `PRINT#`, `INPUT#`, `OPEN`, `CLOSE`, or `CMD` in uppercase outside a string literal, it shall produce a `PrintFile`, `InputFile`, `Open`, `Close`, or `Cmd` token respectively, and for `#` elsewhere outside a string literal, a `Hash` token (so `PRINT #1` is `Print`, `Hash`, `Number`).
 - [x] **LEXER-037**: When the lexer encounters `ON` in uppercase outside a string literal, it shall produce an `On` token.
 - [x] **LEXER-038**: When the lexer encounters `ABS`, `INT`, `SGN`, `SQR`, `RND`, `LOG`, `EXP`, `SIN`, `COS`, `TAN`, or `ATN` in uppercase outside a string literal, it shall produce a `Function` token whose value is the name, and for `π` (U+03C0), a `Pi` token.
+- [x] **LEXER-039**: When the lexer encounters `LEN`, `LEFT$`, `RIGHT$`, `MID$`, `CHR$`, `ASC`, `STR$`, or `VAL` in uppercase outside a string literal, it shall produce a `Function` token whose value is the name.
 
 ## Punctuation and illegal input
 

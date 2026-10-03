@@ -13,6 +13,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Numbers](#numbers)
 - [Arithmetic](#arithmetic)
 - [Number functions](#number-functions)
+- [String functions](#string-functions)
 - [Comparisons](#comparisons)
 - [Logic](#logic)
 - [IF … THEN](#if--then)
@@ -274,6 +275,27 @@ Each takes its argument in parentheses: `PRINT SQR(16)` prints ` 4 `.
 - **The function names break variable names that contain them**: `POINT` contains `INT`, and `COST` contains `COS`.
 
 See [`examples/024-number-functions.bas`](../examples/024-number-functions.bas) for every form.
+
+## String functions
+
+| Function | Gives | Example |
+|---|---|---|
+| `LEN(S$)` | the number of characters | `LEN("HELLO")` is 5 |
+| `LEFT$(S$,N)` | the first `N` characters | `LEFT$("HELLO",2)` is `"HE"` |
+| `RIGHT$(S$,N)` | the last `N` characters | `RIGHT$("HELLO",3)` is `"LLO"` |
+| `MID$(S$,P,N)` | `N` characters from position `P` (counting from 1); without `N`, the rest | `MID$("HELLO",2,3)` is `"ELL"` |
+| `CHR$(N)` | the character with code `N` | `CHR$(65)` is `"A"`, `CHR$(34)` is `"` |
+| `ASC(S$)` | the code of the first character | `ASC("A")` is 65 |
+| `STR$(X)` | a number as a string, as `PRINT` shows it, without the space after | `STR$(5)` is `" 5"` |
+| `VAL(S$)` | the number a string starts with, or 0 | `VAL("3.5 CUPS")` is 3.5 |
+
+- **Asking for more characters than there are** gives what there is: `LEFT$("HI",9)` is `"HI"`, and `MID$("HI",5)` is the empty string.
+- **Positions and lengths** are rounded down and must be from 0 to 255; `MID$` positions start at 1, so position 0 is an `?ILLEGAL QUANTITY  ERROR`, as is `ASC("")`.
+- **Idioms**: loop over a string's characters with `FOR I=1 TO LEN(A$)` and `MID$(A$,I,1)`; check an answer's first letter with `LEFT$(A$,1)="Y"`; put a quote in a string with `CHR$(34)`.
+- **Characters** are Unicode characters. Codes 32 to 126 are the same as on a C64; other codes give the Unicode character with that number.
+- **The function names break variable names that contain them**: `VALUE` contains `VAL`, and `LENGTH` contains `LEN`.
+
+See [`examples/025-string-functions.bas`](../examples/025-string-functions.bas) for every form.
 
 ## Comparisons
 
@@ -712,7 +734,6 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 - Arrays (`DIM A(10)`), and the clock variables `TI` and `TI$`
-- String functions such as `CHR$(34)`
 - `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 

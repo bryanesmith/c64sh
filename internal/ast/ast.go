@@ -252,3 +252,11 @@ type OnStmt struct {
 }
 
 func (*OnStmt) stmt() {}
+
+// CallExpr is a call of a built-in function: Name(Args).
+type CallExpr struct {
+	Name string // "SIN", "RND", …
+	Args []Expr
+}
+
+func (*CallExpr) expr() {}

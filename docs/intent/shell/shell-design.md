@@ -138,6 +138,10 @@ In interactive mode the shell also gives the interpreter stderr for the C64's ta
 
 A `StorageError` from executing a line is reported as `c64sh: ` and the file, then: for a disk file that may not be replaced, `file exists (use REPLACE to replace it)`, with the error's `Replace` (such as `SAVE "@0:HELLO"`); otherwise the reason. When the session ends, the shell calls the interpreter's `CloseFiles`, so that data files a program left open are written, and reports any `StorageError` from it the same way. In interactive mode the shell then writes `READY.` and continues; in script mode it stops with exit status 1, like a BASIC error.
 
+## Clock
+
+The interpreter's clock (for `RND(0)`) is the system clock, unless `Config.Clock` is set: tests set a fixed clock, so that programs using it give the same output every run.
+
 ## Keyboard Input
 
 The shell gives the interpreter a console (`interp.Console`) for `INPUT` and `GET`. Both read **stdin**, whatever the mode:
@@ -257,6 +261,7 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int
 type Config struct {
     Interactive bool
     File        string // empty: read from stdin
+    Clock       func() time.Time // the interpreter's clock; nil: the system clock
     HistoryFile string // line-editor history file; empty: none
 }
 ```

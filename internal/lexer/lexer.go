@@ -55,7 +55,21 @@ var keywords = []struct {
 	{"CLOSE", token.Close},
 	{"CMD", token.Cmd},
 	{"ON", token.On},
+	{"ABS", token.Function},
+	{"INT", token.Function},
+	{"SGN", token.Function},
+	{"SQR", token.Function},
+	{"RND", token.Function},
+	{"LOG", token.Function},
+	{"EXP", token.Function},
+	{"SIN", token.Function},
+	{"COS", token.Function},
+	{"TAN", token.Function},
+	{"ATN", token.Function},
 }
+
+// pi is the C64's pi character.
+const pi = "\u03c0"
 
 // symbols maps single-character tokens to their kinds.
 var symbols = map[byte]token.Kind{
@@ -84,7 +98,7 @@ const upArrow = "\u2191"
 // @spec LEXER-001, LEXER-002, LEXER-003, LEXER-004, LEXER-005, LEXER-006, LEXER-007
 // @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013, LEXER-014
 // @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018, LEXER-019, LEXER-020, LEXER-021
-// @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025, LEXER-026, LEXER-030, LEXER-031, LEXER-032, LEXER-033, LEXER-034, LEXER-035, LEXER-036, LEXER-037
+// @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025, LEXER-026, LEXER-030, LEXER-031, LEXER-032, LEXER-033, LEXER-034, LEXER-035, LEXER-036, LEXER-037, LEXER-038
 func Lex(line string) []token.Token {
 	var toks []token.Token
 	emit := func(k token.Kind, value string, pos int) {
@@ -152,6 +166,7 @@ func Lex(line string) []token.Token {
 		// close = "CLOSE" .
 		// cmd   = "CMD" .
 		// on    = "ON" .
+		// function = "ABS" | "INT" | "SGN" | "SQR" | "RND" | "LOG" | "EXP" | "SIN" | "COS" | "TAN" | "ATN" .
 		if text, kind, ok := matchKeyword(line[i:]); ok {
 			if kind == token.Rem {
 				// A comment runs to the end of the line, untokenized.
@@ -169,6 +184,12 @@ func Lex(line string) []token.Token {
 			text, end := scanName(line, i)
 			emit(token.Name, text, i)
 			i = end
+			continue
+		}
+		// pi = "π" .
+		if strings.HasPrefix(line[i:], pi) {
+			emit(token.Pi, pi, i)
+			i += len(pi)
 			continue
 		}
 		if strings.HasPrefix(line[i:], upArrow) {

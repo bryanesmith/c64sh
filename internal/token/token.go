@@ -60,6 +60,8 @@ const (
 	Cmd                   // CMD
 	Hash                  // #
 	On                    // ON
+	Function              // a built-in function: ABS, INT, …, SIN (Value: the name)
+	Pi                    // π
 )
 
 var kindNames = [...]string{
@@ -115,6 +117,8 @@ var kindNames = [...]string{
 	Cmd:       "Cmd",
 	Hash:      "Hash",
 	On:        "On",
+	Function:  "Function",
+	Pi:        "Pi",
 }
 
 func (k Kind) String() string {

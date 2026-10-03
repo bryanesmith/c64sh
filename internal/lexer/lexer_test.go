@@ -140,7 +140,7 @@ func TestKeywordsAreUppercaseOnly(t *testing.T) {
 // @spec LEXER-010
 func TestWhitespaceInsideKeywordBreaksIt(t *testing.T) {
 	runLexCases(t, []lexCase{
-		{"PR INT", `PR INT`, []token.Token{
+		{"PRI NT", `PRI NT`, []token.Token{
 			tok(token.Name, "PRINT", 0), eol(6),
 		}},
 	})
@@ -498,5 +498,18 @@ func TestOnKeyword(t *testing.T) {
 			tok(token.On, "ON", 0), name("X", 3), tok(token.Goto, "GOTO", 5), num("10", 10), tok(token.Comma, ",", 12), num("20", 13), eol(15),
 		}},
 		{"ON in a name", "MONEY", []token.Token{name("M", 0), tok(token.On, "ON", 1), name("EY", 3), eol(5)}},
+	})
+}
+
+// @spec LEXER-038
+func TestNumberFunctionKeywords(t *testing.T) {
+	for _, f := range []string{"ABS", "INT", "SGN", "SQR", "RND", "LOG", "EXP", "SIN", "COS", "TAN", "ATN"} {
+		runLexCases(t, []lexCase{{f, f + "(1)", []token.Token{
+			tok(token.Function, f, 0), tok(token.LParen, "(", 3), num("1", 4), tok(token.RParen, ")", 5), eol(6),
+		}}})
+	}
+	runLexCases(t, []lexCase{
+		{"pi", "2*π", []token.Token{num("2", 0), tok(token.Star, "*", 1), tok(token.Pi, "π", 2), eol(4)}},
+		{"INT in a name", "POINT", []token.Token{name("PO", 0), tok(token.Function, "INT", 2), eol(5)}},
 	})
 }

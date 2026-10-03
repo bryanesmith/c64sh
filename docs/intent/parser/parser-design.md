@@ -193,6 +193,12 @@ type LoadStmt struct{ FileArgs }
 type SaveStmt struct{ FileArgs }
 type VerifyStmt struct{ FileArgs }
 
+// CallExpr is a call of a built-in function: Name(Args).
+type CallExpr struct {
+    Name string // "SIN", "RND", …
+    Args []Expr
+}
+
 // FnExpr is FN Name(Arg): a call of a user-defined function.
 type FnExpr struct {
     Name *VarRef
@@ -272,6 +278,10 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 ### INPUT and GET
 
 `INPUT` is followed by an optional prompt, then one or more variables separated by commas. The prompt is a string literal followed by `;`, as the ROM requires (`$ABBF`): `INPUT "NAME";N$`. An expression is not allowed as the prompt, so `INPUT "A"+"B";X` and `INPUT P$;X` are SYNTAX errors, and so is a prompt followed by `,` instead of `;`. `GET` is followed by one or more variables separated by commas. A missing variable, or anything after the list other than `:` or the end of the line, is a SYNTAX error in place of the statement.
+
+### Built-in functions
+
+A `Function` token where an operand is expected is a call: the function's name, `(`, its arguments separated by commas, and `)`, becoming a `CallExpr`. Each function takes a fixed number of arguments, checked by the parser (every number function takes one), so `SIN(1,2)` and `SIN 1` are SYNTAX errors, as on a C64, which requires the parentheses (`$AEF1`). Argument types are checked when the call is evaluated. `π` is an operand whose value is pi, 3.14159265.
 
 ### DEF FN
 
@@ -353,10 +363,11 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `ListStatement = list .` | `parseCommand` | `*ast.ListStmt` |
 | `NewStatement = new .` | `parseCommand` | `*ast.NewStmt` |
 | `EndStatement = end .` | `parseCommand` | `*ast.EndStmt` (`parseCommand` parses any command without arguments) |
+| `Call = function "(" Expression { "," Expression } ")" .` | `parseCall` | `*ast.CallExpr` (argument count checked) |
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
-| `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison \| fn FunctionName "(" Expression ")" .` | `parseOperand` | `ast.Expr` |
+| `Operand = string \| number \| pi \| Variable \| "(" Expression ")" \| not Comparison \| fn FunctionName "(" Expression ")" \| Call .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `printfile`, `inputfile`, `open`, `close`, `cmd`, `on`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `printfile`, `inputfile`, `open`, `close`, `cmd`, `on`, `function`, `pi`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 

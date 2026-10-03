@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"sync/atomic"
+	"time"
 	"unicode/utf8"
 
 	"github.com/bryanesmith/c64sh/internal/ast"
@@ -39,6 +40,8 @@ type Interp struct {
 	files    map[int]*ioFile         // open logical files, by number
 	cmd      int                     // the file CMD sends output to; 0 for the screen
 	status   int                     // ST: the status of the last file operation
+	seed     uint64                  // the RND seed
+	clock    func() time.Time        // the clock RND(0) reads; nil: the system clock
 
 	interrupted atomic.Bool // set by Interrupt, checked after each statement
 }
@@ -47,7 +50,7 @@ type Interp struct {
 //
 // @spec INTERP-002
 func New(out io.Writer) *Interp {
-	return &Interp{out: out, vars: map[string]value{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}}
+	return &Interp{out: out, vars: map[string]value{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed}
 }
 
 // Interrupt asks the interpreter to stop, as the C64's STOP key does: the
@@ -334,6 +337,8 @@ func (in *Interp) eval(e ast.Expr) (value, error) {
 		return numberValue(float64(^n)), nil
 	case *ast.FnExpr:
 		return in.callFn(e)
+	case *ast.CallExpr:
+		return in.call(e)
 	case *ast.CompareExpr:
 		l, err := in.eval(e.Left)
 		if err != nil {

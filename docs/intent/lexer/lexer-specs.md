@@ -22,6 +22,7 @@ Design: `lexer-design.md`
 - [x] **LEXER-010**: If a keyword's letters are separated by whitespace outside a string literal (such as `PR INT`), then the lexer shall not produce the keyword token, and shall read the letters as a name (so `PR INT` is `Name(PRINT)`).
 - [x] **LEXER-031**: When the lexer encounters `FOR`, `NEXT`, or `STEP` in uppercase outside a string literal, it shall produce a `For`, `Next`, or `Step` token respectively.
 - [x] **LEXER-032**: When the lexer encounters `GOSUB` or `RETURN` in uppercase outside a string literal, it shall produce a `Gosub` or `Return` token respectively (`GOSUB` being one token, the longest match, rather than `GO` followed by a name).
+- [x] **LEXER-033**: When the lexer encounters `INPUT` or `GET` in uppercase outside a string literal, it shall produce an `Input` or `Get` token respectively.
 
 ## Punctuation and illegal input
 

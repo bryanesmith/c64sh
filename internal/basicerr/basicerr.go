@@ -17,6 +17,7 @@ const (
 	NextWithoutFor                 // NEXT WITHOUT FOR
 	OutOfMemory                    // OUT OF MEMORY
 	ReturnWithoutGosub             // RETURN WITHOUT GOSUB
+	IllegalDirect                  // ILLEGAL DIRECT
 )
 
 // names holds each kind's name as the C64 prints it.
@@ -32,6 +33,7 @@ var names = [...]string{
 	NextWithoutFor:     "NEXT WITHOUT FOR",
 	OutOfMemory:        "OUT OF MEMORY",
 	ReturnWithoutGosub: "RETURN WITHOUT GOSUB",
+	IllegalDirect:      "ILLEGAL DIRECT",
 }
 
 // Error is a BASIC error.

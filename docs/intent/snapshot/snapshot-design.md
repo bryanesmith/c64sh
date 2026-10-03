@@ -44,7 +44,9 @@ PRINT "HELLO ";"WORLD":REM HELLO WORLD
 
 The tests live in `test/snapshot/` (package `snapshot_test`). One test function runs a subtest per example, named after the example's file name without `.bas`.
 
-Each example is run in-process with `shell.Main([]string{path}, stdin, stdout, stderr)`, exactly as `c64sh FILE` runs it, with an empty stdin. This makes the snapshot record what a user sees when running the file, including the skipped `#!` line and script-mode behavior.
+Each example is run in-process with `shell.Main([]string{path}, stdin, stdout, stderr)`, exactly as `c64sh FILE` runs it. This makes the snapshot record what a user sees when running the file, including the skipped `#!` line and script-mode behavior.
+
+**Stdin** is empty, unless the example has an input file: `test/snapshot/testdata/` holding a file named after the example with `.input` in place of `.bas` (`019-keyboard-input.input`). Its contents are then the example's stdin, which is what `INPUT` and `GET` read, as they would from `c64sh FILE < answers`. An example that reads input says in its comments which answers the snapshot uses, and its `PRINT` comments describe the output for those answers. An input file whose example no longer exists fails the tests, like a stale snapshot; unlike snapshots, input files are written by hand, so `make update-snapshots` neither creates nor deletes them.
 
 ### Snapshot Format
 
@@ -116,6 +118,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `016-goto.bas` | `GOTO` skipping lines, a loop with `IF … THEN n`, `IF … GOTO n`, `GO TO`, `GOTO` typed directly keeping variables (unlike `RUN`), and `?UNDEF'D STATEMENT  ERROR IN 20` |
 | `017-loops.bas` | `FOR … NEXT` with and without `STEP` (negative and fractional), bare `NEXT`, the variable's value after a loop, a body that runs once, end values worked out once, nested loops and `NEXT J,I`, a loop across program lines, and `?NEXT WITHOUT FOR  ERROR` |
 | `018-subroutines.bas` | `GOSUB` and `RETURN`, returning mid-line, nested subroutines, passing values in variables, `GOSUB` typed directly, and `?RETURN WITHOUT GOSUB  ERROR IN 20` |
+| `019-keyboard-input.bas` | `INPUT` with and without a prompt, several values, `?? `, `?REDO FROM START`, `?EXTRA IGNORED`, quoted strings, a `GET` wait loop, and `?ILLEGAL DIRECT  ERROR`; its answers come from `019-keyboard-input.input` |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives
@@ -128,6 +131,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | Snapshot contents | Exit status, stdout, and stderr in one file | stdout only | Examples may end in an error to demonstrate it; the error text and exit status are part of what the reader should see. |
 | Obsolete snapshots | Failing check; deleted by the update run | Leave them for manual cleanup | A snapshot without an example documents behavior nothing exercises, and renumbering examples would otherwise leave stale files behind. |
 | Failure report | First differing line, Go-quoted | A full diff | Pinpoints the change and makes tabs visible; `make update-snapshots` followed by `git diff` shows the complete change. |
+| Input for examples that read it | An optional `.input` file beside the snapshot, used as stdin | Answers inside the example file; no examples of `INPUT` and `GET` | The example file must stay a plain BASIC script that a user can run and answer. Keeping the answers next to the snapshot keeps `examples/` to example scripts only, while the snapshot still records a real run. |
 | How examples run | In-process `shell.Main` with the file argument | Execute each file through its `#!` line with a built binary | In-process runs are fast and need no build; `#!` execution is already covered by the shell's functional tests. |
 | PRINT comments | Required on every line with a `PRINT`, and checked | Optional, where useful | Showing the output beside each form is what makes the examples teach; checking it keeps new examples consistent. |
 | Example numbering | Sequential, no gaps, three digits | Free-form names; numbering with gaps for insertion | A fixed reading order from simple to involved suits documentation. Inserting an example renumbers those after it, which is a rename in version control. |

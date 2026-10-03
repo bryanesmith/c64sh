@@ -16,6 +16,7 @@ func TestErrorReturnsC64Name(t *testing.T) {
 		NextWithoutFor:     "NEXT WITHOUT FOR",
 		OutOfMemory:        "OUT OF MEMORY",
 		ReturnWithoutGosub: "RETURN WITHOUT GOSUB",
+		IllegalDirect:      "ILLEGAL DIRECT",
 	}
 	for kind, want := range cases {
 		if got := (&Error{Kind: kind}).Error(); got != want {

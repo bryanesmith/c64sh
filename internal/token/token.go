@@ -46,6 +46,8 @@ const (
 	Step                  // STEP
 	Gosub                 // GOSUB
 	Return                // RETURN
+	Input                 // INPUT
+	Get                   // GET
 )
 
 var kindNames = [...]string{
@@ -87,6 +89,8 @@ var kindNames = [...]string{
 	Step:      "Step",
 	Gosub:     "Gosub",
 	Return:    "Return",
+	Input:     "Input",
+	Get:       "Get",
 }
 
 func (k Kind) String() string {

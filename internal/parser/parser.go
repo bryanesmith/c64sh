@@ -27,6 +27,7 @@ import (
 // @spec PARSER-028, PARSER-029, PARSER-030, PARSER-031, PARSER-032, PARSER-033, PARSER-034
 // @spec PARSER-035, PARSER-036, PARSER-037, PARSER-038, PARSER-039, PARSER-040, PARSER-041
 // @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
+// @spec PARSER-048, PARSER-049, PARSER-050
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -113,7 +114,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -160,6 +161,18 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return stmt, nil
 	case token.Return:
 		return p.parseCommand(&ast.ReturnStmt{})
+	case token.Input:
+		stmt, err := p.parseInputStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	case token.Get:
+		stmt, err := p.parseGetStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
 	case token.List:
 		return p.parseCommand(&ast.ListStmt{})
 	case token.New:
@@ -253,6 +266,59 @@ func (p *parser) parseNextStatement() (*ast.NextStmt, error) {
 		return nil, syntaxError()
 	}
 	return s, nil
+}
+
+// InputStatement = input [ string ";" ] Variable { "," Variable } .
+//
+// The prompt must be a string literal followed by ";" ($ABBF).
+func (p *parser) parseInputStatement() (*ast.InputStmt, error) {
+	p.next() // INPUT
+	s := &ast.InputStmt{}
+	if p.peek() == token.String {
+		s.Prompt, s.HasPrompt = p.next().Value, true
+		if !p.accept(token.Semicolon) {
+			return nil, syntaxError()
+		}
+	}
+	vars, err := p.parseVariableList()
+	if err != nil {
+		return nil, err
+	}
+	s.Vars = vars
+	return s, nil
+}
+
+// GetStatement = get Variable { "," Variable } .
+func (p *parser) parseGetStatement() (*ast.GetStmt, error) {
+	p.next() // GET
+	vars, err := p.parseVariableList()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.GetStmt{Vars: vars}, nil
+}
+
+// parseVariableList parses Variable { "," Variable }, which must end the
+// statement.
+func (p *parser) parseVariableList() ([]*ast.VarRef, error) {
+	var vars []*ast.VarRef
+	for {
+		if p.peek() != token.Name {
+			return nil, syntaxError()
+		}
+		v, err := p.parseVariable()
+		if err != nil {
+			return nil, err
+		}
+		vars = append(vars, v)
+		if !p.accept(token.Comma) {
+			break
+		}
+	}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return vars, nil
 }
 
 // GosubStatement = gosub LineNumber .

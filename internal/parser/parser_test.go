@@ -46,6 +46,8 @@ var (
 	stepk = token.Token{Kind: token.Step, Value: "STEP"}
 	gosub = token.Token{Kind: token.Gosub, Value: "GOSUB"}
 	retk  = token.Token{Kind: token.Return, Value: "RETURN"}
+	input = token.Token{Kind: token.Input, Value: "INPUT"}
+	getk  = token.Token{Kind: token.Get, Value: "GET"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -113,6 +115,14 @@ func dumpStmt(s ast.Stmt) string {
 		return fmt.Sprintf("GOSUB %d", s.Line)
 	case *ast.ReturnStmt:
 		return "RETURN"
+	case *ast.InputStmt:
+		out := "INPUT "
+		if s.HasPrompt {
+			out += strconv.Quote(s.Prompt) + ";"
+		}
+		return out + dumpVars(s.Vars)
+	case *ast.GetStmt:
+		return "GET " + dumpVars(s.Vars)
 	case *ast.ListStmt:
 		return "LIST"
 	case *ast.NewStmt:
@@ -747,5 +757,44 @@ func TestReturn(t *testing.T) {
 		{"then a statement", toks(retk, colon, pr, str("X")), `RETURN : PRINT["X"]`, false},
 		{"junk", toks(retk, number("10")), `BADSTMT`, true},
 		{"GOSUB too large", toks(gosub, number("64000")), `BADSTMT`, true},
+	})
+}
+func dumpVars(vs []*ast.VarRef) string {
+	var out []string
+	for _, v := range vs {
+		out = append(out, dumpExpr(v))
+	}
+	return strings.Join(out, ",")
+}
+
+// @spec PARSER-048
+func TestInput(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"one variable", toks(input, name("A")), `INPUT $A[A]`, false},
+		{"prompt", toks(input, str("NAME"), semi, name("N$")), `INPUT "NAME";$N$[N$]`, false},
+		{"several", toks(input, name("A"), comma, name("B$"), comma, name("C%")), `INPUT $A[A],$B$[B$],$C%[C%]`, false},
+		{"then a statement", toks(input, name("A"), colon, pr, name("A")), `INPUT $A[A] : PRINT[$A[A]]`, false},
+	})
+}
+
+// @spec PARSER-049
+func TestGet(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"one variable", toks(getk, name("K$")), `GET $K$[K$]`, false},
+		{"several", toks(getk, name("A$"), comma, name("B")), `GET $A$[A$],$B[B]`, false},
+	})
+}
+
+// @spec PARSER-050
+func TestInputGetSyntaxErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"no variable", toks(input), `BADSTMT`, true},
+		{"prompt only", toks(input, str("N"), semi), `BADSTMT`, true},
+		{"prompt with comma", toks(input, str("N"), comma, name("A")), `BADSTMT`, true},
+		{"prompt expression", toks(input, str("A"), plus, str("B"), semi, name("X")), `BADSTMT`, true},
+		{"variable prompt", toks(input, name("P$"), semi, name("X")), `BADSTMT`, true},
+		{"trailing comma", toks(input, name("A"), comma), `BADSTMT`, true},
+		{"GET no variable", toks(getk), `BADSTMT`, true},
+		{"GET number", toks(getk, number("1")), `BADSTMT`, true},
 	})
 }

@@ -145,3 +145,27 @@ func TestSubroutines(t *testing.T) {
 		check(t, c.name, runMain(t, c.input), c.want)
 	}
 }
+
+// TestKeyboardInput checks INPUT and GET reading stdin end to end.
+//
+// @spec SHELL-KEY-001, SHELL-KEY-006
+func TestKeyboardInput(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  result
+	}{
+		{"piped script answers itself", "10 INPUT \"NAME\";N$\n20 PRINT \"HI \";N$\nRUN\nALICE\nPRINT \"DONE\"\n", result{"NAME? ALICE\nHI ALICE\nDONE\n", "", 0}},
+		{"redo from start", "10 INPUT A:PRINT A*2\nRUN\nX\n21\n", result{"? X\n?REDO FROM START\n? 21\n 42 \n", "", 0}},
+		{"GET reads characters", "10 GET A$,B$:PRINT \"[\";A$;B$;\"]\"\nRUN\nX\n", result{"[X\r]\n", "", 0}},
+		{"end of input", "10 INPUT A\n", result{"? \n", "c64sh: stdin: end of input\n", 1}},
+		{"direct", "INPUT \"HI\";A\n", result{"HI\n", "?ILLEGAL DIRECT  ERROR\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.name, runMain(t, c.input), c.want)
+	}
+	path := writeFile(t, "double.bas", "10 INPUT A:PRINT A*2\n")
+	check(t, "file reads stdin", runMain(t, "42\n", path), result{"? 42\n 84 \n", "", 0})
+	check(t, "interactive", runInteractive(t, "10 INPUT A$\n20 PRINT A$\nRUN\nHELLO\n"),
+		result{"? HELLO\nHELLO\n", banner + "READY.\n\n", 0})
+}

@@ -60,3 +60,9 @@ Design: `parser-design.md`
 
 - [x] **PARSER-046**: When a statement is `GOSUB`, the parser shall produce an `*ast.GosubStmt` whose `Line` is the line number read as PARSER-039 specifies.
 - [x] **PARSER-047**: When a statement is `RETURN` followed by `:` or `EOL`, the parser shall produce an `*ast.ReturnStmt`; if `RETURN` is followed by any other token, or the line number after `GOSUB` is above 63999, the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.
+
+## Keyboard input
+
+- [x] **PARSER-048**: When a statement is `INPUT`, optionally followed by a string literal and `;`, then one or more variables separated by commas, the parser shall produce an `*ast.InputStmt` holding the prompt (with `HasPrompt` true) if there is one, and the variables in order.
+- [x] **PARSER-049**: When a statement is `GET` followed by one or more variables separated by commas, the parser shall produce an `*ast.GetStmt` holding the variables in order.
+- [x] **PARSER-050**: If an `INPUT` prompt is not a string literal followed by `;`, or an `INPUT` or `GET` lacks a variable, or its variable list is not separated by commas or not followed by `:` or `EOL`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.

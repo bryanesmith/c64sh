@@ -109,3 +109,16 @@ Design: `interp-design.md`
 - [x] **INTERP-078**: When executing an `ast.ReturnStmt`, the interpreter shall search the control stack from the top, passing over `FOR` entries, to the first entry that is not a `FOR` entry; if it is a `GOSUB` entry, the interpreter shall remove it and every entry above it, and continue at its position (which may be in the middle of a line or in the direct-mode line).
 - [x] **INTERP-079**: If executing an `ast.ReturnStmt` finds no `GOSUB` entry (INTERP-078), then the interpreter shall fail with a RETURN WITHOUT GOSUB error.
 - [x] **INTERP-080**: When searching for a `FOR` entry (INTERP-070, INTERP-073), the interpreter shall not pass a `GOSUB` entry, so that a `NEXT` inside a subroutine cannot continue a loop begun outside it.
+
+## Keyboard input
+
+- [x] **INTERP-081**: If an `ast.InputStmt` or `ast.GetStmt` executes in direct mode, then the interpreter shall fail with an ILLEGAL DIRECT error, an `INPUT` after writing its prompt, if any.
+- [x] **INTERP-082**: When executing an `ast.InputStmt`, the interpreter shall write its prompt, if any, and `? `, read a line from the console, remove spaces at its end, and write the line if the console reports it not echoed, then a newline.
+- [x] **INTERP-083**: When the line an `ast.InputStmt` reads first is empty, the interpreter shall end the statement without changing any variable.
+- [x] **INTERP-084**: When reading a value for an `INPUT` variable, the interpreter shall skip spaces, then take, for a string variable, a quoted value up to its closing quote or the end of the line, or else the text up to the next `,`, `:`, or end of the line; and for a number variable, a number written as in a program (spaces inside ignored, 0 if it has no digits); and shall assign the value before reading the next.
+- [x] **INTERP-085**: If, after an `INPUT` value and any spaces, the next character is not `,`, `:`, or the end of the line, then the interpreter shall write `?REDO FROM START` and a newline and execute the statement again from its prompt, keeping values already assigned.
+- [x] **INTERP-086**: When an `INPUT` line has no more values (its end, or a `:`) and variables remain, the interpreter shall write `?? ` and read a new line as INTERP-082 specifies, taking the remaining values from it (an empty line giving the empty string or 0).
+- [x] **INTERP-087**: When every variable of an `ast.InputStmt` has a value and text remains in the line, the interpreter shall write `?EXTRA IGNORED` and a newline.
+- [x] **INTERP-088**: When executing an `ast.GetStmt`, the interpreter shall read one key from the console for each variable in turn and assign it to a string variable as it is (the empty string when no key is waiting).
+- [x] **INTERP-089**: When `GET` assigns a key to a number variable, the interpreter shall assign 0 for no key, a space, `.`, `+`, `-`, or `E`, and the value of a digit; for any other key, it shall fail with a SYNTAX error that carries no line number, even in a running program.
+- [x] **INTERP-090**: If the console returns `io.EOF`, or no console is set, then `INPUT` and `GET` shall stop and `Exec` shall return `ErrEndOfInput`; if the console returns `ErrInterrupted`, they shall fail with a BREAK error.

@@ -130,6 +130,15 @@ Lines are read from `FILE`, or from stdin when there is no `FILE`.
 
 Stopping at the first error matches a C64 running a program, which halts at the failing line, and prevents later lines from running on the assumption that earlier ones succeeded.
 
+## Keyboard Input
+
+The shell gives the interpreter a console (`interp.Console`) for `INPUT` and `GET`. Both read **stdin**, whatever the mode:
+
+- **When stdin is not a terminal** (a pipe or a file), the console reads it as plain text. If the script itself is stdin (no `FILE`), the console shares the shell's reader, so `INPUT` reads the line after the one running, which the shell then does not run: a piped script supplies its own answers, as if typed. `ReadLine` returns the next line without its `\n` and any `\r`, not echoed, so the interpreter writes it after the prompt and the output reads like a C64 screen. `ReadKey` returns the next character, a line end (`\n` or `\r\n`) being the C64's Return, `CHR$(13)`.
+- **When stdin is a terminal**, then while a line executes, the shell switches the terminal to unbuffered input without echo, leaving signals on (Ctrl-C still sends SIGINT) and output processing unchanged, and restores the previous mode afterwards. Keys typed while a program runs wait in the terminal, like the C64's keyboard buffer, until `INPUT` or `GET` reads them, or until the program ends and the line editor reads them. `ReadKey` returns at once: a waiting key, or `""`. Return is `CHR$(13)`, Backspace (or Delete) the C64's DEL, `CHR$(20)`, and the arrow keys the C64's cursor keys: up `CHR$(145)`, down `CHR$(17)`, right `CHR$(29)`, left `CHR$(157)`; other escape sequences are ignored. `ReadLine` reads keys until Return, echoing each character to stderr and erasing the last one on Backspace; it checks `stop` while it waits, returning `ErrInterrupted` when Ctrl-C has been pressed. It reports the line as echoed, so the interpreter writes only the newline.
+
+If the console finds the end of input (`interp.ErrEndOfInput`), there is no C64 equivalent: the shell writes `c64sh: stdin: end of input` to stderr, after `FreshLine`, and stops with exit status 1, in either mode.
+
 ## Interrupts
 
 While the interpreter executes a line (`Exec`), the shell catches SIGINT, which the terminal sends when Ctrl-C is pressed, and calls the interpreter's `Interrupt`, which stops execution after the current statement with a `BREAK` error (see the interpreter design). Outside `Exec` the shell leaves SIGINT alone: while the line editor reads a line the terminal is in raw mode, so Ctrl-C arrives as a key and discards the line, and while a script waits for input, Ctrl-C ends c64sh with the default signal behavior, as it ends any Unix command.
@@ -176,6 +185,7 @@ const (
     NextWithoutFor            // NEXT WITHOUT FOR
     OutOfMemory               // OUT OF MEMORY
     ReturnWithoutGosub        // RETURN WITHOUT GOSUB
+    IllegalDirect             // ILLEGAL DIRECT
     Break                     // BREAK: execution stopped by Ctrl-C
 )
 
@@ -251,6 +261,7 @@ Functional tests live in `test/functional/` (package `functional_test`). Each te
 | Script errors | Stop at first error, exit 1 | Continue and exit non-zero at the end; continue and exit 0 | A C64 program halts at the failing line. Continuing risks later lines acting on the assumption that earlier ones worked. |
 | Error format | `?NAME  ERROR` with two spaces, plus ` IN n` in a running program, to stderr | Single space; to stdout; include a column, or a line number in direct mode | Tenet *Authentic errors over helpful ones*: this is the exact C64 message. stderr per tenet *C64 language, Unix I/O*. |
 | Numbered lines | Read by `lexer.LineNumber`, stored with `interp.Store`; no `READY.` after them | Parse every line and let the parser report a line number | A stored line is checked only when it runs, so the shell needs its text, not a parse; this is also how the C64's input loop decides (`$A494`). |
+| End of input during `INPUT` or `GET` | Stop with `c64sh: stdin: end of input` and status 1 | Treat it as an empty line; exit quietly | The program cannot get the input it asked for, and treating it as empty can loop forever (`IF A$="" THEN 10`). A message in the style of other stdin problems says what happened. |
 | Program never run by a script | Run when input ends | Leave it unrun; require `RUN` | See HLD *Scripts and program mode*. |
 | Catching Ctrl-C | Only while `Exec` runs, by `signal.Notify` around each call | For the whole session; never (the default kills c64sh) | Stopping a running program with `BREAK` is the C64 behavior, and keeps an interactive session (and its variables and program) alive. Catching it only during execution leaves Ctrl-C's usual meaning everywhere else: discarding a typed line, or ending a script that is waiting for input. |
 | Exit status after `BREAK` | 130 | 1, like other errors | 130 is what a Unix shell reports for a command ended by Ctrl-C, so callers can tell an interrupted script from a failed one. |

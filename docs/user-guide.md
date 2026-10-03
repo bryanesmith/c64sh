@@ -19,6 +19,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Programs](#programs)
 - [Loops](#loops)
 - [Subroutines](#subroutines)
+- [Keyboard input](#keyboard-input)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -418,6 +419,56 @@ prints `IN THE SUBROUTINE`, then `BACK`. The `END` keeps the program from runnin
 
 See [`examples/018-subroutines.bas`](../examples/018-subroutines.bas) for every form.
 
+## Keyboard input
+
+A running program reads the keyboard with `INPUT` and `GET`.
+
+**`INPUT`** shows a prompt and `? `, then waits for a line:
+
+```
+10 INPUT "WHAT IS YOUR NAME";N$
+20 PRINT "HELLO, ";N$
+```
+
+shows `WHAT IS YOUR NAME? `, and after you type `ALICE` and Return, prints `HELLO, ALICE`.
+
+- **The prompt** is optional, and must be a string in quotes followed by `;`: `INPUT A` shows just `? `.
+- **Several values** are separated by commas: `INPUT A,B` reads `3,4`. If you give too few, `INPUT` asks for the rest with `?? `; if you give too many, it says `?EXTRA IGNORED` and carries on.
+- **Numbers**: if a number variable gets something that is not a number, `INPUT` says `?REDO FROM START` and asks again.
+- **Strings**: spaces before a value are skipped; put a value in quotes to keep a comma in it: `"PARIS, FRANCE"`. A colon also ends a value, as on a C64.
+- **Pressing Return on an empty line** leaves the variables as they were.
+- **What you type is kept exactly**, including lowercase letters, so `IF A$="Y"` does not match a typed `y`. (A C64 keyboard types uppercase.)
+
+**`GET`** reads one key without waiting. If no key has been pressed, it gives an empty string, so a program that must wait loops:
+
+```
+10 GET K$:IF K$="" THEN 10
+20 PRINT "YOU PRESSED ";K$
+```
+
+- **Keys** come as C64 characters: Return is `CHR$(13)`, Backspace `CHR$(20)`, and the arrow keys the C64 cursor keys (up 145, down 17, right 29, left 157).
+- **`GET A`** with a number variable takes a digit key's value, or 0 for no key; any other key is a `?SYNTAX  ERROR`.
+- **Keys pressed while a program runs** wait until `INPUT` or `GET` reads them, like the C64's keyboard buffer, and are not shown.
+
+Both read **stdin**:
+
+- In an interactive session, the keyboard.
+- In a script file, stdin, so answers can come from a file: `c64sh quiz.bas < answers.txt`. When stdin is not a terminal, c64sh shows each answer after its prompt, as a C64 screen would.
+- In a script piped into c64sh, the lines that follow, which then do not run as commands:
+
+  ```
+  10 INPUT A
+  20 PRINT A*2
+  RUN
+  21
+  ```
+
+  prints `? 21` and ` 42 `.
+
+If the input ends while `INPUT` or `GET` is waiting, c64sh stops with `c64sh: stdin: end of input` and exit status 1. Typed directly, `INPUT` and `GET` are an `?ILLEGAL DIRECT  ERROR`, as on a C64: they work only in a program. Ctrl-C stops a program waiting for input with `BREAK`.
+
+See [`examples/019-keyboard-input.bas`](../examples/019-keyboard-input.bas) for every form.
+
 ## Comments
 
 `REM` starts a comment. Everything after it, to the end of the line, is ignored:
@@ -455,6 +506,7 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?UNDEF'D STATEMENT  ERROR` | `RUN`, `GOTO`, or `IF … THEN` with a line number that is not in the program. |
 | `?NEXT WITHOUT FOR  ERROR` | `NEXT` with no loop to continue. |
 | `?OUT OF MEMORY  ERROR` | More than 10 loops, or 26 subroutine calls, nested. |
+| `?ILLEGAL DIRECT  ERROR` | `INPUT` or `GET` typed directly; they work only in a program. |
 | `?RETURN WITHOUT GOSUB  ERROR` | `RETURN` with no `GOSUB` to return to. |
 | `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
 
@@ -479,7 +531,7 @@ An error in a running program adds the number of the line it happened in, as on 
 | Status | Meaning |
 |---|---|
 | 0 | Success, or an interactive session ended with Ctrl-D |
-| 1 | A script stopped at a BASIC error, or output could not be written |
+| 1 | A script stopped at a BASIC error, input ended while `INPUT` or `GET` was waiting, or output could not be written |
 | 2 | c64sh was run incorrectly: an unknown option, more than one file, or a file that cannot be read |
 | 130 | A script was stopped by Ctrl-C (`BREAK`) |
 
@@ -492,6 +544,8 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 - **No screen emulation**: no 40-column wrapping, colors, or graphics characters. So a print zone past column 40 stays on the same line: `PRINT 2,3,4,5,6` prints ` 6 ` at column 40, where a C64 would start a new screen line.
 - **Arithmetic uses standard 64-bit floating point**, rounded to the C64's 9 digits when printed. Results match a C64 in nearly every case; a C64's own rounding occasionally differs in the last digit. Rarely, a loop with a fractional `STEP`, such as `FOR I=0 TO 1 STEP .1`, runs a different number of times than on a C64.
 - **The banner** reads `C64SH BASIC V2`.
+- **Ctrl-C stops a program waiting in `INPUT`.** On a C64, the STOP key does nothing until Return is pressed.
+- **Typed input keeps lowercase letters**, where a C64 keyboard types uppercase.
 
 ## Not yet supported
 

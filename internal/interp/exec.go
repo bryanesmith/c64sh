@@ -112,6 +112,9 @@ func (in *Interp) statements(line int) []ast.Stmt {
 // atCur returns err with the number of the program line holding the
 // statement executing, or unchanged in direct mode.
 func (in *Interp) atCur(err error) error {
+	if nl, ok := err.(*noLine); ok {
+		return nl.err
+	}
 	if in.cur.line == directLine {
 		return err
 	}

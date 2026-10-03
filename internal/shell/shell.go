@@ -105,7 +105,9 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 		stderr:      stderr,
 		interp:      interp.New(stdout),
 	}
-	var lines lineReader = &plainReader{r: bufio.NewReader(input)}
+	plain := bufio.NewReader(input)
+	var lines lineReader = &plainReader{r: plain}
+	s.setConsole(cfg, stdin, plain)
 	if editorWanted(cfg, stdin, stderr) {
 		tty := stdin.(*os.File)
 		lines = newEditorReader(tty, stderr, terminalRawMode(tty), terminalSize(tty), cfg.HistoryFile, stderr)
@@ -127,6 +129,25 @@ type session struct {
 	interactive bool
 	stderr      io.Writer
 	interp      *interp.Interp
+	programMode func() (restore func(), err error) // for INPUT and GET at a terminal; nil otherwise
+}
+
+// setConsole gives the interpreter a console reading stdin for INPUT and
+// GET: the terminal in program mode, or else stdin as plain text, sharing
+// the reader of the script's lines when the script is stdin.
+//
+// @spec SHELL-KEY-001
+func (s *session) setConsole(cfg Config, stdin io.Reader, lines *bufio.Reader) {
+	switch {
+	case isTerminal(stdin):
+		tty := stdin.(*os.File)
+		s.interp.SetConsole(&ttyConsole{in: tty, echo: s.stderr})
+		s.programMode = terminalProgramMode(tty)
+	case cfg.File == "":
+		s.interp.SetConsole(&lineConsole{r: lines})
+	default:
+		s.interp.SetConsole(&lineConsole{r: bufio.NewReader(stdin)})
+	}
 }
 
 // run reads and executes lines until the input ends or, in script mode, a
@@ -179,7 +200,7 @@ func isBlank(line string) bool {
 // stop.
 //
 // @spec SHELL-LINE-005, SHELL-LINE-006, SHELL-LINE-007, SHELL-MODE-004
-// @spec SHELL-INT-002, SHELL-INT-005, SHELL-SCRIPT-005, SHELL-PROG-001, SHELL-PROG-002
+// @spec SHELL-INT-002, SHELL-INT-005, SHELL-SCRIPT-005, SHELL-PROG-001, SHELL-PROG-002, SHELL-KEY-006
 func (s *session) execLine(line string) (int, bool) {
 	n, rest, numbered, err := lexer.LineNumber(line)
 	switch {
@@ -197,6 +218,10 @@ func (s *session) execLine(line string) (int, bool) {
 
 	basicErr, isBasic := errors.AsType[*basicerr.Error](err)
 	switch {
+	case errors.Is(err, interp.ErrEndOfInput):
+		s.freshLine()
+		io.WriteString(s.stderr, "c64sh: stdin: end of input\n")
+		return 1, true
 	case err == nil:
 	case isBasic:
 		s.report(basicErr)
@@ -229,6 +254,11 @@ var (
 //
 // @spec SHELL-BREAK-001, SHELL-BREAK-002
 func (s *session) exec(tree *ast.Line) error {
+	if s.programMode != nil {
+		if restore, err := s.programMode(); err == nil {
+			defer restore()
+		}
+	}
 	sigs := make(chan os.Signal, 1)
 	notifyInterrupt(sigs)
 	defer stopInterrupt(sigs)

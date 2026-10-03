@@ -126,8 +126,12 @@ func (in *Interp) after() pos {
 	return pos{in.cur.line, in.cur.stmt + 1}
 }
 
-// clr clears the variables and the control stack, as the C64's CLR does.
+// clr clears the variables, function definitions, and the control stack,
+// as the C64's CLR does.
+//
+// @spec INTERP-095
 func (in *Interp) clr() {
 	clear(in.vars)
+	clear(in.fns)
 	in.stack = nil
 }

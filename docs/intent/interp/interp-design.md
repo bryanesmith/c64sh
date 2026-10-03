@@ -80,7 +80,7 @@ func (in *Interp) Column() int
 func (in *Interp) FreshLine() error
 ```
 
-An `Interp` carries state between lines: the cursor column, which starts at 0, the variables, which start empty, the stored program, which starts empty, and the control stack (see *Control stack*), which starts empty. It is created once per shell session, so all of them persist from line to line for the whole session or script.
+An `Interp` carries state between lines: the cursor column, which starts at 0, the variables and function definitions, which start empty, the stored program, which starts empty, and the control stack (see *Control stack*), which starts empty. It is created once per shell session, so all of them persist from line to line for the whole session or script.
 
 ## Cursor Column
 
@@ -110,7 +110,7 @@ func (in *Interp) execStmt(s ast.Stmt) error {
         return s.Err
     case *ast.RunStmt, *ast.GotoStmt, *ast.ListStmt, *ast.NewStmt, *ast.EndStmt,
         *ast.ForStmt, *ast.NextStmt, *ast.GosubStmt, *ast.ReturnStmt,
-        *ast.InputStmt, *ast.GetStmt:
+        *ast.InputStmt, *ast.GetStmt, *ast.DefStmt:
         … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
@@ -244,6 +244,24 @@ Because each line starts with a newline, the listing begins with one: a blank li
 
 `NeverRun` lets the shell run a script's program when the script never ran it itself (see the shell design). It is true when the program holds at least one line and no `RUN`, `GOTO`, or `GOSUB` has been executed, successfully or not, since the `Interp` was created.
 
+## User-defined functions
+
+Executing `DEF FN` follows the ROM (`$B3B3`): if the function's name is a string name, fail with `TYPE MISMATCH`; in direct mode, fail with `ILLEGAL DIRECT`; if the parameter is a string variable, fail with `TYPE MISMATCH`. Otherwise record the definition under the name's identity, replacing any earlier one. Function names are separate from variable names: `FN A` and the variable `A` are unrelated. Definitions are part of the variables, as on a C64, so whatever clears the variables (`RUN`, `NEW`, storing a line) clears them too.
+
+Evaluating `FN NAME(ARG)` follows the ROM (`$B3F4`), in this order:
+
+1. If the name is a string name, fail with `TYPE MISMATCH`.
+2. Evaluate the argument; if it is a string, fail with `TYPE MISMATCH`.
+3. If no function of that name is defined, fail with `UNDEF'D FUNCTION`.
+4. If 9 calls are already in progress, fail with `OUT OF MEMORY` (see below).
+5. Save the parameter variable's value and assign it the argument.
+6. Evaluate the body: if the definition has a `BodyErr`, fail with it; if the value is a string, fail with `TYPE MISMATCH`.
+7. Restore the parameter variable's saved value, and return the body's value.
+
+The body sees every variable's current value, so `DEF FN F(X)=X*K` uses whatever `K` holds at the call, and it can call other functions. If an error stops the call, the parameter keeps the argument, as on a C64, which restores it only after the body has been evaluated.
+
+**Calls in progress.** A call keeps its saved parameter and the evaluator's state on the C64's stack while its body is evaluated, about 20 bytes, and the expression evaluator fails with `OUT OF MEMORY` when the stack runs out (`$ADAC`). c64sh does not model the stack space expressions use, but it limits calls in progress to 9, roughly what the C64's stack holds, so that a function that calls itself (`DEF FN A(X)=FN A(X)`) fails with `OUT OF MEMORY` as on a C64, instead of recursing without end.
+
 ## Keyboard input
 
 `INPUT` and `GET` read from the `Console` the shell sets (see the shell design). Both work only in a running program: in direct mode they fail with `ILLEGAL DIRECT` (`$B3A6`), `INPUT` after writing its prompt, as the ROM writes the prompt first (`$ABBF`).
@@ -368,8 +386,9 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `ILLEGAL QUANTITY` | An operand of `AND`, `OR`, or `NOT` whose size is 32768 or more (other than -32768); `^` with a negative left operand and a right operand that is not a whole number; a value whose size is 32768 or more (other than -32768) assigned to an integer variable. |
 | `SYNTAX` | A `BadItem` reached while executing `PRINT`, or a `BadStmt` reached; the error is the one the parser stored in it. |
 | `NEXT WITHOUT FOR` | `NEXT` with no matching `FOR` entry above the topmost non-`FOR` entry of the control stack. |
-| `OUT OF MEMORY` | A `FOR` or `GOSUB` with no room left on the C64's stack (see *Control stack*). |
-| `ILLEGAL DIRECT` | `INPUT` or `GET` in direct mode. |
+| `OUT OF MEMORY` | A `FOR` or `GOSUB` with no room left on the C64's stack (see *Control stack*), or a 10th function call in progress. |
+| `ILLEGAL DIRECT` | `INPUT`, `GET`, or `DEF` in direct mode. |
+| `UNDEF'D FUNCTION` | `FN` calling a function that has not been defined. |
 | `RETURN WITHOUT GOSUB` | `RETURN` with no `GOSUB` entry on the control stack, other than `FOR` entries above it. |
 | `UNDEF'D STATEMENT` | `RUN n` or `GOTO n` where the program has no line `n`. |
 | `BREAK` | `Interrupt` was called (see *BREAK*). |
@@ -394,6 +413,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | State | `Interp` value created once per session | Stateless function | Variables and the stored program need a home that persists across lines. |
 | Execution model | A position (line, statement index) and a control stack of entries holding positions | Run line by line, with loops handled by re-running whole lines; a tree-walking loop construct built by the parser | A C64 resumes a loop just after its `FOR`, which can be mid-line or in the direct-mode line, and lets `NEXT` and `FOR` be anywhere, unmatched in the text. Only positions reproduce that; a parsed loop construct would reject valid programs such as one `FOR` with two `NEXT`s. |
 | Stack limit | The ROM's byte budget: 18 bytes per `FOR` and 7 per `GOSUB`, `OUT OF MEMORY` from 169 bytes in use for a `FOR` and 179 for a `GOSUB` | No limit; a fixed count of loops | It is the C64's own rule, derived from the stack check at `$A3FB`, and it stops runaway programs from growing memory without end. |
+| Function call depth | A fixed limit of 9 calls in progress | Count the stack bytes of every expression; no limit | Modeling the evaluator's stack use precisely would touch every expression for little gain; with no limit, a recursive function would exhaust the Go stack. A fixed limit near the C64's reproduces its error for runaway recursion. |
 | Keyboard source | A `Console` interface set by the shell, with line and key reads | Reading an `io.Reader` directly | The interpreter stays free of terminals: where keys come from (a terminal, a pipe, the rest of a script), how they are echoed, and how Ctrl-C reaches a waiting read are the shell's concerns, and tests supply input as a list of lines and keys. |
 | Interrupting | A flag set by `Interrupt` and checked after each statement | Cancel through a `context.Context` passed to `Exec`; the shell kills the run some other way | The C64 checks its STOP key between statements, so checking there gives the same `BREAK IN n`. A flag keeps the interpreter free of signals and goroutines; the shell decides where interrupts come from. |
 | Stored line form | Text and parsed tree, parsed once when stored | Text only, parsed each time the line runs, as the C64 does; tree only | The tree runs a line many times without parsing again; syntax errors are in the tree, so they are still reported only when reached. `LIST` needs the text as typed, which the tree does not keep (spaces, `?`). |

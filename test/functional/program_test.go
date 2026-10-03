@@ -169,3 +169,21 @@ func TestKeyboardInput(t *testing.T) {
 	check(t, "interactive", runInteractive(t, "10 INPUT A$\n20 PRINT A$\nRUN\nHELLO\n"),
 		result{"? HELLO\nHELLO\n", banner + "READY.\n\n", 0})
 }
+
+// TestUserFunctions checks DEF FN end to end.
+//
+// @spec INTERP-091, INTERP-092
+func TestUserFunctions(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  result
+	}{
+		{"define and call", "10 DEF FN SQ(X)=X*X\n20 PRINT FN SQ(4)\n", result{" 16 \n", "", 0}},
+		{"direct DEF", "DEF FN A(X)=X\n", result{"", "?ILLEGAL DIRECT  ERROR\n", 1}},
+		{"undefined", "10 PRINT FN Q(1)\n", result{"", "?UNDEF'D FUNCTION  ERROR IN 10\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.name, runMain(t, c.input), c.want)
+	}
+}

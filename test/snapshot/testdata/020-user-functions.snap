@@ -1,0 +1,11 @@
+exit status: 1
+--- stdout ---
+ 9  2.25 
+ 13 
+ 16  100 
+ 20 
+ 40 
+ 27 
+ 25  5 
+--- stderr ---
+?SYNTAX  ERROR IN 120

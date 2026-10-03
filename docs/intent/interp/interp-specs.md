@@ -122,3 +122,11 @@ Design: `interp-design.md`
 - [x] **INTERP-088**: When executing an `ast.GetStmt`, the interpreter shall read one key from the console for each variable in turn and assign it to a string variable as it is (the empty string when no key is waiting).
 - [x] **INTERP-089**: When `GET` assigns a key to a number variable, the interpreter shall assign 0 for no key, a space, `.`, `+`, `-`, or `E`, and the value of a digit; for any other key, it shall fail with a SYNTAX error that carries no line number, even in a running program.
 - [x] **INTERP-090**: If the console returns `io.EOF`, or no console is set, then `INPUT` and `GET` shall stop and `Exec` shall return `ErrEndOfInput`; if the console returns `ErrInterrupted`, they shall fail with a BREAK error.
+
+## User-defined functions
+
+- [x] **INTERP-091**: When executing an `ast.DefStmt` in a running program, the interpreter shall record the definition under the identity of its name, replacing any earlier one; if the name is a string name, it shall fail with TYPE MISMATCH, then, in direct mode, with ILLEGAL DIRECT, then, if the parameter is a string variable, with TYPE MISMATCH.
+- [x] **INTERP-092**: When evaluating an `ast.FnExpr`, the interpreter shall fail with TYPE MISMATCH if the name is a string name; otherwise evaluate the argument (TYPE MISMATCH if it is a string), fail with UNDEF'D FUNCTION if no function of that name is defined, assign the argument to the parameter variable, evaluate the body (failing with its `BodyErr` if it has one, or TYPE MISMATCH if the body's value is a string), restore the parameter variable's previous value, and return the body's value.
+- [x] **INTERP-093**: If a function call fails, then the interpreter shall leave the parameter variable holding the argument.
+- [x] **INTERP-094**: If evaluating an `ast.FnExpr` would make 10 function calls in progress, then the interpreter shall fail with OUT OF MEMORY.
+- [x] **INTERP-095**: The interpreter shall clear all function definitions whenever it clears the variables.

@@ -48,6 +48,8 @@ const (
 	Return                // RETURN
 	Input                 // INPUT
 	Get                   // GET
+	Def                   // DEF
+	Fn                    // FN
 )
 
 var kindNames = [...]string{
@@ -91,6 +93,8 @@ var kindNames = [...]string{
 	Return:    "Return",
 	Input:     "Input",
 	Get:       "Get",
+	Def:       "Def",
+	Fn:        "Fn",
 }
 
 func (k Kind) String() string {

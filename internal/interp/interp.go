@@ -24,14 +24,16 @@ const zoneWidth = 10
 // Interp executes lines, writing program output to its writer.
 type Interp struct {
 	out     io.Writer
-	column  int              // cursor column: characters written since the last newline
-	vars    map[string]value // variables, by identity (ast.VarRef.Name)
-	program []progLine       // stored lines, in ascending order of number
-	ran     bool             // whether RUN or GOTO has been executed
-	direct  *ast.Line        // the line Exec is running, in direct mode
-	stack   []frame          // the control stack: FOR and GOSUB entries
-	cur     pos              // the position of the statement executing
-	console Console          // where INPUT and GET read
+	column  int                     // cursor column: characters written since the last newline
+	vars    map[string]value        // variables, by identity (ast.VarRef.Name)
+	program []progLine              // stored lines, in ascending order of number
+	ran     bool                    // whether RUN or GOTO has been executed
+	direct  *ast.Line               // the line Exec is running, in direct mode
+	stack   []frame                 // the control stack: FOR and GOSUB entries
+	cur     pos                     // the position of the statement executing
+	console Console                 // where INPUT and GET read
+	fns     map[string]*ast.DefStmt // user-defined functions, by name identity
+	calls   int                     // user-defined function calls in progress
 
 	interrupted atomic.Bool // set by Interrupt, checked after each statement
 }
@@ -40,7 +42,7 @@ type Interp struct {
 //
 // @spec INTERP-002
 func New(out io.Writer) *Interp {
-	return &Interp{out: out, vars: map[string]value{}}
+	return &Interp{out: out, vars: map[string]value{}, fns: map[string]*ast.DefStmt{}}
 }
 
 // Interrupt asks the interpreter to stop, as the C64's STOP key does: the
@@ -154,6 +156,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execInput(s)
 	case *ast.GetStmt:
 		return in.execGet(s)
+	case *ast.DefStmt:
+		return in.execDef(s)
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:
@@ -284,6 +288,8 @@ func (in *Interp) eval(e ast.Expr) (value, error) {
 			return value{}, err
 		}
 		return numberValue(float64(^n)), nil
+	case *ast.FnExpr:
+		return in.callFn(e)
 	case *ast.CompareExpr:
 		l, err := in.eval(e.Left)
 		if err != nil {

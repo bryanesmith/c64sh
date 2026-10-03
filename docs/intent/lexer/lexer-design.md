@@ -63,6 +63,8 @@ const (
     Return                // RETURN
     Input                 // INPUT
     Get                   // GET
+    Def                   // DEF
+    Fn                    // FN
 )
 
 type Token struct {
@@ -100,7 +102,7 @@ Inside a string literal, the bytes of the line are kept exactly as they are, inc
 
 ## Keywords
 
-The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, `THEN`, `RUN`, `LIST`, `NEW`, `END`, `GOTO`, `GO`, `TO`, `FOR`, `NEXT`, `STEP`, `GOSUB`, `RETURN`, `INPUT`, and `GET`.
+The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, `THEN`, `RUN`, `LIST`, `NEW`, `END`, `GOTO`, `GO`, `TO`, `FOR`, `NEXT`, `STEP`, `GOSUB`, `RETURN`, `INPUT`, `GET`, `DEF`, and `FN`.
 
 - **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`; `REMARK` is a `Rem` token with the comment `ARK`.
 - **Spaces inside a keyword break it.** `PR INT` is not `PRINT`; it scans as `Illegal(P) Illegal(R) Illegal(I) Illegal(N) Illegal(T)`.
@@ -172,6 +174,8 @@ gosub     = "GOSUB" .
 return    = "RETURN" .
 input     = "INPUT" .
 get       = "GET" .
+def       = "DEF" .
+fn        = "FN" .
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
             [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
 digit     = "0" … "9" .

@@ -22,6 +22,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Exit status](#exit-status)
 - [Differences from a real C64](#differences-from-a-real-c64)
 - [Not yet supported](#not-yet-supported)
+- [Not planned](#not-planned)
 
 ## Installing
 
@@ -451,4 +452,20 @@ These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 - `GOSUB`, `FOR`, `ON`, and the other ways to call or loop in a program; `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 
+These are planned; the [roadmap](https://github.com/bryanesmith/c64sh/issues/34) lists them in the order they will be added.
+
 Every form c64sh accepts is described in this guide, and shown in use in [`examples/`](../examples/).
+
+## Not planned
+
+These C64 BASIC keywords work directly on the C64's memory and processor:
+
+| Keyword | On a C64 |
+|---|---|
+| `PEEK(a)` | Returns the byte stored at memory address `a`, such as `PEEK(197)`, the key being pressed. |
+| `POKE a,v` | Writes byte `v` to memory address `a`. This is how C64 programs set colors, graphics, and sound: `POKE 53280,0` makes the border black. |
+| `SYS a` | Runs machine code starting at address `a`. |
+| `WAIT a,m` | Pauses until a bit at address `a` changes, such as a hardware signal. |
+| `USR(x)` | Calls a machine-code routine set up beforehand with `POKE`, passing it `x` and returning a number. |
+
+c64sh will not support them: each would need an emulated C64 behind it, with its memory, its video, sound, and I/O chips, and a 6502 processor to run machine code. c64sh runs BASIC in a terminal, without emulating the machine. These keywords give `?SYNTAX  ERROR`.

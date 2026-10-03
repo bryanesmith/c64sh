@@ -114,6 +114,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `014-program-mode.bas` | Storing numbered lines in any order, replacing and deleting them, `RUN` and `RUN n`, `LIST` (with `?` shown as `PRINT`), `NEW`, `END`, variables cleared by `RUN` and by storing a line, and a syntax error found only when its line runs (`?SYNTAX  ERROR IN 20`) |
 | `015-numbered-scripts.bas` | The script rule: numbered lines stored and unnumbered lines run at once, and the never-run program run after the last line |
 | `016-goto.bas` | `GOTO` skipping lines, a loop with `IF … THEN n`, `IF … GOTO n`, `GO TO`, `GOTO` typed directly keeping variables (unlike `RUN`), and `?UNDEF'D STATEMENT  ERROR IN 20` |
+| `017-loops.bas` | `FOR … NEXT` with and without `STEP` (negative and fractional), bare `NEXT`, the variable's value after a loop, a body that runs once, end values worked out once, nested loops and `NEXT J,I`, a loop across program lines, and `?NEXT WITHOUT FOR  ERROR` |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

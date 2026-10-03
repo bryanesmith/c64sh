@@ -428,3 +428,15 @@ func TestGotoKeywords(t *testing.T) {
 		{"TO in a name", "TOTAL", []token.Token{tok(token.To, "TO", 0), name("TAL", 2), eol(5)}},
 	})
 }
+
+// @spec LEXER-031
+func TestLoopKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"FOR TO STEP", "FORI=1TO9STEP2", []token.Token{
+			tok(token.For, "FOR", 0), name("I", 3), tok(token.Equal, "=", 4), num("1", 5),
+			tok(token.To, "TO", 6), num("9", 8), tok(token.Step, "STEP", 9), num("2", 13), eol(14),
+		}},
+		{"NEXT", "NEXT I", []token.Token{tok(token.Next, "NEXT", 0), name("I", 5), eol(6)}},
+		{"FOR in a name", "FORM", []token.Token{tok(token.For, "FOR", 0), name("M", 3), eol(4)}},
+	})
+}

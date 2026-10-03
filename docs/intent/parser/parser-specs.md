@@ -48,3 +48,10 @@ Design: `parser-design.md`
 - [x] **PARSER-010**: If a SYNTAX error occurs within a `PRINT` statement's items, then the parser shall include that statement in the returned `*ast.Line` as its last statement, with `Items` holding the items completed before the error followed by an `*ast.BadItem` carrying the SYNTAX error (so `PRINT "A";"B"+@` has items `ExprItem("A")`, `Semicolon`, `BadItem`).
 - [x] **PARSER-011**: If a SYNTAX error occurs other than within a `PRINT` statement's items (for example at the first token of a statement, in an assignment, or in an `IF`), then the parser shall put an `*ast.BadStmt` holding the error in place of the failing statement, as the line's last statement.
 - [x] **PARSER-037**: If `LIST`, `NEW`, or `END` is followed by a token other than `:` or `EOL`, `GO` is not followed by `TO`, or a line number read as PARSER-039 specifies is above 63999, then the parser shall return a SYNTAX error, with an `*ast.BadStmt` in place of the statement (so `LIST 10`, `END 1`, and `GO 10` do nothing but report the error).
+
+## Loops
+
+- [x] **PARSER-042**: When a statement is `FOR`, a variable, `=`, an expression, `TO`, and an expression, optionally followed by `STEP` and an expression, the parser shall produce an `*ast.ForStmt` holding the variable and the three expressions, with `Step` nil when `STEP` is omitted.
+- [x] **PARSER-043**: If a `FOR` statement's variable is an integer variable, or it lacks its variable, `=`, start value, `TO`, end value, or (after `STEP`) step, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.
+- [x] **PARSER-044**: When a statement is `NEXT` followed by `:` or `EOL`, the parser shall produce an `*ast.NextStmt` with no variables; when it is `NEXT` followed by variables separated by commas, an `*ast.NextStmt` holding them in order.
+- [x] **PARSER-045**: If the variables after `NEXT` are not separated by commas, or a comma is not followed by a variable, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.

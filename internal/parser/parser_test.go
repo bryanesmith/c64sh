@@ -41,6 +41,9 @@ var (
 	gotok = token.Token{Kind: token.Goto, Value: "GOTO"}
 	gok   = token.Token{Kind: token.Go, Value: "GO"}
 	tok   = token.Token{Kind: token.To, Value: "TO"}
+	fork  = token.Token{Kind: token.For, Value: "FOR"}
+	nextk = token.Token{Kind: token.Next, Value: "NEXT"}
+	stepk = token.Token{Kind: token.Step, Value: "STEP"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -92,6 +95,18 @@ func dumpStmt(s ast.Stmt) string {
 		return "RUN"
 	case *ast.GotoStmt:
 		return fmt.Sprintf("GOTO %d", s.Line)
+	case *ast.ForStmt:
+		out := "FOR " + dumpExpr(s.Var) + "=" + dumpExpr(s.From) + " TO " + dumpExpr(s.To)
+		if s.Step != nil {
+			out += " STEP " + dumpExpr(s.Step)
+		}
+		return out
+	case *ast.NextStmt:
+		var vars []string
+		for _, v := range s.Vars {
+			vars = append(vars, dumpExpr(v))
+		}
+		return strings.TrimSpace("NEXT " + strings.Join(vars, ","))
 	case *ast.ListStmt:
 		return "LIST"
 	case *ast.NewStmt:
@@ -662,5 +677,49 @@ func TestIfGoto(t *testing.T) {
 	runParseCases(t, []parseCase{
 		{"GOTO n", toks(iff, name("A"), gotok, number("20")), `IF $A[A] : GOTO 20`, false},
 		{"GOTO alone", toks(iff, name("A"), gotok), `IF $A[A] : GOTO 0`, false},
+	})
+}
+
+// @spec PARSER-042
+func TestFor(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"FOR TO", toks(fork, name("I"), eq, number("1"), tok, number("3")), `FOR $I[I]=#1 TO #3`, false},
+		{"FOR TO STEP", toks(fork, name("I"), eq, number("10"), tok, number("1"), stepk, minus, number("2")), `FOR $I[I]=#10 TO #1 STEP (-#2)`, false},
+		{"expressions", toks(fork, name("I"), eq, name("A"), plus, number("1"), tok, name("B"), star, number("2")), `FOR $I[I]=($A[A]+#1) TO ($B[B]*#2)`, false},
+		{"string variable", toks(fork, name("A$"), eq, str("X"), tok, number("1")), `FOR $A$[A$]="X" TO #1`, false},
+		{"then a statement", toks(fork, name("I"), eq, number("1"), tok, number("3"), colon, pr, name("I")), `FOR $I[I]=#1 TO #3 : PRINT[$I[I]]`, false},
+	})
+}
+
+// @spec PARSER-043
+func TestForSyntaxErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"integer variable", toks(fork, name("I%"), eq, number("1"), tok, number("3")), `BADSTMT`, true},
+		{"no variable", toks(fork, eq, number("1"), tok, number("3")), `BADSTMT`, true},
+		{"no =", toks(fork, name("I"), number("1"), tok, number("3")), `BADSTMT`, true},
+		{"no start", toks(fork, name("I"), eq, tok, number("3")), `BADSTMT`, true},
+		{"no TO", toks(fork, name("I"), eq, number("1"), number("3")), `BADSTMT`, true},
+		{"no end", toks(fork, name("I"), eq, number("1"), tok), `BADSTMT`, true},
+		{"no step", toks(fork, name("I"), eq, number("1"), tok, number("3"), stepk), `BADSTMT`, true},
+		{"junk after", toks(fork, name("I"), eq, number("1"), tok, number("3"), str("X")), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-044
+func TestNext(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"bare", toks(nextk), `NEXT`, false},
+		{"one variable", toks(nextk, name("I")), `NEXT $I[I]`, false},
+		{"two variables", toks(nextk, name("J"), comma, name("I")), `NEXT $J[J],$I[I]`, false},
+		{"then a statement", toks(nextk, colon, pr, str("X")), `NEXT : PRINT["X"]`, false},
+	})
+}
+
+// @spec PARSER-045
+func TestNextSyntaxErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"no comma", toks(nextk, name("I"), name("J")), `BADSTMT`, true},
+		{"trailing comma", toks(nextk, name("I"), comma), `BADSTMT`, true},
+		{"not a variable", toks(nextk, number("1")), `BADSTMT`, true},
 	})
 }

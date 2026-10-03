@@ -107,3 +107,23 @@ func TestGotoInScripts(t *testing.T) {
 		check(t, c.name, runMain(t, c.input), c.want)
 	}
 }
+
+// TestLoops checks FOR … NEXT end to end.
+//
+// @spec INTERP-068, INTERP-074
+func TestLoops(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  result
+	}{
+		{"program", "10 FOR I=1 TO 3\n20 PRINT I;\n30 NEXT\n", result{" 1  2  3 ", "", 0}},
+		{"direct", "FOR I=1 TO 3:PRINT I;:NEXT:PRINT\n", result{" 1  2  3 \n", "", 0}},
+		{"NEXT without FOR", "10 NEXT\n", result{"", "?NEXT WITHOUT FOR  ERROR IN 10\n", 1}},
+		{"integer counter", "FOR I%=1 TO 3\n", result{"", "?SYNTAX  ERROR\n", 1}},
+		{"FOR in a name", "FORM=1\n", result{"", "?SYNTAX  ERROR\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.name, runMain(t, c.input), c.want)
+	}
+}

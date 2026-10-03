@@ -173,6 +173,8 @@ const (
     DivisionByZero            // DIVISION BY ZERO
     IllegalQuantity           // ILLEGAL QUANTITY
     UndefdStatement           // UNDEF'D STATEMENT
+    NextWithoutFor            // NEXT WITHOUT FOR
+    OutOfMemory               // OUT OF MEMORY
     Break                     // BREAK: execution stopped by Ctrl-C
 )
 

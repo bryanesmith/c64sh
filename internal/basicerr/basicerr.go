@@ -14,6 +14,8 @@ const (
 	IllegalQuantity             // ILLEGAL QUANTITY
 	UndefdStatement             // UNDEF'D STATEMENT
 	Break                       // BREAK: execution stopped by Ctrl-C
+	NextWithoutFor              // NEXT WITHOUT FOR
+	OutOfMemory                 // OUT OF MEMORY
 )
 
 // names holds each kind's name as the C64 prints it.
@@ -26,6 +28,8 @@ var names = [...]string{
 	IllegalQuantity: "ILLEGAL QUANTITY",
 	UndefdStatement: "UNDEF'D STATEMENT",
 	Break:           "BREAK",
+	NextWithoutFor:  "NEXT WITHOUT FOR",
+	OutOfMemory:     "OUT OF MEMORY",
 }
 
 // Error is a BASIC error.

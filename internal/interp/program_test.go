@@ -382,3 +382,97 @@ func TestExecDiscardsEarlierInterrupt(t *testing.T) {
 		t.Errorf("output %q, error %v; want both lines and no error", rec.String(), err)
 	}
 }
+
+// @spec INTERP-068
+func TestForRunsBody(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"count", lines(`10 FOR I=1 TO 3`, `20 PRINT I;`, `30 NEXT I`, "RUN"), " 1  2  3 ", nil},
+		{"step", lines(`10 FOR I=1 TO 10 STEP 4:PRINT I;:NEXT`, "RUN"), " 1  5  9 ", nil},
+		{"negative step", lines(`10 FOR I=3 TO 1 STEP -1:PRINT I;:NEXT`, "RUN"), " 3  2  1 ", nil},
+		{"fraction step", lines(`10 FOR I=0 TO 1 STEP .5:PRINT I;:NEXT`, "RUN"), " 0  .5  1 ", nil},
+		{"end evaluated once", lines(`10 N=3:FOR I=1 TO N:N=1:PRINT I;:NEXT`, "RUN"), " 1  2  3 ", nil},
+		{"body runs once even past the end", lines(`10 FOR I=5 TO 1:PRINT I;:NEXT`, "RUN"), " 5 ", nil},
+		{"variable after loop", lines(`10 FOR I=1 TO 3:NEXT:PRINT I`, "RUN"), " 4 \n", nil},
+		{"nested", lines(`10 FOR I=1 TO 2:FOR J=1 TO 2:PRINT I;J;:NEXT J,I`, "RUN"), " 1  1  1  2  2  1  2  2 ", nil},
+		{"across lines", lines(`10 FOR I=1 TO 2`, `20 FOR J=1 TO 2`, `30 PRINT I*10+J;`, `40 NEXT`, `50 NEXT`, "RUN"), " 11  12  21  22 ", nil},
+	})
+}
+
+// @spec INTERP-069
+func TestForTypeMismatch(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"string variable", lines(`10 FOR A$="X" TO "Y"`, "RUN", `PRINT A$`), "X\n", nil},
+		{"string variable error", lines(`10 FOR A$="X" TO "Y"`, "RUN"), "", errIn(basicerr.TypeMismatch, 10)},
+		{"string end", lines(`10 FOR I=1 TO "X"`, "RUN"), "", errIn(basicerr.TypeMismatch, 10)},
+		{"string step", lines(`10 FOR I=1 TO 2 STEP "X"`, "RUN"), "", errIn(basicerr.TypeMismatch, 10)},
+		{"string start", lines(`10 FOR I="X" TO 2`, "RUN"), "", errIn(basicerr.TypeMismatch, 10)},
+	})
+}
+
+// @spec INTERP-070
+func TestForReusingVariable(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"restart discards old loop", lines(`10 FOR I=1 TO 2:FOR J=1 TO 9:FOR I=7 TO 8:PRINT I;:NEXT I`, `20 NEXT J`, "RUN"), " 7  8 ", errIn(basicerr.NextWithoutFor, 20)},
+		{"same variable twice", lines(`10 FOR I=1 TO 2:FOR I=5 TO 6:PRINT I;:NEXT:NEXT`, "RUN"), " 5  6 ", errIn(basicerr.NextWithoutFor, 10)},
+	})
+}
+
+// @spec INTERP-071
+func TestNextEndTest(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"lands on end", lines(`10 FOR I=1 TO 3 STEP 2:PRINT I;:NEXT`, "RUN"), " 1  3 ", nil},
+		{"zero step stops at end", lines(`10 FOR I=1 TO 1 STEP 0:PRINT I;:NEXT`, "RUN"), " 1 ", nil},
+		{"zero step changing variable", lines(`10 FOR I=1 TO 3 STEP 0:PRINT I;:I=I+1:NEXT`, "RUN"), " 1  2 ", nil},
+		{"body changes variable", lines(`10 FOR I=1 TO 5:PRINT I;:I=I+1:NEXT`, "RUN"), " 1  3  5 ", nil},
+	})
+}
+
+// @spec INTERP-072
+func TestNextSeveralVariables(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"NEXT J,I", lines(`10 FOR I=1 TO 2:FOR J=1 TO 2:NEXT J,I:PRINT I;J`, "RUN"), " 3  3 \n", nil},
+		{"statement after NEXT", lines(`10 FOR I=1 TO 2:NEXT:PRINT "DONE"`, "RUN"), "DONE\n", nil},
+	})
+}
+
+// @spec INTERP-073
+func TestNextSearch(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"no loop", lines(`10 NEXT`, "RUN"), "", errIn(basicerr.NextWithoutFor, 10)},
+		{"wrong variable", lines(`10 FOR I=1 TO 2:NEXT J`, "RUN"), "", errIn(basicerr.NextWithoutFor, 10)},
+		{"bare NEXT is innermost", lines(`10 FOR I=1 TO 2:FOR J=1 TO 2:PRINT J;:NEXT:NEXT`, "RUN"), " 1  2  1  2 ", nil},
+		{"outer NEXT drops inner loop", lines(`10 FOR I=1 TO 2:FOR J=1 TO 9:NEXT I:PRINT I;J`, "RUN", "NEXT J"), " 3  1 \n", &basicerr.Error{Kind: basicerr.NextWithoutFor}},
+		{"direct", lines("NEXT"), "", &basicerr.Error{Kind: basicerr.NextWithoutFor}},
+	})
+}
+
+// @spec INTERP-074
+func TestLoopsResumeMidLine(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"direct mode", lines(`FOR I=1 TO 3:PRINT I;:NEXT`), " 1  2  3 ", nil},
+		{"after other statements", lines(`PRINT "X";:FOR I=1 TO 2:PRINT I;:NEXT:PRINT "Y"`), "X 1  2 Y\n", nil},
+		{"program mid-line", lines(`10 PRINT "A";:FOR I=1 TO 2:PRINT I;`, `20 NEXT:PRINT "B"`, "RUN"), "A 1  2 B\n", nil},
+		{"NEXT after program ends", lines(`10 FOR I=1 TO 3:PRINT I;:END`, "RUN", "NEXT"), " 1  2 ", nil},
+	})
+}
+
+// @spec INTERP-075
+func TestForStackLimit(t *testing.T) {
+	ten := `10 FOR A=1 TO 1:FOR B=1 TO 1:FOR C=1 TO 1:FOR D=1 TO 1:FOR E=1 TO 1:FOR F=1 TO 1:FOR G=1 TO 1:FOR H=1 TO 1:FOR I=1 TO 1:FOR J=1 TO 1`
+	runSessionCases(t, []sessionCase{
+		{"ten nested", lines(ten+`:PRINT "OK"`, "RUN"), "OK\n", nil},
+		{"eleven nested", lines(ten+`:FOR K=1 TO 1:PRINT "OK"`, "RUN"), "", errIn(basicerr.OutOfMemory, 10)},
+		{"reused variable takes no room", lines(`10 FOR A=1 TO 1:FOR A=1 TO 1:FOR A=1 TO 1:FOR A=1 TO 1:FOR A=1 TO 1:FOR A=1 TO 1:FOR A=1 TO 1:FOR A=1 TO 1:FOR A=1 TO 1:FOR A=1 TO 1:FOR A=1 TO 1:PRINT "OK"`, "RUN"), "OK\n", nil},
+	})
+}
+
+// @spec INTERP-076
+func TestControlStackClearing(t *testing.T) {
+	runSessionCases(t, []sessionCase{
+		{"RUN clears", lines(`10 FOR I=1 TO 3:END`, `20 NEXT`, "RUN", "RUN 20"), "", errIn(basicerr.NextWithoutFor, 20)},
+		{"storing clears", lines(`10 FOR I=1 TO 3:END`, "RUN", "20 REM", "NEXT"), "", &basicerr.Error{Kind: basicerr.NextWithoutFor}},
+		{"error clears", lines(`10 FOR I=1 TO 3:PRINT 1/0`, "RUN", "NEXT"), "", &basicerr.Error{Kind: basicerr.NextWithoutFor}},
+		{"NEW clears", lines(`10 FOR I=1 TO 3:END`, "RUN", "NEW", "NEXT"), "", &basicerr.Error{Kind: basicerr.NextWithoutFor}},
+		{"direct loop removed after its line", lines(`FOR I=1 TO 3`, "NEXT"), "", &basicerr.Error{Kind: basicerr.NextWithoutFor}},
+	})
+}

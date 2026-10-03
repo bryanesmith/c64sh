@@ -71,6 +71,35 @@ var ErrEndOfInput = errors.New("end of input")
 // end of input.
 func (in *Interp) SetConsole(c Console)
 
+// Storage holds the files that LOAD, SAVE, and VERIFY use, by name.
+type Storage interface {
+    // ReadFile returns a file's contents, or an error satisfying
+    // errors.Is(err, fs.ErrNotExist) if there is no such file.
+    ReadFile(name string) ([]byte, error)
+    // WriteFile writes a file. If the file exists and replace is false,
+    // it writes nothing and returns an error satisfying
+    // errors.Is(err, fs.ErrExist).
+    WriteFile(name string, data []byte, replace bool) error
+}
+
+// SetStorage sets where LOAD, SAVE, and VERIFY find files. Without one,
+// they fail with DEVICE NOT PRESENT.
+func (in *Interp) SetStorage(s Storage)
+
+// SetMessages sets where the C64's tape and disk messages (SAVING NAME,
+// LOADING, …) are written, for statements executed in direct mode.
+// Without a writer, no messages are written.
+func (in *Interp) SetMessages(w io.Writer)
+
+// StorageError is returned by Exec when storage refused or failed to read
+// or write a file. It is not a BASIC error: a C64 reports these only
+// through the disk drive's light and error channel.
+type StorageError struct {
+    File string // the file's name in storage, such as HELLO.bas
+    Name string // the name the program used, such as @0:HELLO
+    Err  error  // fs.ErrExist for a disk file that may not be replaced
+}
+
 // Column returns the cursor column: the number of characters written
 // since the last newline. It is 0 at the start of a line.
 func (in *Interp) Column() int
@@ -110,7 +139,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
         return s.Err
     case *ast.RunStmt, *ast.GotoStmt, *ast.ListStmt, *ast.NewStmt, *ast.EndStmt,
         *ast.ForStmt, *ast.NextStmt, *ast.GosubStmt, *ast.ReturnStmt,
-        *ast.InputStmt, *ast.GetStmt, *ast.DefStmt:
+        *ast.InputStmt, *ast.GetStmt, *ast.DefStmt,
+        *ast.LoadStmt, *ast.SaveStmt, *ast.VerifyStmt:
         … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
@@ -262,6 +292,54 @@ The body sees every variable's current value, so `DEF FN F(X)=X*K` uses whatever
 
 **Calls in progress.** A call keeps its saved parameter and the evaluator's state on the C64's stack while its body is evaluated, about 20 bytes, and the expression evaluator fails with `OUT OF MEMORY` when the stack runs out (`$ADAC`). c64sh does not model the stack space expressions use, but it limits calls in progress to 9, roughly what the C64's stack holds, so that a function that calls itself (`DEF FN A(X)=FN A(X)`) fails with `OUT OF MEMORY` as on a C64, instead of recursing without end.
 
+## Program files
+
+`LOAD`, `SAVE`, and `VERIFY` move the whole program between memory and the `Storage` the shell sets (see the shell design).
+
+### Arguments
+
+The arguments are evaluated in order: the name must be a string (else `TYPE MISMATCH`), and the device and secondary address numbers from 0 to 255, rounded down (else `ILLEGAL QUANTITY`), as the ROM reads them (`$E1D4`, `$B79E`). The device defaults to 1 (tape); the secondary address is ignored. The device then decides what happens, as on a C64:
+
+| Device | Meaning |
+|---|---|
+| 1 | Tape: storage |
+| 8 to 11 | Disk drives: storage |
+| 0, 3, 4, 5 | Keyboard, screen, printers: `ILLEGAL DEVICE NUMBER` |
+| any other | `DEVICE NOT PRESENT` |
+
+An empty or missing name is `MISSING FILE NAME`. (A C64 lets tape use an empty name, meaning the next file on the tape; storage has no "next file".)
+
+### File names
+
+For a disk drive, a leading `@0:` or `@:` means "replace the file if it exists", and a leading `0:` (drive 0) is dropped; the rest is the name. For tape, the name is used as given. The file in storage is the name with `.bas` added if the name has no extension (no `.` in it): `HELLO` is `HELLO.bas`, and `HELLO.TXT` is `HELLO.TXT`. Letters keep their case.
+
+### SAVE
+
+`SAVE` writes the program as text: the line `#!/usr/bin/env c64sh`, then each line, in order, as its number, a space, and its text exactly as stored, each ending in `\n`. Saving an empty program writes just the first line. On tape, an existing file is replaced. On a disk drive, it is replaced only with `@0:`; otherwise nothing is written and `Exec` returns a `StorageError` with `fs.ErrExist`, the 1541's `63, FILE EXISTS`, which a C64 shows only by blinking the drive's light. Any other storage failure is also a `StorageError`.
+
+### LOAD
+
+`LOAD` reads the file: the name as given first, and if there is no such file and the name has no extension, the name with `.bas`. If neither exists, it fails with `FILE NOT FOUND`. The file must be a program: an optional first line beginning `#!`, blank lines, and lines beginning with a line number, each stored as if typed (so a later line replaces an earlier one with the same number). Anything else, or a line number above 63999, is `LOAD` (the C64's `?LOAD  ERROR`), and the program is unchanged. Then, as on a C64:
+
+- **In direct mode**, the program is replaced and the variables are cleared, and the rest of the line does not run.
+- **In a running program**, the program is replaced, the variables are kept, the control stack is emptied, and the new program runs from its first line (`$E1AB`): this is how C64 programs chain to the next part of a program too large for memory.
+
+### VERIFY
+
+`VERIFY` reads the file as `LOAD` does and compares its lines (numbers and text) with the program's. If they differ, or the file is not a program, it fails with `VERIFY`; if they match, it continues.
+
+### Messages
+
+When a writer is set with `SetMessages` and the statement runs in direct mode, the C64's messages are written to it, each on its own line, after `FreshLine`; a running program writes none, as on a C64, which turns them off for `RUN` (`$A871`). `NAME` is the name as given.
+
+| Statement | Tape | Disk |
+|---|---|---|
+| `SAVE` | `PRESS RECORD & PLAY ON TAPE`, `OK`, `SAVING NAME` | `SAVING NAME` |
+| `LOAD` | `PRESS PLAY ON TAPE`, `OK`, `SEARCHING FOR NAME`, `FOUND NAME`, `LOADING` | `SEARCHING FOR NAME`, `LOADING` |
+| `VERIFY` | as `LOAD`, with `VERIFYING` for `LOADING`, then `OK` if it matches | `SEARCHING FOR NAME`, `VERIFYING`, then `OK` if it matches |
+
+When the file is not found, the messages stop after `SEARCHING FOR NAME`. A tape never needs a key pressed: c64sh writes `PRESS PLAY ON TAPE` and carries on.
+
 ## Keyboard input
 
 `INPUT` and `GET` read from the `Console` the shell sets (see the shell design). Both work only in a running program: in direct mode they fail with `ILLEGAL DIRECT` (`$B3A6`), `INPUT` after writing its prompt, as the ROM writes the prompt first (`$ABBF`).
@@ -388,6 +466,12 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `NEXT WITHOUT FOR` | `NEXT` with no matching `FOR` entry above the topmost non-`FOR` entry of the control stack. |
 | `OUT OF MEMORY` | A `FOR` or `GOSUB` with no room left on the C64's stack (see *Control stack*), or a 10th function call in progress. |
 | `ILLEGAL DIRECT` | `INPUT`, `GET`, or `DEF` in direct mode. |
+| `FILE NOT FOUND` | `LOAD` or `VERIFY` with no such file. |
+| `DEVICE NOT PRESENT` | `LOAD`, `SAVE`, or `VERIFY` with a device that is not storage, a keyboard, a screen, or a printer, or with no storage set. |
+| `ILLEGAL DEVICE NUMBER` | `LOAD`, `SAVE`, or `VERIFY` with the keyboard (0), the screen (3), or a printer (4, 5). |
+| `MISSING FILE NAME` | `LOAD`, `SAVE`, or `VERIFY` with an empty or missing name. |
+| `LOAD` | `LOAD` of a file that is not a program. |
+| `VERIFY` | `VERIFY` of a file that differs from the program. |
 | `UNDEF'D FUNCTION` | `FN` calling a function that has not been defined. |
 | `RETURN WITHOUT GOSUB` | `RETURN` with no `GOSUB` entry on the control stack, other than `FOR` entries above it. |
 | `UNDEF'D STATEMENT` | `RUN n` or `GOTO n` where the program has no line `n`. |
@@ -414,6 +498,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Execution model | A position (line, statement index) and a control stack of entries holding positions | Run line by line, with loops handled by re-running whole lines; a tree-walking loop construct built by the parser | A C64 resumes a loop just after its `FOR`, which can be mid-line or in the direct-mode line, and lets `NEXT` and `FOR` be anywhere, unmatched in the text. Only positions reproduce that; a parsed loop construct would reject valid programs such as one `FOR` with two `NEXT`s. |
 | Stack limit | The ROM's byte budget: 18 bytes per `FOR` and 7 per `GOSUB`, `OUT OF MEMORY` from 169 bytes in use for a `FOR` and 179 for a `GOSUB` | No limit; a fixed count of loops | It is the C64's own rule, derived from the stack check at `$A3FB`, and it stops runaway programs from growing memory without end. |
 | Function call depth | A fixed limit of 9 calls in progress | Count the stack bytes of every expression; no limit | Modeling the evaluator's stack use precisely would touch every expression for little gain; with no limit, a recursive function would exhaust the Go stack. A fixed limit near the C64's reproduces its error for runaway recursion. |
+| Storage | A `Storage` interface set by the shell, with whole-file reads and writes | `os` calls in the interpreter; an `fs.FS` | Tests use storage in memory and never touch the filesystem (HLD *Non-Goals*). `fs.FS` cannot write, and the disk-overwrite rule needs a write that refuses to replace. |
 | Keyboard source | A `Console` interface set by the shell, with line and key reads | Reading an `io.Reader` directly | The interpreter stays free of terminals: where keys come from (a terminal, a pipe, the rest of a script), how they are echoed, and how Ctrl-C reaches a waiting read are the shell's concerns, and tests supply input as a list of lines and keys. |
 | Interrupting | A flag set by `Interrupt` and checked after each statement | Cancel through a `context.Context` passed to `Exec`; the shell kills the run some other way | The C64 checks its STOP key between statements, so checking there gives the same `BREAK IN n`. A flag keeps the interpreter free of signals and goroutines; the shell decides where interrupts come from. |
 | Stored line form | Text and parsed tree, parsed once when stored | Text only, parsed each time the line runs, as the C64 does; tree only | The tree runs a line many times without parsing again; syntax errors are in the tree, so they are still reported only when reached. `LIST` needs the text as typed, which the tree does not keep (spaces, `?`). |

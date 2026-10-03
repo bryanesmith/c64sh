@@ -40,20 +40,26 @@ func (*jump) Error() string { return "jump" }
 // @spec INTERP-048, INTERP-049, INTERP-050, INTERP-051
 func (in *Interp) Store(n int, text string) {
 	in.clr()
-	i, found := in.find(n)
+	in.program = storeLine(in.program, n, text)
+}
+
+// storeLine stores text as line n of prog, replacing any line n, or
+// deletes line n if text is empty, and returns the program.
+func storeLine(prog []progLine, n int, text string) []progLine {
+	i, found := findLine(prog, n)
 	switch {
 	case text == "" && found:
-		in.program = slices.Delete(in.program, i, i+1)
+		return slices.Delete(prog, i, i+1)
 	case text == "":
-	default:
-		tree, _ := parser.Parse(lexer.Lex(text)) // errors are in the tree
-		l := progLine{number: n, text: text, tree: tree}
-		if found {
-			in.program[i] = l
-		} else {
-			in.program = slices.Insert(in.program, i, l)
-		}
+		return prog
 	}
+	tree, _ := parser.Parse(lexer.Lex(text)) // errors are in the tree
+	l := progLine{number: n, text: text, tree: tree}
+	if found {
+		prog[i] = l
+		return prog
+	}
+	return slices.Insert(prog, i, l)
 }
 
 // NeverRun reports whether the stored program holds lines and no RUN or
@@ -66,7 +72,12 @@ func (in *Interp) NeverRun() bool {
 
 // find returns the index of line n in the program, or where it would go.
 func (in *Interp) find(n int) (int, bool) {
-	return slices.BinarySearchFunc(in.program, n, func(l progLine, n int) int {
+	return findLine(in.program, n)
+}
+
+// findLine returns the index of line n in prog, or where it would go.
+func findLine(prog []progLine, n int) (int, bool) {
+	return slices.BinarySearchFunc(prog, n, func(l progLine, n int) int {
 		return l.number - n
 	})
 }

@@ -88,7 +88,7 @@ func isTerminal(r io.Reader) bool {
 // Interactive selects the behavior; File, or stdin when File is empty,
 // selects the input.
 //
-// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006
+// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002
 func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	input, name := stdin, "stdin"
 	if cfg.File != "" {
@@ -108,6 +108,10 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	plain := bufio.NewReader(input)
 	var lines lineReader = &plainReader{r: plain}
 	s.setConsole(cfg, stdin, plain)
+	s.interp.SetStorage(dirStorage{})
+	if cfg.Interactive {
+		s.interp.SetMessages(stderr)
+	}
 	if editorWanted(cfg, stdin, stderr) {
 		tty := stdin.(*os.File)
 		lines = newEditorReader(tty, stderr, terminalRawMode(tty), terminalSize(tty), cfg.HistoryFile, stderr)
@@ -217,11 +221,17 @@ func (s *session) execLine(line string) (int, bool) {
 	}
 
 	basicErr, isBasic := errors.AsType[*basicerr.Error](err)
+	var storageErr *interp.StorageError
 	switch {
 	case errors.Is(err, interp.ErrEndOfInput):
 		s.freshLine()
 		io.WriteString(s.stderr, "c64sh: stdin: end of input\n")
 		return 1, true
+	case errors.As(err, &storageErr):
+		s.reportStorage(storageErr)
+		if !s.interactive {
+			return 1, true
+		}
 	case err == nil:
 	case isBasic:
 		s.report(basicErr)
@@ -272,6 +282,30 @@ func (s *session) exec(tree *ast.Line) error {
 		}
 	}()
 	return s.interp.Exec(tree)
+}
+
+// reportStorage writes a storage failure the way c64sh reports problems
+// outside BASIC. A disk file that may not be replaced is the 1541's
+// FILE EXISTS, which a C64 shows only with its drive light.
+//
+// @spec SHELL-FILE-003
+func (s *session) reportStorage(err *interp.StorageError) {
+	s.freshLine()
+	reason := err.Err.Error()
+	if pathErr, ok := errors.AsType[*fs.PathError](err.Err); ok {
+		reason = pathErr.Err.Error()
+	}
+	if errors.Is(err.Err, fs.ErrExist) {
+		name := err.Name
+		for _, prefix := range []string{"@0:", "@:", "0:"} {
+			if rest, ok := strings.CutPrefix(name, prefix); ok {
+				name = rest
+				break
+			}
+		}
+		reason = fmt.Sprintf("file exists (use SAVE \"@0:%s\" to replace it)", name)
+	}
+	fmt.Fprintf(s.stderr, "c64sh: %s: %s\n", err.File, reason)
 }
 
 // report writes a BASIC error the way a C64 prints it, on a fresh line,

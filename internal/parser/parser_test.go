@@ -50,6 +50,9 @@ var (
 	getk  = token.Token{Kind: token.Get, Value: "GET"}
 	def   = token.Token{Kind: token.Def, Value: "DEF"}
 	fn    = token.Token{Kind: token.Fn, Value: "FN"}
+	load  = token.Token{Kind: token.Load, Value: "LOAD"}
+	save  = token.Token{Kind: token.Save, Value: "SAVE"}
+	verif = token.Token{Kind: token.Verify, Value: "VERIFY"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -131,6 +134,12 @@ func dumpStmt(s ast.Stmt) string {
 			return out + "<" + s.BodyErr.Error() + ">"
 		}
 		return out + dumpExpr(s.Body)
+	case *ast.LoadStmt:
+		return "LOAD" + dumpFileArgs(s.FileArgs)
+	case *ast.SaveStmt:
+		return "SAVE" + dumpFileArgs(s.FileArgs)
+	case *ast.VerifyStmt:
+		return "VERIFY" + dumpFileArgs(s.FileArgs)
 	case *ast.ListStmt:
 		return "LIST"
 	case *ast.NewStmt:
@@ -851,5 +860,36 @@ func TestFnCall(t *testing.T) {
 		{"integer name", toks(pr, fn, name("A%"), lp, number("3"), rp), `PRINT[BAD(SYNTAX)]`, true},
 		{"no (", toks(pr, fn, name("A"), number("3")), `PRINT[BAD(SYNTAX)]`, true},
 		{"no )", toks(pr, fn, name("A"), lp, number("3")), `PRINT[BAD(SYNTAX)]`, true},
+	})
+}
+func dumpFileArgs(a ast.FileArgs) string {
+	out := ""
+	for _, e := range []ast.Expr{a.Name, a.Device, a.Secondary} {
+		if e != nil {
+			out += " " + dumpExpr(e)
+		}
+	}
+	return out
+}
+
+// @spec PARSER-055
+func TestFileStatements(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"LOAD", toks(load), `LOAD`, false},
+		{"name", toks(load, str("X")), `LOAD "X"`, false},
+		{"device", toks(save, str("X"), comma, number("8")), `SAVE "X" #8`, false},
+		{"secondary", toks(verif, str("X"), comma, number("8"), comma, number("1")), `VERIFY "X" #8 #1`, false},
+		{"expressions", toks(save, name("N$"), plus, str("X"), comma, name("D")), `SAVE ($N$[N$]+"X") $D[D]`, false},
+		{"then a statement", toks(save, str("X"), colon, pr, str("Y")), `SAVE "X" : PRINT["Y"]`, false},
+	})
+}
+
+// @spec PARSER-056
+func TestFileStatementErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"dangling comma", toks(load, str("X"), comma), `BADSTMT`, true},
+		{"four arguments", toks(load, str("X"), comma, number("8"), comma, number("1"), comma, number("2")), `BADSTMT`, true},
+		{"junk", toks(save, str("X"), str("Y")), `BADSTMT`, true},
+		{"comma first", toks(load, comma, number("8")), `BADSTMT`, true},
 	})
 }

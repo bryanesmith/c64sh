@@ -1,0 +1,7 @@
+exit status: 1
+--- stdout ---
+HELLO FROM DEMO
+SAME
+PART 2 SEES N = 7 
+--- stderr ---
+c64sh: PART2.bas: file exists (use SAVE "@0:PART2" to replace it)

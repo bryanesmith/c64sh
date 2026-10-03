@@ -201,3 +201,20 @@ type FnExpr struct {
 
 func (*DefStmt) stmt() {}
 func (*FnExpr) expr()  {}
+
+// FileArgs are the arguments of LOAD, SAVE, and VERIFY: the file name,
+// the device, and the secondary address, each nil when omitted.
+type FileArgs struct{ Name, Device, Secondary Expr }
+
+// LoadStmt is LOAD [name [, device [, secondary]]].
+type LoadStmt struct{ FileArgs }
+
+// SaveStmt is SAVE [name [, device [, secondary]]].
+type SaveStmt struct{ FileArgs }
+
+// VerifyStmt is VERIFY [name [, device [, secondary]]].
+type VerifyStmt struct{ FileArgs }
+
+func (*LoadStmt) stmt()   {}
+func (*SaveStmt) stmt()   {}
+func (*VerifyStmt) stmt() {}

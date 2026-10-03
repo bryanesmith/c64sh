@@ -24,6 +24,7 @@ Design: `lexer-design.md`
 - [x] **LEXER-032**: When the lexer encounters `GOSUB` or `RETURN` in uppercase outside a string literal, it shall produce a `Gosub` or `Return` token respectively (`GOSUB` being one token, the longest match, rather than `GO` followed by a name).
 - [x] **LEXER-033**: When the lexer encounters `INPUT` or `GET` in uppercase outside a string literal, it shall produce an `Input` or `Get` token respectively.
 - [x] **LEXER-034**: When the lexer encounters `DEF` or `FN` in uppercase outside a string literal, it shall produce a `Def` or `Fn` token respectively.
+- [x] **LEXER-035**: When the lexer encounters `LOAD`, `SAVE`, or `VERIFY` in uppercase outside a string literal, it shall produce a `Load`, `Save`, or `Verify` token respectively.
 
 ## Punctuation and illegal input
 

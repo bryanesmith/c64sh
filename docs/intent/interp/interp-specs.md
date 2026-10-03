@@ -130,3 +130,18 @@ Design: `interp-design.md`
 - [x] **INTERP-093**: If a function call fails, then the interpreter shall leave the parameter variable holding the argument.
 - [x] **INTERP-094**: If evaluating an `ast.FnExpr` would make 10 function calls in progress, then the interpreter shall fail with OUT OF MEMORY.
 - [x] **INTERP-095**: The interpreter shall clear all function definitions whenever it clears the variables.
+
+## Program files
+
+- [x] **INTERP-096**: When executing a `LOAD`, `SAVE`, or `VERIFY`, the interpreter shall evaluate its name (TYPE MISMATCH unless a string), its device (1 if omitted), and its secondary address, each number rounded down and required to be 0 to 255 (else ILLEGAL QUANTITY).
+- [x] **INTERP-097**: If the device of a `LOAD`, `SAVE`, or `VERIFY` is 0, 3, 4, or 5, then the interpreter shall fail with ILLEGAL DEVICE NUMBER; if it is not 1 or 8 to 11, or no storage is set, with DEVICE NOT PRESENT.
+- [x] **INTERP-098**: If the name of a `LOAD`, `SAVE`, or `VERIFY` is empty or omitted, then the interpreter shall fail with MISSING FILE NAME.
+- [x] **INTERP-099**: For a disk device (8 to 11), the interpreter shall remove a leading `@0:` or `@:` from the name, noting that the file may be replaced, or else a leading `0:`; and for any device, the file in storage shall be the name with `.bas` added if it contains no `.`.
+- [x] **INTERP-100**: When executing a `SAVE`, the interpreter shall write to its file `#!/usr/bin/env c64sh` and a newline, then each program line in order as its number, a space, its stored text, and a newline, replacing an existing file for tape (device 1) or a name that began with `@0:` or `@:`.
+- [x] **INTERP-101**: If storage refuses or fails to write the file of a `SAVE` (including an existing disk file that may not be replaced), or fails to read a file other than by its absence, then `Exec` shall return a `*StorageError` holding the file, the name as given, and the storage's error.
+- [x] **INTERP-102**: When executing a `LOAD` or `VERIFY`, the interpreter shall read the file named as given, or, if there is none and the name contains no `.`, the name with `.bas`; if neither exists, it shall fail with FILE NOT FOUND.
+- [x] **INTERP-103**: When a `LOAD` reads a file, the interpreter shall accept an optional first line beginning `#!`, blank lines, and lines beginning with a line number, each stored as if typed in file order; for any other line, or a line number above 63999, it shall fail with LOAD and leave the program unchanged.
+- [x] **INTERP-104**: When a `LOAD` executes in direct mode, the interpreter shall replace the program with the file's lines, clear the variables, and execute no further statements on the line.
+- [x] **INTERP-105**: When a `LOAD` executes in a running program, the interpreter shall replace the program with the file's lines, keep the variables, empty the control stack, and run the new program from its first line.
+- [x] **INTERP-106**: When executing a `VERIFY`, the interpreter shall fail with VERIFY if the file is not a program (INTERP-103) or its lines' numbers and texts differ from the program's, and otherwise continue.
+- [x] **INTERP-107**: When a `LOAD`, `SAVE`, or `VERIFY` executes in direct mode and a messages writer is set, the interpreter shall call `FreshLine` and write to the writer, one per line, the C64's messages for the statement and device: for tape `PRESS RECORD & PLAY ON TAPE`, `OK`, `SAVING NAME` (SAVE) or `PRESS PLAY ON TAPE`, `OK`, `SEARCHING FOR NAME`, `FOUND NAME`, then `LOADING` (LOAD) or `VERIFYING` (VERIFY); for disk `SAVING NAME` or `SEARCHING FOR NAME`, then `LOADING` or `VERIFYING`; then `OK` after a VERIFY that matches; stopping after `SEARCHING FOR NAME` when the file is not found, `NAME` being the name as given.

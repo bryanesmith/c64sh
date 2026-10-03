@@ -21,6 +21,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Subroutines](#subroutines)
 - [Keyboard input](#keyboard-input)
 - [User-defined functions](#user-defined-functions)
+- [Saving programs](#saving-programs)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -492,6 +493,39 @@ prints ` 10 `.
 
 See [`examples/020-user-functions.bas`](../examples/020-user-functions.bas) for every form.
 
+## Saving programs
+
+`SAVE` writes the program to a file, `LOAD` reads it back, and `VERIFY` checks that they match:
+
+```
+10 PRINT "HELLO"
+SAVE "HELLO"
+NEW
+LOAD "HELLO"
+RUN
+```
+
+prints `HELLO`. The file is `HELLO.bas` in the current directory.
+
+- **The file is text**: a `#!/usr/bin/env c64sh` line, then the program's lines as you typed them. So a saved program is also a script: `c64sh HELLO.bas` runs it. `.bas` is added to a name without an extension; `SAVE "NOTES.TXT"` keeps the name as given.
+- **`LOAD` typed directly** replaces the program and clears the variables. **In a running program**, `LOAD` replaces the program and runs the new one from the start, keeping the variables, which is how C64 programs chain to their next part.
+- **A file to `LOAD`** may only hold a `#!` first line, blank lines, and numbered lines; anything else is a `?LOAD  ERROR`, and the program is unchanged. A missing file is a `?FILE NOT FOUND  ERROR`.
+- **`VERIFY "HELLO"`** gives a `?VERIFY  ERROR` if the program and the file differ.
+- **Device numbers** work as on a C64, after the name: `SAVE "HELLO",8`. Tape (1, the default) and the disk drives (8 to 11) all mean the current directory. The keyboard (0), the screen (3), and the printers (4, 5) cannot hold programs: `?ILLEGAL DEVICE NUMBER  ERROR`; any other device is `?DEVICE NOT PRESENT  ERROR`. A third number, the secondary address (`LOAD "HELLO",8,1`), is accepted and ignored.
+- **Every file needs a name**: `SAVE` alone is a `?MISSING FILE NAME  ERROR`. (On a C64, tape allows no name.)
+- **In an interactive session**, typed directly, the C64's messages appear: `SAVING HELLO`, or `SEARCHING FOR HELLO` and `LOADING`, with tape's `PRESS PLAY ON TAPE` (no key needed).
+
+**Replacing a file on disk.** As on the C64's 1541 drive, saving to a disk drive (8 to 11) does not replace an existing file unless the name starts with `@0:`:
+
+```
+SAVE "HELLO",8        : REM refused if HELLO.bas exists
+SAVE "@0:HELLO",8     : REM replaces it
+```
+
+A C64 refuses silently, blinking its drive light; c64sh says `c64sh: HELLO.bas: file exists (use SAVE "@0:HELLO" to replace it)` on stderr, and a script stops with exit status 1. Saving to tape (`SAVE "HELLO"`, device 1) always replaces the file, as recording over a tape does. A name may also start with `0:`, the drive number, which is ignored.
+
+See [`examples/021-saving-programs.bas`](../examples/021-saving-programs.bas) for every form.
+
 ## Comments
 
 `REM` starts a comment. Everything after it, to the end of the line, is ignored:
@@ -530,6 +564,12 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?NEXT WITHOUT FOR  ERROR` | `NEXT` with no loop to continue. |
 | `?OUT OF MEMORY  ERROR` | More than 10 loops, 26 subroutine calls, or 9 function calls, nested. |
 | `?ILLEGAL DIRECT  ERROR` | `INPUT`, `GET`, or `DEF` typed directly; they work only in a program. |
+| `?FILE NOT FOUND  ERROR` | `LOAD` or `VERIFY` of a file that does not exist. |
+| `?LOAD  ERROR` | `LOAD` of a file that is not a program. |
+| `?VERIFY  ERROR` | `VERIFY` of a file that differs from the program. |
+| `?MISSING FILE NAME  ERROR` | `LOAD`, `SAVE`, or `VERIFY` without a name. |
+| `?ILLEGAL DEVICE NUMBER  ERROR` | `LOAD`, `SAVE`, or `VERIFY` with the keyboard (0), the screen (3), or a printer (4, 5). |
+| `?DEVICE NOT PRESENT  ERROR` | `LOAD`, `SAVE`, or `VERIFY` with a device other than tape (1), a disk drive (8 to 11), the keyboard, the screen, or a printer. |
 | `?UNDEF'D FUNCTION  ERROR` | `FN` with a function that has not been defined. |
 | `?RETURN WITHOUT GOSUB  ERROR` | `RETURN` with no `GOSUB` to return to. |
 | `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
@@ -555,7 +595,7 @@ An error in a running program adds the number of the line it happened in, as on 
 | Status | Meaning |
 |---|---|
 | 0 | Success, or an interactive session ended with Ctrl-D |
-| 1 | A script stopped at a BASIC error, input ended while `INPUT` or `GET` was waiting, or output could not be written |
+| 1 | A script stopped at a BASIC error, input ended while `INPUT` or `GET` was waiting, a file could not be saved or read, or output could not be written |
 | 2 | c64sh was run incorrectly: an unknown option, more than one file, or a file that cannot be read |
 | 130 | A script was stopped by Ctrl-C (`BREAK`) |
 
@@ -570,6 +610,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 - **The banner** reads `C64SH BASIC V2`.
 - **Ctrl-C stops a program waiting in `INPUT`.** On a C64, the STOP key does nothing until Return is pressed.
 - **Typed input keeps lowercase letters**, where a C64 keyboard types uppercase.
+- **Programs are saved as text**, not as the C64's tokenized program files, and every device that holds programs is the current directory.
 
 ## Not yet supported
 

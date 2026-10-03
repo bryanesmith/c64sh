@@ -46,6 +46,8 @@ The tests live in `test/snapshot/` (package `snapshot_test`). One test function 
 
 Each example is run in-process with `shell.Main([]string{path}, stdin, stdout, stderr)`, exactly as `c64sh FILE` runs it. This makes the snapshot record what a user sees when running the file, including the skipped `#!` line and script-mode behavior.
 
+**The current directory** is a new, empty temporary directory for each example, so an example that saves files (`SAVE`) starts with none and leaves nothing behind in the repository.
+
 **Stdin** is empty, unless the example has an input file: `test/snapshot/testdata/` holding a file named after the example with `.input` in place of `.bas` (`019-keyboard-input.input`). Its contents are then the example's stdin, which is what `INPUT` and `GET` read, as they would from `c64sh FILE < answers`. An example that reads input says in its comments which answers the snapshot uses, and its `PRINT` comments describe the output for those answers. An input file whose example no longer exists fails the tests, like a stale snapshot; unlike snapshots, input files are written by hand, so `make update-snapshots` neither creates nor deletes them.
 
 ### Snapshot Format
@@ -120,6 +122,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `018-subroutines.bas` | `GOSUB` and `RETURN`, returning mid-line, nested subroutines, passing values in variables, `GOSUB` typed directly, and `?RETURN WITHOUT GOSUB  ERROR IN 20` |
 | `019-keyboard-input.bas` | `INPUT` with and without a prompt, several values, `?? `, `?REDO FROM START`, `?EXTRA IGNORED`, quoted strings, a `GET` wait loop, and `?ILLEGAL DIRECT  ERROR`; its answers come from `019-keyboard-input.input` |
 | `020-user-functions.bas` | `DEF FN` and `FN`, the protected parameter, bodies using other variables and functions, two-character names separate from variables, and a body mistake reported at the call (`?SYNTAX  ERROR IN 120`) |
+| `021-saving-programs.bas` | `SAVE`, `LOAD`, and `VERIFY` on tape and disk, `LOAD` chaining a running program with its variables, names with and without an extension, replacing on tape and with `@0:` on disk, and the disk's refusal to replace a file |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

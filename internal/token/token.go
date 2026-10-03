@@ -50,6 +50,9 @@ const (
 	Get                   // GET
 	Def                   // DEF
 	Fn                    // FN
+	Load                  // LOAD
+	Save                  // SAVE
+	Verify                // VERIFY
 )
 
 var kindNames = [...]string{
@@ -95,6 +98,9 @@ var kindNames = [...]string{
 	Get:       "Get",
 	Def:       "Def",
 	Fn:        "Fn",
+	Load:      "Load",
+	Save:      "Save",
+	Verify:    "Verify",
 }
 
 func (k Kind) String() string {

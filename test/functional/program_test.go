@@ -1,6 +1,9 @@
 package functional_test
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 // @spec SHELL-PROG-001, SHELL-MODE-004
 func TestNumberedLinesAreStored(t *testing.T) {
@@ -186,4 +189,25 @@ func TestUserFunctions(t *testing.T) {
 	for _, c := range cases {
 		check(t, c.name, runMain(t, c.input), c.want)
 	}
+}
+
+// TestProgramFiles checks SAVE, LOAD, and VERIFY end to end, in a
+// temporary current directory.
+//
+// @spec SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-003
+func TestProgramFiles(t *testing.T) {
+	t.Chdir(t.TempDir())
+	check(t, "save", runMain(t, "10 PRINT \"HELLO\"\nSAVE \"HELLO\",8\nNEW\n"), result{"", "", 0})
+	data, err := os.ReadFile("HELLO.bas")
+	if err != nil || string(data) != "#!/usr/bin/env c64sh\n10 PRINT \"HELLO\"\n" {
+		t.Errorf("HELLO.bas = %q, %v", data, err)
+	}
+	check(t, "load and run", runMain(t, "LOAD \"HELLO\"\nRUN\n"), result{"HELLO\n", "", 0})
+	check(t, "saved program is a script", runMain(t, "", "HELLO.bas"), result{"HELLO\n", "", 0})
+	check(t, "disk refuses to replace", runMain(t, "10 REM\nSAVE \"HELLO\",8\nPRINT \"NOT REACHED\"\n"),
+		result{"", "c64sh: HELLO.bas: file exists (use SAVE \"@0:HELLO\" to replace it)\n", 1})
+	check(t, "replace with @0:", runMain(t, "10 PRINT \"NEW\"\nSAVE \"@0:HELLO\",8\nLOAD \"HELLO\"\nRUN\n"), result{"NEW\n", "", 0})
+	check(t, "not found", runMain(t, "LOAD \"NONE\",8\n"), result{"", "?FILE NOT FOUND  ERROR\n", 1})
+	check(t, "interactive messages", runInteractive(t, "10 REM\nSAVE \"TWO\",8\nLOAD \"TWO\",8\nSAVE \"TWO\",8\n"),
+		result{"", banner + "SAVING TWO\nREADY.\nSEARCHING FOR TWO\nLOADING\nREADY.\nSAVING TWO\nc64sh: TWO.bas: file exists (use SAVE \"@0:TWO\" to replace it)\nREADY.\n\n", 0})
 }

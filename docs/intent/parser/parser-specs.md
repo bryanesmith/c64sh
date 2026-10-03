@@ -73,3 +73,8 @@ Design: `parser-design.md`
 - [x] **PARSER-052**: If the body of a `DEF FN` is not a valid expression followed by `:` or `EOL`, then the parser shall produce the `*ast.DefStmt` with `Body` nil and `BodyErr` a SYNTAX error, continue after the next `:` (or at `EOL`), and return no error for the statement.
 - [x] **PARSER-053**: If a `DEF` lacks `FN`, the name, `(`, the parameter, `)`, or `=`, or its name or parameter is an integer name, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.
 - [x] **PARSER-054**: When `FN` appears where an operand is expected, followed by a name, `(`, an expression, and `)`, the parser shall produce an `*ast.FnExpr`; if the name is an integer name or a part is missing, the parser shall return a SYNTAX error.
+
+## Program files
+
+- [x] **PARSER-055**: When a statement is `LOAD`, `SAVE`, or `VERIFY` followed by up to three expressions separated by commas and then `:` or `EOL`, the parser shall produce an `*ast.LoadStmt`, `*ast.SaveStmt`, or `*ast.VerifyStmt` whose `Name`, `Device`, and `Secondary` hold the expressions in order, nil for those omitted.
+- [x] **PARSER-056**: If a comma after `LOAD`, `SAVE`, or `VERIFY` or one of its arguments is not followed by an expression, or the arguments are followed by anything other than `:` or `EOL`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.

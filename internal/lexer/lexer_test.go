@@ -470,3 +470,12 @@ func TestFunctionKeywords(t *testing.T) {
 		{"FN in an expression", "FN A(1)", []token.Token{tok(token.Fn, "FN", 0), name("A", 3), tok(token.LParen, "(", 4), num("1", 5), tok(token.RParen, ")", 6), eol(7)}},
 	})
 }
+
+// @spec LEXER-035
+func TestFileKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"LOAD", `LOAD"X",8`, []token.Token{tok(token.Load, "LOAD", 0), tok(token.String, "X", 4), tok(token.Comma, ",", 7), num("8", 8), eol(9)}},
+		{"SAVE", "SAVE", []token.Token{tok(token.Save, "SAVE", 0), eol(4)}},
+		{"VERIFY", "VERIFY", []token.Token{tok(token.Verify, "VERIFY", 0), eol(6)}},
+	})
+}

@@ -18,6 +18,7 @@ const (
 	OutOfMemory                    // OUT OF MEMORY
 	ReturnWithoutGosub             // RETURN WITHOUT GOSUB
 	IllegalDirect                  // ILLEGAL DIRECT
+	UndefdFunction                 // UNDEF'D FUNCTION
 )
 
 // names holds each kind's name as the C64 prints it.
@@ -34,6 +35,7 @@ var names = [...]string{
 	OutOfMemory:        "OUT OF MEMORY",
 	ReturnWithoutGosub: "RETURN WITHOUT GOSUB",
 	IllegalDirect:      "ILLEGAL DIRECT",
+	UndefdFunction:     "UNDEF'D FUNCTION",
 }
 
 // Error is a BASIC error.

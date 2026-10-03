@@ -183,3 +183,21 @@ func (*GotoStmt) stmt()   {}
 func (*ListStmt) stmt()   {}
 func (*NewStmt) stmt()    {}
 func (*EndStmt) stmt()    {}
+
+// DefStmt is DEF FN Name(Param) = Body. If the body is not a valid
+// expression ending the statement, Body is nil and BodyErr holds the
+// SYNTAX error, reported when the function is called.
+type DefStmt struct {
+	Name, Param *VarRef
+	Body        Expr
+	BodyErr     error
+}
+
+// FnExpr is FN Name(Arg): a call of a user-defined function.
+type FnExpr struct {
+	Name *VarRef
+	Arg  Expr
+}
+
+func (*DefStmt) stmt() {}
+func (*FnExpr) expr()  {}

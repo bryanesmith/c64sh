@@ -20,6 +20,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Loops](#loops)
 - [Subroutines](#subroutines)
 - [Keyboard input](#keyboard-input)
+- [User-defined functions](#user-defined-functions)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -469,6 +470,28 @@ If the input ends while `INPUT` or `GET` is waiting, c64sh stops with `c64sh: st
 
 See [`examples/019-keyboard-input.bas`](../examples/019-keyboard-input.bas) for every form.
 
+## User-defined functions
+
+`DEF FN` defines a one-line function of one number, which you then use as `FN` and the name, anywhere a value can go:
+
+```
+10 DEF FN SQ(X)=X*X
+20 PRINT FN SQ(3)+1
+```
+
+prints ` 10 `.
+
+- **One parameter, one number back.** The body is a single expression; for anything longer, use a subroutine.
+- **The parameter belongs to the function**: calling `FN SQ(4)` does not change the program's own `X`.
+- **The body sees the other variables as they are at the call**, and can call other functions.
+- **Names** follow the rules for variables: only the first two characters count, and integer names (`FN A%`) are a `?SYNTAX  ERROR`. A function's name is separate from any variable with the same name.
+- **`DEF` works only in a program**; typed directly it is an `?ILLEGAL DIRECT  ERROR`. A function can be called typed directly once the program has defined it.
+- **The body is checked when the function is called**, not when it is defined, as on a C64, so a mistake in it is reported at the `FN`.
+- **Calling a function not yet defined** is an `?UNDEF'D FUNCTION  ERROR`. Definitions are erased with the variables (`RUN`, `NEW`, or changing the program).
+- **A function that calls itself** runs out of room: `?OUT OF MEMORY  ERROR`. At most 9 calls can be in progress at once.
+
+See [`examples/020-user-functions.bas`](../examples/020-user-functions.bas) for every form.
+
 ## Comments
 
 `REM` starts a comment. Everything after it, to the end of the line, is ignored:
@@ -505,8 +528,9 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
 | `?UNDEF'D STATEMENT  ERROR` | `RUN`, `GOTO`, or `IF … THEN` with a line number that is not in the program. |
 | `?NEXT WITHOUT FOR  ERROR` | `NEXT` with no loop to continue. |
-| `?OUT OF MEMORY  ERROR` | More than 10 loops, or 26 subroutine calls, nested. |
-| `?ILLEGAL DIRECT  ERROR` | `INPUT` or `GET` typed directly; they work only in a program. |
+| `?OUT OF MEMORY  ERROR` | More than 10 loops, 26 subroutine calls, or 9 function calls, nested. |
+| `?ILLEGAL DIRECT  ERROR` | `INPUT`, `GET`, or `DEF` typed directly; they work only in a program. |
+| `?UNDEF'D FUNCTION  ERROR` | `FN` with a function that has not been defined. |
 | `?RETURN WITHOUT GOSUB  ERROR` | `RETURN` with no `GOSUB` to return to. |
 | `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
 

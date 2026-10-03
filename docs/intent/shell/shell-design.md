@@ -186,6 +186,7 @@ const (
     OutOfMemory               // OUT OF MEMORY
     ReturnWithoutGosub        // RETURN WITHOUT GOSUB
     IllegalDirect             // ILLEGAL DIRECT
+    UndefdFunction            // UNDEF'D FUNCTION
     Break                     // BREAK: execution stopped by Ctrl-C
 )
 

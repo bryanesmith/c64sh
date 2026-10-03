@@ -460,3 +460,13 @@ func TestInputKeywords(t *testing.T) {
 		{"GET in a name", "TARGET", []token.Token{name("TAR", 0), tok(token.Get, "GET", 3), eol(6)}},
 	})
 }
+
+// @spec LEXER-034
+func TestFunctionKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"DEF FN", "DEFFNSQ(X)", []token.Token{
+			tok(token.Def, "DEF", 0), tok(token.Fn, "FN", 3), name("SQ", 5), tok(token.LParen, "(", 7), name("X", 8), tok(token.RParen, ")", 9), eol(10),
+		}},
+		{"FN in an expression", "FN A(1)", []token.Token{tok(token.Fn, "FN", 0), name("A", 3), tok(token.LParen, "(", 4), num("1", 5), tok(token.RParen, ")", 6), eol(7)}},
+	})
+}

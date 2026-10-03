@@ -48,6 +48,8 @@ var (
 	retk  = token.Token{Kind: token.Return, Value: "RETURN"}
 	input = token.Token{Kind: token.Input, Value: "INPUT"}
 	getk  = token.Token{Kind: token.Get, Value: "GET"}
+	def   = token.Token{Kind: token.Def, Value: "DEF"}
+	fn    = token.Token{Kind: token.Fn, Value: "FN"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -123,6 +125,12 @@ func dumpStmt(s ast.Stmt) string {
 		return out + dumpVars(s.Vars)
 	case *ast.GetStmt:
 		return "GET " + dumpVars(s.Vars)
+	case *ast.DefStmt:
+		out := "DEF FN " + dumpExpr(s.Name) + "(" + dumpExpr(s.Param) + ")="
+		if s.BodyErr != nil {
+			return out + "<" + s.BodyErr.Error() + ">"
+		}
+		return out + dumpExpr(s.Body)
 	case *ast.ListStmt:
 		return "LIST"
 	case *ast.NewStmt:
@@ -175,6 +183,8 @@ func dumpExpr(e ast.Expr) string {
 		return "(NOT " + dumpExpr(e.X) + ")"
 	case *ast.VarRef:
 		return "$" + e.Name + "[" + e.Text + "]"
+	case *ast.FnExpr:
+		return "FN " + dumpExpr(e.Name) + "(" + dumpExpr(e.Arg) + ")"
 	case *ast.CompareExpr:
 		rel := ""
 		if e.Rel&ast.RelLess != 0 {
@@ -796,5 +806,50 @@ func TestInputGetSyntaxErrors(t *testing.T) {
 		{"trailing comma", toks(input, name("A"), comma), `BADSTMT`, true},
 		{"GET no variable", toks(getk), `BADSTMT`, true},
 		{"GET number", toks(getk, number("1")), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-051
+func TestDef(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"DEF FN", toks(def, fn, name("SQ"), lp, name("X"), rp, eq, name("X"), star, name("X")), `DEF FN $SQ[SQ]($X[X])=($X[X]*$X[X])`, false},
+		{"long names", toks(def, fn, name("AREA"), lp, name("RADIUS"), rp, eq, number("1")), `DEF FN $AR[AREA]($RA[RADIUS])=#1`, false},
+		{"string name parses", toks(def, fn, name("A$"), lp, name("X"), rp, eq, number("1")), `DEF FN $A$[A$]($X[X])=#1`, false},
+		{"then a statement", toks(def, fn, name("A"), lp, name("X"), rp, eq, name("X"), colon, pr, str("Y")), `DEF FN $A[A]($X[X])=$X[X] : PRINT["Y"]`, false},
+	})
+}
+
+// @spec PARSER-052
+func TestDefBodyErrorsAreKept(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"bad body", toks(def, fn, name("A"), lp, name("X"), rp, eq, name("X"), plus), `DEF FN $A[A]($X[X])=<SYNTAX>`, false},
+		{"junk after body", toks(def, fn, name("A"), lp, name("X"), rp, eq, name("X"), name("Y")), `DEF FN $A[A]($X[X])=<SYNTAX>`, false},
+		{"no body", toks(def, fn, name("A"), lp, name("X"), rp, eq), `DEF FN $A[A]($X[X])=<SYNTAX>`, false},
+		{"continues after colon", toks(def, fn, name("A"), lp, name("X"), rp, eq, ill("@"), colon, pr, str("Y")), `DEF FN $A[A]($X[X])=<SYNTAX> : PRINT["Y"]`, false},
+	})
+}
+
+// @spec PARSER-053
+func TestDefSyntaxErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"no FN", toks(def, name("A"), lp, name("X"), rp, eq, number("1")), `BADSTMT`, true},
+		{"no name", toks(def, fn, lp, name("X"), rp, eq, number("1")), `BADSTMT`, true},
+		{"no (", toks(def, fn, name("A"), name("X"), rp, eq, number("1")), `BADSTMT`, true},
+		{"no parameter", toks(def, fn, name("A"), lp, rp, eq, number("1")), `BADSTMT`, true},
+		{"no )", toks(def, fn, name("A"), lp, name("X"), eq, number("1")), `BADSTMT`, true},
+		{"no =", toks(def, fn, name("A"), lp, name("X"), rp, number("1")), `BADSTMT`, true},
+		{"integer name", toks(def, fn, name("A%"), lp, name("X"), rp, eq, number("1")), `BADSTMT`, true},
+		{"integer parameter", toks(def, fn, name("A"), lp, name("X%"), rp, eq, number("1")), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-054
+func TestFnCall(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"call", toks(pr, fn, name("SQ"), lp, number("3"), rp), `PRINT[FN $SQ[SQ](#3)]`, false},
+		{"in an expression", toks(pr, number("1"), plus, fn, name("A"), lp, name("B"), star, number("2"), rp), `PRINT[(#1+FN $A[A](($B[B]*#2)))]`, false},
+		{"integer name", toks(pr, fn, name("A%"), lp, number("3"), rp), `PRINT[BAD(SYNTAX)]`, true},
+		{"no (", toks(pr, fn, name("A"), number("3")), `PRINT[BAD(SYNTAX)]`, true},
+		{"no )", toks(pr, fn, name("A"), lp, number("3")), `PRINT[BAD(SYNTAX)]`, true},
 	})
 }

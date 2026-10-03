@@ -146,6 +146,21 @@ type InputStmt struct {
 
 // GetStmt is GET Var {, Var}.
 type GetStmt struct{ Vars []*VarRef }
+
+// DefStmt is DEF FN Name(Param) = Body. If the body is not a valid
+// expression ending the statement, Body is nil and BodyErr holds the
+// SYNTAX error, reported when the function is called.
+type DefStmt struct {
+    Name, Param *VarRef
+    Body        Expr
+    BodyErr     error
+}
+
+// FnExpr is FN Name(Arg): a call of a user-defined function.
+type FnExpr struct {
+    Name *VarRef
+    Arg  Expr
+}
 ```
 
 Binary operators are left-associative within a precedence level: `"A"+"B"+"C"` is `BinaryExpr(Add, BinaryExpr(Add, "A", "B"), "C")`, and `8-2-1` is `(8-2)-1`. The parser does not check operand types: whether `+` joins strings, adds numbers, or is a type mismatch is decided by the interpreter from the values, as on a C64.
@@ -221,6 +236,14 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 
 `INPUT` is followed by an optional prompt, then one or more variables separated by commas. The prompt is a string literal followed by `;`, as the ROM requires (`$ABBF`): `INPUT "NAME";N$`. An expression is not allowed as the prompt, so `INPUT "A"+"B";X` and `INPUT P$;X` are SYNTAX errors, and so is a prompt followed by `,` instead of `;`. `GET` is followed by one or more variables separated by commas. A missing variable, or anything after the list other than `:` or the end of the line, is a SYNTAX error in place of the statement.
 
+### DEF FN
+
+`DEF` is followed by `FN`, the function's name, `(`, the parameter's name, `)`, `=`, and the body. The name and the parameter are variable names whose identity is computed as for variables; a name followed by `(` is allowed here, unlike a variable. An integer name or parameter (`FN A%`, `(X%)`) is a SYNTAX error, as on a C64; a string name or parameter parses, and is a `TYPE MISMATCH` when the statement runs. Anything else missing or out of place before the body is a SYNTAX error in place of the statement.
+
+**The body is not checked when the `DEF` runs**, because a C64 skips over it to the end of the statement (`$B3DB`) and evaluates it only when the function is called, then requires the statement to end after it (`$B441`). So the parser parses the body as an expression; if that fails, or the expression is not followed by `:` or the end of the line, it records the SYNTAX error in `BodyErr`, skips to the next `:` or the end of the line, and the `DefStmt` is otherwise valid. The error is reported only when the function is called.
+
+`FN` is read where an operand is expected, followed by the function's name and a parenthesized argument: `FN SQ(3)` is an `FnExpr`. An integer name is a SYNTAX error; a missing `(` or `)` too.
+
 ### Items side by side
 
 An expression ends at the first token that cannot continue it, and PRINT then reads the next item. A token that can start an expression but not continue one begins a new item: `PRINT 2(3)` prints two numbers, ` 2  3 `. A `-` or `+` after an operand always continues the expression as a binary operator, as on a C64: `PRINT 1 -1` prints ` 0 `, and `PRINT "A"-1` is `TYPE MISMATCH`.
@@ -234,7 +257,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
@@ -256,15 +279,17 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `ReturnStatement = return .` | `parseCommand` | `*ast.ReturnStmt` |
 | `InputStatement = input [ string ";" ] Variable { "," Variable } .` | `parseInputStatement` | `*ast.InputStmt` |
 | `GetStatement = get Variable { "," Variable } .` | `parseGetStatement` | `*ast.GetStmt` |
+| `DefStatement = def fn FunctionName "(" FunctionName ")" "=" Expression .` | `parseDefStatement` | `*ast.DefStmt` (body errors kept in `BodyErr`) |
+| `FunctionName = name .` | `parseFunctionName` | `*ast.VarRef` (not an integer name; may be followed by `(`) |
 | `GotoStatement = ( goto \| go to ) LineNumber .` | `parseGotoStatement` | `*ast.GotoStmt` |
 | `LineNumber = [ number ] .` | `parseLineNumber` | `int`: the line number, 0 if there is none (see *Program commands*) |
 | `ListStatement = list .` | `parseCommand` | `*ast.ListStmt` |
 | `NewStatement = new .` | `parseCommand` | `*ast.NewStmt` |
 | `EndStatement = end .` | `parseCommand` | `*ast.EndStmt` (`parseCommand` parses any command without arguments) |
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
-| `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison .` | `parseOperand` | `ast.Expr` |
+| `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison \| fn FunctionName "(" Expression ")" .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 

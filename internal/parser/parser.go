@@ -27,7 +27,7 @@ import (
 // @spec PARSER-028, PARSER-029, PARSER-030, PARSER-031, PARSER-032, PARSER-033, PARSER-034
 // @spec PARSER-035, PARSER-036, PARSER-037, PARSER-038, PARSER-039, PARSER-040, PARSER-041
 // @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
-// @spec PARSER-048, PARSER-049, PARSER-050
+// @spec PARSER-048, PARSER-049, PARSER-050, PARSER-051, PARSER-052, PARSER-053, PARSER-054
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -114,7 +114,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -163,6 +163,12 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return p.parseCommand(&ast.ReturnStmt{})
 	case token.Input:
 		stmt, err := p.parseInputStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	case token.Def:
+		stmt, err := p.parseDefStatement()
 		if err != nil {
 			return nil, err
 		}
@@ -319,6 +325,59 @@ func (p *parser) parseVariableList() ([]*ast.VarRef, error) {
 		return nil, syntaxError()
 	}
 	return vars, nil
+}
+
+// DefStatement = def fn FunctionName "(" FunctionName ")" "=" Expression .
+//
+// A C64 skips the body when DEF runs and checks it only when the function
+// is called ($B3DB, $B441), so an error in the body is kept in BodyErr,
+// and parsing continues after the statement.
+func (p *parser) parseDefStatement() (*ast.DefStmt, error) {
+	p.next() // DEF
+	if !p.accept(token.Fn) {
+		return nil, syntaxError()
+	}
+	name, err := p.parseFunctionName()
+	if err != nil {
+		return nil, err
+	}
+	if !p.accept(token.LParen) {
+		return nil, syntaxError()
+	}
+	param, err := p.parseFunctionName()
+	if err != nil {
+		return nil, err
+	}
+	if !p.accept(token.RParen) || !p.accept(token.Equal) {
+		return nil, syntaxError()
+	}
+	s := &ast.DefStmt{Name: name, Param: param}
+	body, err := p.parseExpression()
+	if k := p.peek(); err == nil && (k == token.Colon || k == token.EOL) {
+		s.Body = body
+		return s, nil
+	}
+	s.BodyErr = syntaxError()
+	for k := p.peek(); k != token.Colon && k != token.EOL; k = p.peek() {
+		p.next()
+	}
+	return s, nil
+}
+
+// FunctionName = name .
+//
+// The name of a user-defined function or its parameter, which, unlike a
+// variable, may be followed by "(", and cannot be an integer name.
+func (p *parser) parseFunctionName() (*ast.VarRef, error) {
+	if p.peek() != token.Name {
+		return nil, syntaxError()
+	}
+	text := p.next().Value
+	v := &ast.VarRef{Name: variableIdentity(text), Text: text}
+	if strings.HasSuffix(v.Name, "%") {
+		return nil, syntaxError()
+	}
+	return v, nil
 }
 
 // GosubStatement = gosub LineNumber .
@@ -480,7 +539,7 @@ func (p *parser) parsePrintItem() (ast.PrintItem, error) {
 	case token.Comma:
 		p.next()
 		return &ast.Comma{}, nil
-	case token.String, token.Number, token.Name, token.Not, token.Minus, token.Plus, token.LParen:
+	case token.String, token.Number, token.Name, token.Not, token.Fn, token.Minus, token.Plus, token.LParen:
 		expr, err := p.parseExpression()
 		if err != nil {
 			return nil, err
@@ -665,7 +724,7 @@ func (p *parser) parseExponent() (ast.Expr, error) {
 	return p.parseOperand()
 }
 
-// Operand = string | number | Variable | "(" Expression ")" | not Comparison .
+// Operand = string | number | Variable | "(" Expression ")" | not Comparison | fn FunctionName "(" Expression ")" .
 //
 // Parentheses produce no node: the tree's shape records the grouping.
 func (p *parser) parseOperand() (ast.Expr, error) {
@@ -676,6 +735,23 @@ func (p *parser) parseOperand() (ast.Expr, error) {
 		return &ast.NumberLit{Value: numberValue(p.next().Value)}, nil
 	case token.Name:
 		return p.parseVariable()
+	case token.Fn:
+		p.next()
+		name, err := p.parseFunctionName()
+		if err != nil {
+			return nil, err
+		}
+		if !p.accept(token.LParen) {
+			return nil, syntaxError()
+		}
+		arg, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+		if !p.accept(token.RParen) {
+			return nil, syntaxError()
+		}
+		return &ast.FnExpr{Name: name, Arg: arg}, nil
 	case token.Not:
 		// NOT takes in everything up to the next AND or OR, as on a C64.
 		p.next()

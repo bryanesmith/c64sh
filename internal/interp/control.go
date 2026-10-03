@@ -65,6 +65,21 @@ func (in *Interp) execGosub(s *ast.GosubStmt) error {
 	return &jump{line: s.Line, hasLine: true}
 }
 
+// execOn jumps to, or calls, the line its index picks from its list, or
+// does nothing if the index is 0 or past the end of the list ($A94B).
+//
+// @spec INTERP-120, INTERP-121
+func (in *Interp) execOn(s *ast.OnStmt) error {
+	n, err := in.evalByte(s.Index)
+	if err != nil || n == 0 || n > len(s.Lines) {
+		return err
+	}
+	if s.Gosub {
+		return in.execGosub(&ast.GosubStmt{Line: s.Lines[n-1]})
+	}
+	return in.execGoto(&ast.GotoStmt{Line: s.Lines[n-1]})
+}
+
 // execReturn passes over FOR entries to the topmost other entry, which
 // must be a GOSUB, removes it and everything above it, and continues
 // after its GOSUB ($A8D2).

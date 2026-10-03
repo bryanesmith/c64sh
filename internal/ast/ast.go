@@ -243,3 +243,12 @@ type CmdStmt struct {
 func (*OpenStmt) stmt()  {}
 func (*CloseStmt) stmt() {}
 func (*CmdStmt) stmt()   {}
+
+// OnStmt is ON Index GOTO|GOSUB Line {, Line}.
+type OnStmt struct {
+	Index Expr
+	Gosub bool // GOSUB; otherwise GOTO
+	Lines []int
+}
+
+func (*OnStmt) stmt() {}

@@ -232,3 +232,21 @@ func TestDataFiles(t *testing.T) {
 	check(t, "CMD to the printer", runMain(t, "10 REM HI\nOPEN 4,4:CMD 4:LIST\n"), result{"\n\n10 REM HI\n", "", 0})
 	check(t, "missing file", runMain(t, "OPEN 2,8,2,\"NONE\"\n"), result{"", "?FILE NOT FOUND  ERROR\n", 1})
 }
+
+// TestComputedJumps checks ON … GOTO and ON … GOSUB end to end.
+//
+// @spec INTERP-120, INTERP-121
+func TestComputedJumps(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  result
+	}{
+		{"menu", "10 FOR C=1 TO 3:ON C GOSUB 100,200,300:NEXT:END\n100 PRINT \"ONE\":RETURN\n200 PRINT \"TWO\":RETURN\n300 PRINT \"THREE\":RETURN\n", result{"ONE\nTWO\nTHREE\n", "", 0}},
+		{"falls through", "10 ON 5 GOTO 100:PRINT \"NONE\"\n100 END\n", result{"NONE\n", "", 0}},
+		{"illegal quantity", "10 ON -1 GOTO 100\n100 END\n", result{"", "?ILLEGAL QUANTITY  ERROR IN 10\n", 1}},
+	}
+	for _, c := range cases {
+		check(t, c.name, runMain(t, c.input), c.want)
+	}
+}

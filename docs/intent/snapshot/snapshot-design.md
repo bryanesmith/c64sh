@@ -124,6 +124,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `020-user-functions.bas` | `DEF FN` and `FN`, the protected parameter, bodies using other variables and functions, two-character names separate from variables, and a body mistake reported at the call (`?SYNTAX  ERROR IN 120`) |
 | `021-saving-programs.bas` | `SAVE`, `LOAD`, and `VERIFY` on tape and disk, `LOAD` chaining a running program with its variables, names with and without an extension, replacing on tape and with `@0:` on disk, and the disk's refusal to replace a file |
 | `022-data-files.bas` | `OPEN`, `PRINT#`, and `CLOSE` writing a disk file, an `INPUT#` loop ended by `ST`, `GET#`, `CMD`, the printer, appending with `,S,A`, and `?FILE NOT FOUND  ERROR` opening a missing file |
+| `023-computed-jumps.bas` | `ON … GOTO` in a loop, `ON … GOSUB` returning after the statement, indexes rounded down, 0 and past the list falling through, `ON` typed directly, and `?ILLEGAL QUANTITY  ERROR` |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

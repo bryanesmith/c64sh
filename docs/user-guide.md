@@ -19,6 +19,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Programs](#programs)
 - [Loops](#loops)
 - [Subroutines](#subroutines)
+- [Computed jumps](#computed-jumps)
 - [Keyboard input](#keyboard-input)
 - [User-defined functions](#user-defined-functions)
 - [Saving programs](#saving-programs)
@@ -422,6 +423,27 @@ prints `IN THE SUBROUTINE`, then `BACK`. The `END` keeps the program from runnin
 
 See [`examples/018-subroutines.bas`](../examples/018-subroutines.bas) for every form.
 
+## Computed jumps
+
+`ON` picks a line from a list by number, which is how a BASIC V2 program makes a menu without a chain of `IF`s:
+
+```
+10 INPUT "CHOICE (1-3)";C
+20 ON C GOTO 100,200,300
+30 PRINT "INVALID":GOTO 10
+```
+
+goes to line 100 when `C` is 1, 200 when it is 2, and 300 when it is 3.
+
+- **`ON X GOSUB`** calls the line as a subroutine; its `RETURN` comes back after the whole `ON` statement.
+- **`X` is rounded down**: `ON 2.9 GOTO …` takes the second line.
+- **When `X` is 0, or larger than the list**, nothing happens, and the program goes on with the next statement (line 30 above).
+- **`X` must be from 0 to 255**; anything else is an `?ILLEGAL QUANTITY  ERROR`.
+- **Only `GOTO` and `GOSUB`** can follow: `ON X GO TO 100` is a `?SYNTAX  ERROR`, as on a C64. The list holds line numbers, not expressions.
+- **`ON` breaks names that contain it**: `MONEY`, `ONE`, and `DONE` cannot be variable names.
+
+See [`examples/023-computed-jumps.bas`](../examples/023-computed-jumps.bas) for every form.
+
 ## Keyboard input
 
 A running program reads the keyboard with `INPUT` and `GET`.
@@ -667,7 +689,7 @@ These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 - Arrays (`DIM A(10)`), and the clock variables `TI` and `TI$`
 - Functions such as `CHR$(34)`
-- `ON … GOTO` and `ON … GOSUB`; `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
+- `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 
 These are planned; the [roadmap](https://github.com/bryanesmith/c64sh/issues/34) lists them in the order they will be added.

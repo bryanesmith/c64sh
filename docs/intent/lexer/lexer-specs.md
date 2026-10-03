@@ -26,6 +26,7 @@ Design: `lexer-design.md`
 - [x] **LEXER-034**: When the lexer encounters `DEF` or `FN` in uppercase outside a string literal, it shall produce a `Def` or `Fn` token respectively.
 - [x] **LEXER-035**: When the lexer encounters `LOAD`, `SAVE`, or `VERIFY` in uppercase outside a string literal, it shall produce a `Load`, `Save`, or `Verify` token respectively.
 - [x] **LEXER-036**: When the lexer encounters `PRINT#`, `INPUT#`, `OPEN`, `CLOSE`, or `CMD` in uppercase outside a string literal, it shall produce a `PrintFile`, `InputFile`, `Open`, `Close`, or `Cmd` token respectively, and for `#` elsewhere outside a string literal, a `Hash` token (so `PRINT #1` is `Print`, `Hash`, `Number`).
+- [x] **LEXER-037**: When the lexer encounters `ON` in uppercase outside a string literal, it shall produce an `On` token.
 
 ## Punctuation and illegal input
 

@@ -59,6 +59,7 @@ var (
 	close = token.Token{Kind: token.Close, Value: "CLOSE"}
 	cmdk  = token.Token{Kind: token.Cmd, Value: "CMD"}
 	hash  = token.Token{Kind: token.Hash, Value: "#"}
+	onk   = token.Token{Kind: token.On, Value: "ON"}
 	eol   = token.Token{Kind: token.EOL}
 )
 
@@ -109,6 +110,12 @@ func dumpStmt(s ast.Stmt) string {
 		return out
 	case *ast.CloseStmt:
 		return "CLOSE " + dumpExpr(s.File)
+	case *ast.OnStmt:
+		kw := "GOTO"
+		if s.Gosub {
+			kw = "GOSUB"
+		}
+		return fmt.Sprintf("ON %s %s %v", dumpExpr(s.Index), kw, s.Lines)
 	case *ast.RemStmt:
 		return "REM(" + strconv.Quote(s.Text) + ")"
 	case *ast.LetStmt:
@@ -989,5 +996,29 @@ func TestStatusVariable(t *testing.T) {
 		{"assign ST", toks(name("ST"), eq, number("1")), `BADSTMT`, true},
 		{"LET ST", toks(let, name("STATUS"), eq, number("1")), `BADSTMT`, true},
 		{"TI still reserved", toks(pr, name("TI")), `PRINT[BAD(SYNTAX)]`, true},
+	})
+}
+
+// @spec PARSER-064
+func TestOn(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"GOTO", toks(onk, name("X"), gotok, number("100"), comma, number("200")), `ON $X[X] GOTO [100 200]`, false},
+		{"GOSUB", toks(onk, name("X"), plus, number("1"), gosub, number("10")), `ON ($X[X]+#1) GOSUB [10]`, false},
+		{"fraction", toks(onk, number("1"), gotok, number("10.5")), `ON #1 GOTO [10]`, false},
+		{"then a statement", toks(onk, name("X"), gotok, number("10"), colon, pr, str("Y")), `ON $X[X] GOTO [10] : PRINT["Y"]`, false},
+	})
+}
+
+// @spec PARSER-065
+func TestOnSyntaxErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"no GOTO", toks(onk, name("X"), number("10")), `BADSTMT`, true},
+		{"GO TO", toks(onk, name("X"), gok, tok, number("10")), `BADSTMT`, true},
+		{"THEN", toks(onk, name("X"), then, number("10")), `BADSTMT`, true},
+		{"no line", toks(onk, name("X"), gotok), `BADSTMT`, true},
+		{"empty element", toks(onk, name("X"), gotok, number("10"), comma, comma, number("30")), `BADSTMT`, true},
+		{"name element", toks(onk, name("X"), gotok, name("A")), `BADSTMT`, true},
+		{"too large", toks(onk, name("X"), gotok, number("64000")), `BADSTMT`, true},
+		{"junk", toks(onk, name("X"), gotok, number("10"), str("Y")), `BADSTMT`, true},
 	})
 }

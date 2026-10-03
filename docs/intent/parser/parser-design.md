@@ -155,6 +155,13 @@ type GetStmt struct {
     Vars []*VarRef
 }
 
+// OnStmt is ON Index GOTO|GOSUB Line {, Line}.
+type OnStmt struct {
+    Index Expr
+    Gosub bool // GOSUB; otherwise GOTO
+    Lines []int
+}
+
 // OpenStmt is OPEN File [, Device [, Secondary [, Name]]]; omitted
 // arguments are nil.
 type OpenStmt struct{ File, Device, Secondary, Name Expr }
@@ -278,6 +285,10 @@ These forms are valid C64 BASIC that c64sh does not support yet, so they are SYN
 
 Each takes up to three arguments, separated by commas, as on a C64 (`$E1D4`): the file name, the device, and the secondary address, each an expression, so `SAVE "GAME",8` and `LOAD N$,D` are valid. Any may be omitted from the end: `LOAD` alone, `LOAD "GAME"`. A comma not followed by an expression, or anything after the arguments other than `:` or the end of the line, is a SYNTAX error in place of the statement. The types and ranges of the arguments are checked when the statement runs.
 
+### ON
+
+`ON` is followed by an expression, then `GOTO` or `GOSUB` (the ROM accepts only these two keywords, `$A94F`, so `ON X GO TO` is a SYNTAX error), then one or more line numbers separated by commas, each a `Number` token read as for `GOTO`. A missing line number, a line number above 63999, or anything after the list other than `:` or the end of the line is a SYNTAX error in place of the statement.
+
 ### Data files
 
 - **`OPEN`** takes one to four arguments separated by commas: the logical file number, the device, the secondary address, and the name, each an expression whose type and range are checked when it runs.
@@ -303,7 +314,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OnStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," .` | `parsePrintItem` | `ast.PrintItem` |
@@ -331,6 +342,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `SaveStatement = save FileArgs .` | `parseFileStatement` | `*ast.SaveStmt` |
 | `VerifyStatement = verify FileArgs .` | `parseFileStatement` | `*ast.VerifyStmt` |
 | `FileArgs = [ Expression [ "," Expression [ "," Expression ] ] ] .` | `parseFileArgs` | `ast.FileArgs` |
+| `OnStatement = on Expression ( goto \| gosub ) number { "," number } .` | `parseOnStatement` | `*ast.OnStmt` |
 | `OpenStatement = open Expression [ "," Expression [ "," Expression [ "," Expression ] ] ] .` | `parseOpenStatement` | `*ast.OpenStmt` |
 | `CloseStatement = close Expression .` | `parseCloseStatement` | `*ast.CloseStmt` |
 | `PrintFileStatement = printfile Expression [ "," { PrintItem } ] .` | `parseFilePrint` | `*ast.PrintStmt` with `File` |
@@ -344,7 +356,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `Variable = name .` | `parseVariable` | `*ast.VarRef` |
 | `Operand = string \| number \| Variable \| "(" Expression ")" \| not Comparison \| fn FunctionName "(" Expression ")" .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `printfile`, `inputfile`, `open`, `close`, `cmd`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `printfile`, `inputfile`, `open`, `close`, `cmd`, `on`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 

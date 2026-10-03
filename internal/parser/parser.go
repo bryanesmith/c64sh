@@ -29,7 +29,7 @@ import (
 // @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
 // @spec PARSER-048, PARSER-049, PARSER-050, PARSER-051, PARSER-052, PARSER-053, PARSER-054
 // @spec PARSER-055, PARSER-056
-// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063
+// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -116,7 +116,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OnStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -171,6 +171,8 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return stmt, nil
 	case token.Load, token.Save, token.Verify:
 		return p.parseFileStatement()
+	case token.On:
+		return p.parseOnStatement()
 	case token.Open:
 		return p.parseOpenStatement()
 	case token.Close:
@@ -635,6 +637,42 @@ func (p *parser) parseFilePrint() (ast.Stmt, error) {
 		return &ast.CmdStmt{File: file, Items: items}, err
 	}
 	return &ast.PrintStmt{File: file, Items: items}, err
+}
+
+// OnStatement = on Expression ( goto | gosub ) number { "," number } .
+//
+// Only the GOTO and GOSUB keywords are accepted ($A94F).
+func (p *parser) parseOnStatement() (ast.Stmt, error) {
+	p.next() // ON
+	index, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+	s := &ast.OnStmt{Index: index}
+	switch p.next().Kind {
+	case token.Goto:
+	case token.Gosub:
+		s.Gosub = true
+	default:
+		return nil, syntaxError()
+	}
+	for {
+		if p.peek() != token.Number {
+			return nil, syntaxError()
+		}
+		n, err := p.parseLineNumber()
+		if err != nil {
+			return nil, err
+		}
+		s.Lines = append(s.Lines, n)
+		if !p.accept(token.Comma) {
+			break
+		}
+	}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return s, nil
 }
 
 // OpenStatement = open Expression [ "," Expression [ "," Expression [ "," Expression ] ] ] .

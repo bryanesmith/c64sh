@@ -160,3 +160,8 @@ Design: `interp-design.md`
 - [x] **INTERP-117**: When executing an `ast.GetStmt` with a `File`, the interpreter shall read one character per variable as `GET` reads a key, giving the empty string at the end of the file and `CHR$(13)` for a line end, and shall fail with ILLEGAL DIRECT in direct mode.
 - [x] **INTERP-118**: If the file of an `INPUT#` or `GET#` is not open, then the interpreter shall fail with FILE NOT OPEN; if it is output-only, with NOT INPUT FILE; a file opened on the keyboard shall be read from the console.
 - [x] **INTERP-119**: The interpreter shall set `ST` to 64 after an `INPUT#` or `GET#` whose reading reached the end of its file, and to 0 after any other `OPEN`, `PRINT#`, `CMD`, `INPUT#`, or `GET#`; `ST` shall start at 0.
+
+## Computed jumps
+
+- [x] **INTERP-120**: When executing an `ast.OnStmt`, the interpreter shall evaluate its index as a number from 0 to 255, rounded down (TYPE MISMATCH for a string, ILLEGAL QUANTITY out of range), and, if the index is from 1 to the number of line numbers, execute a `GOTO` or `GOSUB` to the line number at that place in the list, with a `GOSUB` entry holding the position after the `ON` statement.
+- [x] **INTERP-121**: When an `ast.OnStmt`'s index is 0 or larger than the number of line numbers, the interpreter shall continue with the next statement.

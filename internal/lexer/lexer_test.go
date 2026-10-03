@@ -490,3 +490,13 @@ func TestDataFileKeywords(t *testing.T) {
 		{"OPEN CLOSE CMD", "OPEN CLOSE CMD", []token.Token{tok(token.Open, "OPEN", 0), tok(token.Close, "CLOSE", 5), tok(token.Cmd, "CMD", 11), eol(14)}},
 	})
 }
+
+// @spec LEXER-037
+func TestOnKeyword(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"ON GOTO", "ON X GOTO 10,20", []token.Token{
+			tok(token.On, "ON", 0), name("X", 3), tok(token.Goto, "GOTO", 5), num("10", 10), tok(token.Comma, ",", 12), num("20", 13), eol(15),
+		}},
+		{"ON in a name", "MONEY", []token.Token{name("M", 0), tok(token.On, "ON", 1), name("EY", 3), eol(5)}},
+	})
+}

@@ -31,7 +31,9 @@ Design: `lexer-design.md`
 - [x] **LEXER-039**: When the lexer encounters `LEN`, `LEFT$`, `RIGHT$`, `MID$`, `CHR$`, `ASC`, `STR$`, or `VAL` in uppercase outside a string literal, it shall produce a `Function` token whose value is the name.
 - [x] **LEXER-040**: When the lexer encounters `TAB(` or `SPC(` in uppercase outside a string literal, it shall produce a `Tab` or `Spc` token, and for `POS`, a `Function` token with value `POS`.
 - [x] **LEXER-041**: When the lexer encounters `DIM` in uppercase outside a string literal, it shall produce a `Dim` token.
-- [x] **LEXER-042**: When the lexer encounters `DATA`, `READ`, `RESTORE`, `STOP`, `CONT`, `CLR`, `FRE`, `PEEK`, `POKE`, `SYS`, `WAIT`, or `USR` in uppercase outside a string literal, it shall produce a `Reserved` token whose value is the keyword.
+- [x] **LEXER-042**: When the lexer encounters `STOP`, `CONT`, `CLR`, `FRE`, `PEEK`, `POKE`, `SYS`, `WAIT`, or `USR` in uppercase outside a string literal, it shall produce a `Reserved` token whose value is the keyword.
+- [x] **LEXER-043**: When the lexer encounters `DATA` in uppercase outside a string literal, it shall produce a `Data` token whose value is the text after it up to the next `:` outside double quotes, or else to the end of the line with trailing spaces removed, without recognizing keywords in it, and continue scanning at the `:`.
+- [x] **LEXER-044**: When the lexer encounters `READ` or `RESTORE` in uppercase outside a string literal, it shall produce a `Read` or `Restore` token respectively.
 
 ## Punctuation and illegal input
 

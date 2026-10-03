@@ -66,6 +66,9 @@ const (
 	Spc                   // SPC(
 	Dim                   // DIM
 	Reserved              // a BASIC V2 keyword c64sh does not support yet (Value: the keyword)
+	Data                  // DATA and its text up to ":" outside quotes (Value: the text)
+	Read                  // READ
+	Restore               // RESTORE
 )
 
 var kindNames = [...]string{
@@ -127,6 +130,9 @@ var kindNames = [...]string{
 	Spc:       "Spc",
 	Dim:       "Dim",
 	Reserved:  "Reserved",
+	Data:      "Data",
+	Read:      "Read",
+	Restore:   "Restore",
 }
 
 func (k Kind) String() string {

@@ -41,6 +41,7 @@ type Interp struct {
 	cmd         int                     // the file CMD sends output to; 0 for the screen
 	status      int                     // ST: the status of the last file operation
 	arrays      map[string]*array       // arrays, by identity
+	data        dataPos                 // the data pointer: the next DATA item
 	printing    bool                    // a PRINT to the screen is evaluating an item
 	printColumn int                     // while printing: the column its output so far reaches
 	seed        uint64                  // the RND seed
@@ -197,6 +198,13 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 		return in.execOn(s)
 	case *ast.DimStmt:
 		return in.execDim(s)
+	case *ast.DataStmt:
+		return nil // DATA is read by READ
+	case *ast.ReadStmt:
+		return in.execRead(s)
+	case *ast.RestoreStmt:
+		in.restore()
+		return nil
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:

@@ -81,6 +81,9 @@ const (
     Spc                   // SPC(
     Dim                   // DIM
     Reserved              // a BASIC V2 keyword c64sh does not support yet (Value: the keyword)
+    Data                  // DATA and its text up to ":" outside quotes (Value: the text)
+    Read                  // READ
+    Restore               // RESTORE
 )
 
 type Token struct {
@@ -102,6 +105,7 @@ At each position the lexer applies the first matching rule:
 | Space or tab | Skipped. |
 | `"` | `String` token. Its value is every character up to the next `"`, or to the end of the line if there is none. The closing quote, if present, is consumed. |
 | `REM` (see *Keywords*) | `Rem` token whose value is every byte after `REM` to the end of the line, exactly as written (including a leading space, quotes, colons, and keywords). Scanning stops; the next token is `EOL`. |
+| `DATA` | `Data` token whose value is the text after `DATA` up to the next `:` outside double quotes, or to the end of the line, exactly as written except that spaces at the end of the line are removed; the `:` is then scanned as usual. As on a C64, whose tokenizer does not crunch `DATA` items, keywords inside are not recognized: `DATA PRINT,TO` holds the text `PRINT,TO`. |
 | Other keyword text (see *Keywords*) | Keyword token (`Print`, `Let`, `If`, …). |
 | `?` | `Print` token (the C64 abbreviation for `PRINT`). |
 | `:` `;` `,` `+` `-` `*` `/` `(` `)` `#` | `Colon`, `Semicolon`, `Comma`, `Plus`, `Minus`, `Star`, `Slash`, `LParen`, `RParen`, `Hash`. |
@@ -122,7 +126,7 @@ The keywords are `PRINT`, `REM`, `LET`, `AND`, `OR`, `NOT`, `IF`, `THEN`, `RUN`,
 
 - **Recognition is by prefix, without word boundaries**, as on the C64: at any position outside a string, if the upcoming characters spell a keyword, the keyword token is produced, whatever follows. `PRINT"X"` is `Print String`; `PRINTX` is `Print Illegal(X)`; `REMARK` is a `Rem` token with the comment `ARK`.
 - **Spaces inside a keyword break it.** `PRI NT` is not `PRINT`; it scans as the name `PRINT`, since spaces inside a name are skipped.
-- **Reserved keywords.** The BASIC V2 keywords c64sh does not support yet, or will never support, are keywords all the same, as on a C64: `DATA`, `READ`, `RESTORE`, `STOP`, `CONT`, `CLR`, `FRE`, `PEEK`, `POKE`, `SYS`, `WAIT`, and `USR` each produce a `Reserved` token whose value is the keyword. So they break names that contain them (`READY` contains `READ`), and the parser rejects them wherever they appear, so `PEEK(197)` is a SYNTAX error rather than an array element.
+- **Reserved keywords.** The BASIC V2 keywords c64sh does not support yet, or will never support, are keywords all the same, as on a C64: `STOP`, `CONT`, `CLR`, `FRE`, `PEEK`, `POKE`, `SYS`, `WAIT`, and `USR` each produce a `Reserved` token whose value is the keyword. So they break names that contain them (`READY` contains `READ`), and the parser rejects them wherever they appear, so `PEEK(197)` is a SYNTAX error rather than an array element.
 - **Case-sensitive.** Keywords are recognized only in uppercase, exactly as written in their token rules. `print` and `Print` are not keywords; their letters scan as `Illegal` tokens, so `print "HI"` is a syntax error, as it is on a C64, where lowercase letters are different characters from uppercase ones.
 
 Keywords are kept in a table, so future keywords are added by extending the table. When more than one keyword could match at a position, the longest match wins: `GOTO` is one `Goto` token and `GOSUB` one `Gosub` token, while `GO TO`, with a space, is `Go` then `To`. As on a C64, `GO` and `TO` also end names that contain them (`GOLD`, `TOTAL`), whether or not they are followed by `TO` or used with `FOR`.
@@ -208,6 +212,9 @@ pi        = "π" .
 tab       = "TAB(" .
 spc       = "SPC(" .
 dim       = "DIM" .
+data      = "DATA" { character | `"` { character } `"` } .   /* up to ":" outside quotes */
+read      = "READ" .
+restore   = "RESTORE" .
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
             [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
 digit     = "0" … "9" .

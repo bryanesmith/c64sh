@@ -276,3 +276,16 @@ func (*CallExpr) expr() {}
 type DimStmt struct{ Arrays []*VarRef }
 
 func (*DimStmt) stmt() {}
+
+// DataStmt is DATA and its text, exactly as the lexer kept it.
+type DataStmt struct{ Text string }
+
+// ReadStmt is READ Var {, Var}.
+type ReadStmt struct{ Vars []*VarRef }
+
+// RestoreStmt is RESTORE.
+type RestoreStmt struct{}
+
+func (*DataStmt) stmt()    {}
+func (*ReadStmt) stmt()    {}
+func (*RestoreStmt) stmt() {}

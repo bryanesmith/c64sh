@@ -33,6 +33,7 @@ const (
 	FileData                        // FILE DATA
 	BadSubscript                    // BAD SUBSCRIPT
 	RedimdArray                     // REDIM'D ARRAY
+	OutOfData                       // OUT OF DATA
 )
 
 // names holds each kind's name as the C64 prints it.
@@ -64,6 +65,7 @@ var names = [...]string{
 	FileData:            "FILE DATA",
 	BadSubscript:        "BAD SUBSCRIPT",
 	RedimdArray:         "REDIM'D ARRAY",
+	OutOfData:           "OUT OF DATA",
 }
 
 // Error is a BASIC error.

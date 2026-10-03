@@ -114,3 +114,8 @@ Design: `parser-design.md`
 ## Reserved keywords
 
 - [x] **PARSER-074**: If a `Reserved` token appears anywhere in a statement, then the parser shall return a SYNTAX error, with an `*ast.BadStmt` in place of the statement, or a `BadItem` inside `PRINT` items.
+
+## DATA statements
+
+- [x] **PARSER-075**: When a statement is a `Data` token, the parser shall produce an `*ast.DataStmt` holding its text; when it is `READ` followed by one or more variables separated by commas, an `*ast.ReadStmt`; and when it is `RESTORE` followed by `:` or `EOL`, an `*ast.RestoreStmt`.
+- [x] **PARSER-076**: If `READ` lacks a variable or its list is not followed by `:` or `EOL`, or `RESTORE` is followed by anything other than `:` or `EOL`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.

@@ -32,6 +32,7 @@ func TestErrorReturnsC64Name(t *testing.T) {
 		FileData:            "FILE DATA",
 		BadSubscript:        "BAD SUBSCRIPT",
 		RedimdArray:         "REDIM'D ARRAY",
+		OutOfData:           "OUT OF DATA",
 	}
 	for kind, want := range cases {
 		if got := (&Error{Kind: kind}).Error(); got != want {

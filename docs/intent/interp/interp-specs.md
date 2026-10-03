@@ -194,3 +194,10 @@ Design: `interp-design.md`
 - [x] **INTERP-136**: The interpreter shall keep arrays separate from plain variables of the same identity, and shall assign to an element by the rules for a plain variable of its type.
 - [x] **INTERP-137**: If creating an array would make all arrays take more than 38911 bytes, counting 5 bytes plus 2 per dimension for each array and 5, 3, or 2 bytes per element for numbers, strings, or integers, then the interpreter shall fail with OUT OF MEMORY.
 - [x] **INTERP-138**: The interpreter shall clear all arrays whenever it clears the variables.
+
+## DATA statements
+
+- [x] **INTERP-139**: When executing an `ast.ReadStmt`, the interpreter shall assign each variable, in order, the next item of the program's `DATA` statements in program order, read as `INPUT` reads a value (quoted or unquoted strings; numbers, an empty item being 0), items being separated by commas, and move the data pointer past it.
+- [x] **INTERP-140**: If no `DATA` item remains, then `READ` shall fail with OUT OF DATA.
+- [x] **INTERP-141**: If a `DATA` item cannot be read into its variable, or is followed by anything but a comma or the end of its text, then `READ` shall fail with a SYNTAX error carrying the number of the line holding the `DATA` statement.
+- [x] **INTERP-142**: The interpreter shall move the data pointer to the first item when executing an `ast.RestoreStmt`, when it clears the variables, and when a `LOAD` chains; executing an `ast.DataStmt` shall do nothing.

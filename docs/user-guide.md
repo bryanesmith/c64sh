@@ -19,6 +19,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [IF … THEN](#if--then)
 - [Variables](#variables)
 - [Arrays](#arrays)
+- [DATA statements](#data-statements)
 - [Programs](#programs)
 - [Loops](#loops)
 - [Subroutines](#subroutines)
@@ -382,7 +383,7 @@ prints `B IS 11 ` and `HELLO, ALICE`.
 - **Three kinds**: a name ending in `$` holds a string (`N$`); a name ending in `%` holds a whole number (`C%`); any other name holds a number (`A`, `HEIGHT`). `A`, `A%`, and `A$` are different variables. Putting a string in a number variable, or a number in a string variable, is a `?TYPE MISMATCH  ERROR`.
 - **Integer variables** (`%`) round down what is stored in them: `C%=3.7` stores 3, and `C%=-3.7` stores -4. They hold -32768 to 32767; storing a number outside that range is an `?ILLEGAL QUANTITY  ERROR`. In calculations they are ordinary numbers.
 - **Names** start with an uppercase letter, followed by letters and digits. **Only the first two characters count**, so `HEIGHT` and `HE` are the same variable.
-- **A name cannot contain a keyword**, including keywords c64sh does not support yet (`READY` contains `READ`, `FREE` contains `FRE`), because the C64 finds keywords anywhere: `PREMIUM=1` is a `?SYNTAX  ERROR` (it contains `REM`), and so is `SCORE=1` (it contains `OR`). It also means `PRINTER` prints the variable `ER`, and `LETTER=1` sets `TE`.
+- **A name cannot contain a keyword**, including keywords c64sh does not support yet (`FREE` contains `FRE`, `STOPS` contains `STOP`), because the C64 finds keywords anywhere: `PREMIUM=1` is a `?SYNTAX  ERROR` (it contains `REM`), and so is `SCORE=1` (it contains `OR`). It also means `PRINTER` prints the variable `ER`, and `LETTER=1` sets `TE`.
 - **Spaces inside a name are ignored**: `A B` is the variable `AB`.
 - **A variable never set** is 0, or the empty string.
 - **Values last** from line to line, for the whole session or script.
@@ -411,6 +412,27 @@ prints ` 9 `.
 - **Arrays are cleared** with the variables (`RUN`, `NEW`, changing the program). Elements can be read with `INPUT`, `GET`, and `INPUT#`, but cannot be loop counters.
 
 See [`examples/027-arrays.bas`](../examples/027-arrays.bas) for every form.
+
+## DATA statements
+
+`DATA` lines keep values inside a program, and `READ` takes them, in order:
+
+```
+10 READ N$,A
+20 PRINT N$;" IS";A
+30 DATA ALICE,12
+```
+
+prints `ALICE IS 12 `.
+
+- **Items are separated by commas** and read the way `INPUT` reads answers: put an item in quotes to keep a comma, a colon, or leading spaces in it. Without quotes, an item is plain text, even if it looks like a keyword (`DATA PRINT`). An empty item reads as 0 or the empty string.
+- **`READ` goes through every `DATA` statement in the program**, in line order, wherever they are; it does not matter where `DATA` lines sit, and running a `DATA` line does nothing.
+- **`RESTORE`** starts again from the first item. `RUN` does too.
+- **Idioms**: fill an array with a `FOR` loop of `READ`s; or end a table with a marker value (`DATA …,END`) and stop reading when you reach it.
+- **Running out** is an `?OUT OF DATA  ERROR`. An item that is not a number, read into a number variable, is a `?SYNTAX  ERROR` naming the `DATA` line, as on a C64.
+- `DATA` typed directly is ignored; `READ` typed directly reads the program's `DATA`.
+
+See [`examples/028-data-statements.bas`](../examples/028-data-statements.bas) for every form.
 
 ## Programs
 
@@ -722,6 +744,7 @@ Errors are reported the way a C64 reports them, on stderr:
 | `?UNDEF'D FUNCTION  ERROR` | `FN` with a function that has not been defined. |
 | `?BAD SUBSCRIPT  ERROR` | An array subscript past the top, or the wrong number of subscripts. |
 | `?REDIM'D ARRAY  ERROR` | `DIM` of an array that already exists. |
+| `?OUT OF DATA  ERROR` | `READ` with no `DATA` items left. |
 | `?RETURN WITHOUT GOSUB  ERROR` | `RETURN` with no `GOSUB` to return to. |
 | `?ILLEGAL QUANTITY  ERROR` | A number outside -32768 to 32767 used with `AND`, `OR`, or `NOT`; a negative number raised to a fractional power, such as `(-8)^(1/3)`, or a number outside -32768 to 32767 stored in an integer variable (`C%`). |
 
@@ -769,7 +792,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 - The clock variables `TI` and `TI$`
-- `DATA`, `READ`, and `RESTORE`; `FRE`
+- `FRE`
 - `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 

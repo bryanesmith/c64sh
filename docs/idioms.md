@@ -15,6 +15,7 @@ Everything here works in c64sh. The [user guide](user-guide.md) describes each s
 - [Data and arrays](#data-and-arrays)
 - [Files](#files)
 - [Time](#time)
+- [The environment](#the-environment) (c64sh extension)
 
 ## Program structure
 
@@ -536,3 +537,34 @@ SAVE "@0:GAME",8
 ```
 
 **Why:** BASIC V2 has no `SLEEP`; looping until the clock has moved on waits for a set time, the same on every computer. (An empty `FOR` loop also waits, but for different times on different machines.)
+
+## The environment
+
+*c64sh extension: `ENVIRON$` and `ENVIRON` are not part of C64 BASIC V2, so these patterns do not work on a real C64.*
+
+### Read a setting with a default
+
+```basic
+10 E$=ENVIRON$("EDITOR"):IF E$="" THEN E$="VI"
+20 PRINT "EDITING WITH ";E$
+```
+
+**Why:** an unset variable reads as the empty string, never an error, so testing for `""` straight after reading it is how a program falls back to its own default.
+
+### Extend PATH
+
+```basic
+ENVIRON "PATH=";ENVIRON$("PATH");":/opt/bin"
+```
+
+**Why:** `PATH` is often longer than a BASIC string's 255 characters, so `ENVIRON "PATH="+ENVIRON$("PATH")+":/opt/bin"` can fail with `STRING TOO LONG`. `ENVIRON` joins parts separated by `;` without that limit, so the whole value is never stored in a string variable.
+
+### List every variable
+
+```basic
+10 I=1
+20 E$=ENVIRON$(I):IF E$="" THEN END
+30 PRINT E$:I=I+1:GOTO 20
+```
+
+**Why:** `ENVIRON$(N)` gives the `N`th variable as `NAME=VALUE`, in order of name, and the empty string past the last, so counting up until it comes back empty visits them all.

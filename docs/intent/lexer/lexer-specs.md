@@ -35,6 +35,8 @@ Design: `lexer-design.md`
 - [x] **LEXER-043**: When the lexer encounters `DATA` in uppercase outside a string literal, it shall produce a `Data` token whose value is the text after it up to the next `:` outside double quotes, or else to the end of the line with trailing spaces removed, without recognizing keywords in it, and continue scanning at the `:`.
 - [x] **LEXER-044**: When the lexer encounters `READ` or `RESTORE` in uppercase outside a string literal, it shall produce a `Read` or `Restore` token respectively.
 
+- [x] **LEXER-045**: When the lexer encounters `ENVIRON$` in uppercase outside a string literal, it shall produce a `Function` token with value `ENVIRON$`, and for `ENVIRON` not followed by `$`, an `Environ` token (both c64sh extensions; the longest match decides).
+
 ## Punctuation and illegal input
 
 - [x] **LEXER-011**: When the lexer encounters `:`, `;`, `,`, `+`, `-`, `*`, `/`, `(`, or `)` outside a string literal and outside a number literal's exponent, it shall produce a `Colon`, `Semicolon`, `Comma`, `Plus`, `Minus`, `Star`, `Slash`, `LParen`, or `RParen` token respectively (so `1-2` is `Number Minus Number`, while `1E-2` is one `Number`).

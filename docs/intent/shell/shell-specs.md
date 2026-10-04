@@ -107,6 +107,10 @@ Design: `shell-design.md`
 
 - [x] **SHELL-CLOCK-001**: When `Config.Clock` is set, the shell shall set it as the interpreter's clock.
 
+## Environment
+
+- [x] **SHELL-ENV-001**: When `shell.Main` runs, it shall set `Config.Env` to the process's environment; when `Config.Env` is set, `Run` shall set it as the interpreter's environment.
+
 ## Terminal output
 
 - [x] **SHELL-SCREEN-001**: When `shell.Main` runs, it shall set `Config.Terminal` if stdout is a terminal, and `Config.NoColor` if the environment variable `NO_COLOR` is set to a non-empty value; `Run` shall set the interpreter's screen to `Config.Terminal`, with colors on unless `Config.NoColor` is set.

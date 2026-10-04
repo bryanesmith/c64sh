@@ -81,6 +81,9 @@ var keywords = []struct {
 	{"DATA", token.Data},
 	{"READ", token.Read},
 	{"RESTORE", token.Restore},
+	// c64sh extensions (HLD tenet *BASIC V2, plus marked extensions).
+	{"ENVIRON$", token.Function},
+	{"ENVIRON", token.Environ},
 	// Keywords that c64sh does not support, reserved as on a C64, so a
 	// name containing one breaks and the parser rejects them.
 	{"STOP", token.Reserved},

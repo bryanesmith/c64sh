@@ -69,6 +69,7 @@ const (
 	Data                  // DATA and its text up to ":" outside quotes (Value: the text)
 	Read                  // READ
 	Restore               // RESTORE
+	Environ               // ENVIRON (a c64sh extension)
 )
 
 var kindNames = [...]string{
@@ -133,6 +134,7 @@ var kindNames = [...]string{
 	Data:      "Data",
 	Read:      "Read",
 	Restore:   "Restore",
+	Environ:   "Environ",
 }
 
 func (k Kind) String() string {

@@ -84,6 +84,7 @@ const (
     Data                  // DATA and its text up to ":" outside quotes (Value: the text)
     Read                  // READ
     Restore               // RESTORE
+    Environ               // ENVIRON (a c64sh extension)
 )
 
 type Token struct {
@@ -207,7 +208,8 @@ close     = "CLOSE" .
 cmd       = "CMD" .
 on        = "ON" .
 function  = "POS" | "ABS" | "INT" | "SGN" | "SQR" | "RND" | "LOG" | "EXP" | "SIN" | "COS" | "TAN" | "ATN"
-          | "LEN" | "LEFT$" | "RIGHT$" | "MID$" | "CHR$" | "ASC" | "STR$" | "VAL" .
+          | "LEN" | "LEFT$" | "RIGHT$" | "MID$" | "CHR$" | "ASC" | "STR$" | "VAL"
+          | "ENVIRON$" .   /* a c64sh extension */
 pi        = "π" .
 tab       = "TAB(" .
 spc       = "SPC(" .
@@ -215,6 +217,7 @@ dim       = "DIM" .
 data      = "DATA" { character | `"` { character } `"` } .   /* up to ":" outside quotes */
 read      = "READ" .
 restore   = "RESTORE" .
+environ   = "ENVIRON" .   /* a c64sh extension */
 number    = ( digit { digit } [ "." { digit } ] | "." { digit } )
             [ "E" [ "+" | "-" ] { digit } ] .   /* spaces inside are ignored */
 digit     = "0" … "9" .

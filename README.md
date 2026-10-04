@@ -2,7 +2,7 @@
 
 A shell that speaks Commodore 64 BASIC V2, in your terminal. Type a line and it runs, just like the C64's direct mode, or run BASIC scripts like any other command.
 
-c64sh currently supports `PRINT` with strings, numbers, and arithmetic (`+ - * / ^` and parentheses), number functions (`INT`, `RND`, `SIN`, …), string functions (`LEN`, `MID$`, `CHR$`, …), the C64's colors and screen codes, comparisons, logic (`AND`, `OR`, `NOT`), `IF … THEN`, `FOR … NEXT` loops, `GOSUB` subroutines, keyboard input (`INPUT`, `GET`), `DEF FN` functions, `SAVE`/`LOAD`, data files (`OPEN`, `PRINT#`, `INPUT#`), variables (including `%` integers) arrays, `DATA` statements, the clock (`TI`, `TI$`), `REM` comments, and programs with numbered lines (`RUN`, `LIST`, `NEW`, `END`, `GOTO`, `ON … GOTO`). More of the language is on the way.
+c64sh currently supports `PRINT` with strings, numbers, and arithmetic (`+ - * / ^` and parentheses), number functions (`INT`, `RND`, `SIN`, …), string functions (`LEN`, `MID$`, `CHR$`, …), the C64's colors and screen codes, comparisons, logic (`AND`, `OR`, `NOT`), `IF … THEN`, `FOR … NEXT` loops, `GOSUB` subroutines, keyboard input (`INPUT`, `GET`), `DEF FN` functions, `SAVE`/`LOAD`, data files (`OPEN`, `PRINT#`, `INPUT#`), variables (including `%` integers) arrays, `DATA` statements, the clock (`TI`, `TI$`), environment variables (`ENVIRON$`, `ENVIRON`, a c64sh extension), `REM` comments, and programs with numbered lines (`RUN`, `LIST`, `NEW`, `END`, `GOTO`, `ON … GOTO`). More of the language is on the way.
 
 ## Build and run
 

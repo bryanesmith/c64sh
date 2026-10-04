@@ -44,6 +44,7 @@ type Interp struct {
 	color       bool                    // the terminal shows colors
 	reverse     bool                    // reverse video is on in the terminal
 	ink         string                  // escape code of the last color written to the terminal
+	env         Environment             // ENVIRON's environment variables
 	arrays      map[string]*array       // arrays, by identity
 	data        dataPos                 // the data pointer: the next DATA item
 	printing    bool                    // a PRINT to the screen is evaluating an item
@@ -60,7 +61,7 @@ type Interp struct {
 //
 // @spec INTERP-002
 func New(out io.Writer) *Interp {
-	return &Interp{out: out, vars: map[string]value{}, arrays: map[string]*array{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed, tiStart: time.Now()}
+	return &Interp{out: out, vars: map[string]value{}, arrays: map[string]*array{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed, tiStart: time.Now(), env: MapEnvironment{}}
 }
 
 // Interrupt asks the interpreter to stop, as the C64's STOP key does: the
@@ -214,6 +215,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 	case *ast.RestoreStmt:
 		in.restore()
 		return nil
+	case *ast.EnvironStmt:
+		return in.execEnviron(s)
 	case *ast.ListStmt:
 		return in.execList()
 	case *ast.NewStmt:

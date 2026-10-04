@@ -102,6 +102,23 @@ type Storage interface {
 // they fail with DEVICE NOT PRESENT.
 func (in *Interp) SetStorage(s Storage)
 
+// Environment holds the environment variables ENVIRON$ reads and ENVIRON
+// sets (a c64sh extension).
+type Environment interface {
+    Lookup(name string) (value string, ok bool)
+    Set(name, value string) error
+    Unset(name string) error
+    List() []string // every variable as "NAME=VALUE", in any order
+}
+
+// MapEnvironment is an Environment held in a map, apart from the process's
+// own environment.
+type MapEnvironment map[string]string
+
+// SetEnvironment sets the environment ENVIRON$ and ENVIRON use. Without
+// one, they use an empty MapEnvironment.
+func (in *Interp) SetEnvironment(e Environment)
+
 // SetMessages sets where the C64's tape and disk messages (SAVING NAME,
 // LOADING, …) are written, for statements executed in direct mode.
 // Without a writer, no messages are written.
@@ -162,7 +179,7 @@ func (in *Interp) execStmt(s ast.Stmt) error {
         *ast.InputStmt, *ast.GetStmt, *ast.DefStmt,
         *ast.LoadStmt, *ast.SaveStmt, *ast.VerifyStmt,
         *ast.OpenStmt, *ast.CloseStmt, *ast.CmdStmt, *ast.OnStmt, *ast.DimStmt,
-        *ast.DataStmt, *ast.ReadStmt, *ast.RestoreStmt:
+        *ast.DataStmt, *ast.ReadStmt, *ast.RestoreStmt, *ast.EnvironStmt:
         … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
@@ -507,6 +524,18 @@ String functions evaluate their arguments in order; each must have its type (a s
 | `STR$(X)` | `X` formatted as `PRINT` formats it, without the space after: `STR$(5)` is `" 5"`. |
 | `VAL(S$)` | The number `S$` starts with, read as `INPUT` reads a number (spaces skipped, stopping at the first character that cannot continue it); 0 if there is none; `OVERFLOW` if too large (`$B7AD`). |
 
+## The environment
+
+*c64sh extension*, with the names GW-BASIC gives these words. The interpreter reads and changes environment variables through its `Environment`: the shell gives it the process's own environment, so programs c64sh starts later see the changes; tests and other callers give it a `MapEnvironment` or nothing, so they never depend on, or change, the real one.
+
+| Form | Effect |
+|---|---|
+| `ENVIRON$(S$)` | The value of the variable named `S$`, or the empty string if it is not set. |
+| `ENVIRON$(N)` | The `N`th (byte, from 1) variable as `NAME=VALUE`, counting in order of name, or the empty string past the last; `N` of 0 is `ILLEGAL QUANTITY`. A loop up to the first empty string lists them all. |
+| `ENVIRON S$ [; S$ …]` | Joins the strings into one text and splits it at its first `=` into a name and a value: sets the variable, or removes it if the value is empty. A number among them is `TYPE MISMATCH`; no `=`, or nothing before it, is `ILLEGAL QUANTITY`, as is a name or value the environment refuses. |
+
+Environment values are often longer than a BASIC string's 255 characters (`PATH` is). `ENVIRON$` returns the whole value, so `PRINT ENVIRON$("PATH")` shows it, and the string functions read it; storing it in a variable, or joining it with `+`, is `STRING TOO LONG` as for any other string, so a value is never silently cut short. `ENVIRON`'s parts are joined without that limit, so `ENVIRON "PATH=";ENVIRON$("PATH");":/opt/bin"` extends a long `PATH`.
+
 ## The clock
 
 `TI` counts **jiffies**, sixtieths of a second, as the C64's clock does: it starts at 0 when the `Interp` is created (or a clock is set with `SetClock`), the counterpart of a C64's power-on, and counts the clock's time since, rounded down to whole jiffies. `TI$` is the same clock as six digits, hours, minutes, and seconds: `TI` of 216000 is `"010000"`. Both wrap to 0 after 24 hours (5184000 jiffies).
@@ -651,6 +680,10 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
+| Environment access | Through an `Environment`, the process's own from the shell | Read and set the process environment directly | Tests and snapshots stay deterministic and never change the test process's environment. |
+| Values over 255 characters | `ENVIRON$` returns all of it; storing or `+` is `STRING TOO LONG` | Truncate to 255; `STRING TOO LONG` from `ENVIRON$` itself | Truncating would silently corrupt a value written back (a cut-short `PATH`); an error from `ENVIRON$` would make long values impossible even to print. |
+| Building long values | `ENVIRON` joins `;`-separated parts, without the string limit | GW-BASIC's single string only; raise the string limit | Keeps GW-BASIC's form working unchanged while making `PATH` editable; the 255-character limit stays a C64 rule everywhere else. |
+| `ENVIRON$(N)` order | By name | The process's order, as GW-BASIC lists its table | The process's order is arbitrary; by name, a listing is stable and easy to read. |
 | Number type | `float64` with C64 range checks and C64 output format | Emulating the C64's 5-byte float | See HLD *Number representation*. The range constants make overflow and underflow match the C64's limits, and formatting reproduces its output. |
 | Integer variable conversion | Round down (toward minus infinity) | Truncate toward zero; round to nearest | The C64 ROM converts by shifting the two's-complement mantissa, which rounds down, so `-3.7` becomes -4. |
 | Rounding for output | Round to 9 significant digits in decimal, then choose notation | Scale by 10 in binary as the ROM does | Decimal rounding gives the same 9 digits for all but rare boundary cases, and is simple and exact with `strconv`. |

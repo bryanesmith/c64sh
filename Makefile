@@ -24,7 +24,7 @@ install: build
 test:
 	@$(GO) test ./...
 
-# Rewrite the snapshots of examples/ from current output; review the diff.
+# Rewrite the snapshots of examples/features/ from current output; review the diff.
 update-snapshots:
 	@UPDATE_SNAPS=true $(GO) test ./test/snapshot ./test/tutorial
 

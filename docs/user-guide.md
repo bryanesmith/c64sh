@@ -6,7 +6,7 @@ c64sh is being built one command at a time. This guide describes what works toda
 
 c64sh is Commodore 64 BASIC V2, plus a few **extensions** for working in a modern terminal. Every section about an extension begins with *c64sh extension*, so you know it won't work on a real C64; [Extensions](#extensions) lists them all.
 
-To learn the language by building a game, start with the [tutorial](tutorial/index.md); for the patterns experienced BASIC programmers used, see [idiomatic BASIC](idioms.md). For hands-on examples, see the numbered scripts in [`examples/`](../examples/). Each one shows a feature in many forms, with a comment beside every `PRINT` saying what it prints, and each can be run directly: `./examples/001-hello-world.bas`.
+To learn the language by building a game, start with the [tutorial](tutorial/index.md); for the patterns experienced BASIC programmers used, see [idiomatic BASIC](idioms.md). For hands-on examples, see the numbered scripts in [`examples/features/`](../examples/features/). Each one shows a feature in many forms, with a comment beside every `PRINT` saying what it prints, and each can be run directly: `./examples/features/001-hello-world.bas`.
 
 - [Installing](#installing)
 - [Interactive sessions](#interactive-sessions)
@@ -232,7 +232,7 @@ PRINT "FIRST"
 20 PRINT "TWO"
 ```
 
-prints `FIRST` at once, then runs the program at the end: `ONE`, `TWO`, `THREE`. With a `RUN` line at the end it prints the same; a script that runs its program itself is left as written. See [`examples/015-numbered-scripts.bas`](../examples/015-numbered-scripts.bas).
+prints `FIRST` at once, then runs the program at the end: `ONE`, `TWO`, `THREE`. With a `RUN` line at the end it prints the same; a script that runs its program itself is left as written. See [`examples/features/015-numbered-scripts.bas`](../examples/features/015-numbered-scripts.bas).
 
 ## PRINT
 
@@ -288,7 +288,7 @@ prints `HELLO, WORLD`.
 
 **Strings.** A string is text between double quotes. Everything inside is printed exactly as written, including spaces and punctuation. The closing quote may be left off at the end of a line: `PRINT "HI` prints `HI`. A string cannot contain a double quote.
 
-On a C64 a string holds at most 255 characters, and longer results cause `?STRING TOO LONG  ERROR`. c64sh's strings are unlimited by default; set [`C64SH_STRING_LIMIT`](#settings) to `255` for the C64's limit, to check that a program will run on one. See [`examples/032-string-length.bas`](../examples/032-string-length.bas).
+On a C64 a string holds at most 255 characters, and longer results cause `?STRING TOO LONG  ERROR`. c64sh's strings are unlimited by default; set [`C64SH_STRING_LIMIT`](#settings) to `255` for the C64's limit, to check that a program will run on one. See [`examples/features/032-string-length.bas`](../examples/features/032-string-length.bas).
 
 **Keywords are uppercase.** `PRINT` must be typed in capitals; `print` is a syntax error. Text inside quotes can use any case.
 
@@ -318,7 +318,7 @@ clears the screen, then prints `RED ALERT` in red, and sets the color back to th
 - **`NO_COLOR=1`** in the environment turns colors off; the other codes still work.
 - **Idiom**: keep codes in variables, such as `RE$=CHR$(28)`, so `PRINT RE$;"DANGER"` reads well.
 
-See [`examples/030-screen-codes.bas`](../examples/030-screen-codes.bas) for every form.
+See [`examples/features/030-screen-codes.bas`](../examples/features/030-screen-codes.bas) for every form.
 
 ## Numbers
 
@@ -340,7 +340,7 @@ A few more rules come straight from the C64:
 - **`+` adds numbers** as well as joining strings, but it cannot join a number and a string: `PRINT "AGE: "+42` is a `?TYPE MISMATCH  ERROR`. See [Arithmetic](#arithmetic).
 - **Numbers range up to 1.70141183E+38.** A larger number is an `?OVERFLOW  ERROR`; a number too small for a C64 (below about 2.9E-39) becomes 0.
 
-See [`examples/006-numbers.bas`](../examples/006-numbers.bas) for every form in one script.
+See [`examples/features/006-numbers.bas`](../examples/features/006-numbers.bas) for every form in one script.
 
 ## Arithmetic
 
@@ -373,7 +373,7 @@ A few details:
 - **Dividing by zero** is a `?DIVISION BY ZERO  ERROR`.
 - **A `(` right after a number starts a new item**: `PRINT 2(3)` prints ` 2  3 `. But `-` and `+` always continue the calculation: `PRINT 1 -1` prints ` 0 `.
 
-See [`examples/007-arithmetic.bas`](../examples/007-arithmetic.bas) and [`examples/008-exponents.bas`](../examples/008-exponents.bas) for every form.
+See [`examples/features/007-arithmetic.bas`](../examples/features/007-arithmetic.bas) and [`examples/features/008-exponents.bas`](../examples/features/008-exponents.bas) for every form.
 
 ## Number functions
 
@@ -396,7 +396,7 @@ Each takes its argument in parentheses: `PRINT SQR(16)` prints ` 4 `.
 - **Errors**: a square root or logarithm of a number it cannot take (`SQR(-1)`, `LOG(0)`) is an `?ILLEGAL QUANTITY  ERROR`, and a string argument a `?TYPE MISMATCH  ERROR`.
 - **The function names break variable names that contain them**: `POINT` contains `INT`, and `COST` contains `COS`.
 
-See [`examples/024-number-functions.bas`](../examples/024-number-functions.bas) for every form.
+See [`examples/features/024-number-functions.bas`](../examples/features/024-number-functions.bas) for every form.
 
 ## String functions
 
@@ -417,7 +417,7 @@ See [`examples/024-number-functions.bas`](../examples/024-number-functions.bas) 
 - **Characters** are Unicode characters. Codes 32 to 126 are the same as on a C64; other codes give the Unicode character with that number.
 - **The function names break variable names that contain them**: `VALUE` contains `VAL`, and `LENGTH` contains `LEN`.
 
-See [`examples/025-string-functions.bas`](../examples/025-string-functions.bas) for every form.
+See [`examples/features/025-string-functions.bas`](../examples/features/025-string-functions.bas) for every form.
 
 ## The clock
 
@@ -438,7 +438,7 @@ PRINT "THAT TOOK";INT(TI/60);"SECONDS"
   30 X=RND(-TI)
   ```
 
-See [`examples/029-clock.bas`](../examples/029-clock.bas) for every form.
+See [`examples/features/029-clock.bas`](../examples/features/029-clock.bas) for every form.
 
 ## Comparisons
 
@@ -458,7 +458,7 @@ A comparison is a number: **-1 when true, 0 when false**. `PRINT 1<2` prints `-1
 - **A string cannot be compared with a number**: `PRINT "1"=1` is a `?TYPE MISMATCH  ERROR`.
 - **Testing calculated decimals for equality** can differ from a real C64 in rare cases, because c64sh stores numbers with more precision; `.1+.2=.3`, for example, depends on the last binary digits of each result.
 
-See [`examples/011-comparisons.bas`](../examples/011-comparisons.bas) for every form.
+See [`examples/features/011-comparisons.bas`](../examples/features/011-comparisons.bas) for every form.
 
 ## Logic
 
@@ -474,7 +474,7 @@ PRINT NOT 1=2         : REM -1
 - **They work bit by bit** on whole numbers from -32768 to 32767, as on a C64: `PRINT 12 AND 10` prints ` 8 `, `PRINT 12 OR 10` prints ` 14 `, and `PRINT NOT 5` prints `-6 `. Fractions are rounded down first.
 - A number outside -32768 to 32767 is an `?ILLEGAL QUANTITY  ERROR`, and a string is a `?TYPE MISMATCH  ERROR`.
 
-See [`examples/012-logic.bas`](../examples/012-logic.bas) for every form.
+See [`examples/features/012-logic.bas`](../examples/features/012-logic.bas) for every form.
 
 ## IF … THEN
 
@@ -496,7 +496,7 @@ prints `A IS BIG` and `BETWEEN`.
 - **A skipped part of the line is never checked**, as on a C64: `IF 0 THEN PRINT "X"@` prints nothing and reports no error, because the mistake is never reached.
 - **`THEN` is required.** `IF A>3 PRINT "X"` is a `?SYNTAX  ERROR`.
 
-See [`examples/013-if-then.bas`](../examples/013-if-then.bas) for every form.
+See [`examples/features/013-if-then.bas`](../examples/features/013-if-then.bas) for every form.
 
 ## Variables
 
@@ -520,7 +520,7 @@ prints `B IS 11 ` and `HELLO, ALICE`.
 - **A variable never set** is 0, or the empty string.
 - **Values last** from line to line, for the whole session or script.
 
-See [`examples/009-variables.bas`](../examples/009-variables.bas) and [`examples/010-integer-variables.bas`](../examples/010-integer-variables.bas) for every form.
+See [`examples/features/009-variables.bas`](../examples/features/009-variables.bas) and [`examples/features/010-integer-variables.bas`](../examples/features/010-integer-variables.bas) for every form.
 
 ## Arrays
 
@@ -543,7 +543,7 @@ prints ` 9 `.
 - **Memory**: as on a C64, all arrays together must fit in 38911 bytes (5 bytes per number, 3 per string, 2 per integer), or it is an `?OUT OF MEMORY  ERROR`. `DIM A(7000)` fits; `DIM A(8000)` does not.
 - **Arrays are cleared** with the variables (`RUN`, `NEW`, changing the program). Elements can be read with `INPUT`, `GET`, and `INPUT#`, but cannot be loop counters.
 
-See [`examples/027-arrays.bas`](../examples/027-arrays.bas) for every form.
+See [`examples/features/027-arrays.bas`](../examples/features/027-arrays.bas) for every form.
 
 ## DATA statements
 
@@ -564,7 +564,7 @@ prints `ALICE IS 12 `.
 - **Running out** is an `?OUT OF DATA  ERROR`. An item that is not a number, read into a number variable, is a `?SYNTAX  ERROR` naming the `DATA` line, as on a C64.
 - `DATA` typed directly is ignored; `READ` typed directly reads the program's `DATA`.
 
-See [`examples/028-data-statements.bas`](../examples/028-data-statements.bas) for every form.
+See [`examples/features/028-data-statements.bas`](../examples/features/028-data-statements.bas) for every form.
 
 ## Programs
 
@@ -609,7 +609,7 @@ prints `HELLO` and `WORLD`.
 - **`LIST` lists the whole program.** Listing part of it (`LIST 10-20`) is not supported yet and is a `?SYNTAX  ERROR`.
 - **These keywords break names that contain them**: `FRIEND=1` is a `?SYNTAX  ERROR` (it contains `END`), as are names containing `RUN`, `NEW`, `LIST`, `GOTO`, `GO` (`GOLD`), or `TO` (`TOTAL`).
 
-See [`examples/014-program-mode.bas`](../examples/014-program-mode.bas) and [`examples/016-goto.bas`](../examples/016-goto.bas) for every form.
+See [`examples/features/014-program-mode.bas`](../examples/features/014-program-mode.bas) and [`examples/features/016-goto.bas`](../examples/features/016-goto.bas) for every form.
 
 ## Loops
 
@@ -631,7 +631,7 @@ prints ` 1  2  3  4  5 `.
 - **At most 10 loops can be nested**, as on a C64; the 11th is an `?OUT OF MEMORY  ERROR`. Subroutine calls share the same space (see [Subroutines](#subroutines)).
 - **The keywords break names that contain them**: `FORM` and `STEPS` cannot be variable names.
 
-See [`examples/017-loops.bas`](../examples/017-loops.bas) for every form.
+See [`examples/features/017-loops.bas`](../examples/features/017-loops.bas) for every form.
 
 ## Subroutines
 
@@ -654,7 +654,7 @@ prints `IN THE SUBROUTINE`, then `BACK`. The `END` keeps the program from runnin
 - **`RETURN` with no `GOSUB`** to return to is a `?RETURN WITHOUT GOSUB  ERROR`. This is what happens when a program runs on into its subroutines without an `END`.
 - **Loops and subroutines**: `RETURN` ends any loops begun inside the subroutine, and a `NEXT` inside a subroutine cannot continue a loop begun outside it (`?NEXT WITHOUT FOR  ERROR`).
 
-See [`examples/018-subroutines.bas`](../examples/018-subroutines.bas) for every form.
+See [`examples/features/018-subroutines.bas`](../examples/features/018-subroutines.bas) for every form.
 
 ## Computed jumps
 
@@ -675,7 +675,7 @@ goes to line 100 when `C` is 1, 200 when it is 2, and 300 when it is 3.
 - **Only `GOTO` and `GOSUB`** can follow: `ON X GO TO 100` is a `?SYNTAX  ERROR`, as on a C64. The list holds line numbers, not expressions.
 - **`ON` breaks names that contain it**: `MONEY`, `ONE`, and `DONE` cannot be variable names.
 
-See [`examples/023-computed-jumps.bas`](../examples/023-computed-jumps.bas) for every form.
+See [`examples/features/023-computed-jumps.bas`](../examples/features/023-computed-jumps.bas) for every form.
 
 ## Keyboard input
 
@@ -725,7 +725,7 @@ Both read **stdin**:
 
 If the input ends while `INPUT` or `GET` is waiting, c64sh stops with `c64sh: stdin: end of input` and exit status 1. Typed directly, `INPUT` and `GET` are an `?ILLEGAL DIRECT  ERROR`, as on a C64: they work only in a program. Ctrl-C stops a program waiting for input with `BREAK`.
 
-See [`examples/019-keyboard-input.bas`](../examples/019-keyboard-input.bas) for every form.
+See [`examples/features/019-keyboard-input.bas`](../examples/features/019-keyboard-input.bas) for every form.
 
 ## User-defined functions
 
@@ -747,7 +747,7 @@ prints ` 10 `.
 - **Calling a function not yet defined** is an `?UNDEF'D FUNCTION  ERROR`. Definitions are erased with the variables (`RUN`, `NEW`, or changing the program).
 - **A function that calls itself** runs out of room: `?OUT OF MEMORY  ERROR`. At most 9 calls can be in progress at once.
 
-See [`examples/020-user-functions.bas`](../examples/020-user-functions.bas) for every form.
+See [`examples/features/020-user-functions.bas`](../examples/features/020-user-functions.bas) for every form.
 
 ## Saving programs
 
@@ -780,7 +780,7 @@ SAVE "@0:HELLO",8     : REM replaces it
 
 A C64 refuses silently, blinking its drive light; c64sh says `c64sh: HELLO.bas: file exists (use SAVE "@0:HELLO" to replace it)` on stderr, and a script stops with exit status 1. Saving to tape (`SAVE "HELLO"`, device 1) always replaces the file, as recording over a tape does. A name may also start with `0:`, the drive number, which is ignored.
 
-See [`examples/021-saving-programs.bas`](../examples/021-saving-programs.bas) for every form.
+See [`examples/features/021-saving-programs.bas`](../examples/features/021-saving-programs.bas) for every form.
 
 ## Data files
 
@@ -821,7 +821,7 @@ prints `ALICE 12 `, and leaves the file `SCORES` in the current directory.
 - **Files are text** with Unix line ends, so other tools can read and write them.
 - **Errors**: opening a file number already open is `?FILE OPEN  ERROR`, more than 10 open files is `?TOO MANY FILES  ERROR`, a file number not open is `?FILE NOT OPEN  ERROR`, reading an output file (or the screen) is `?NOT INPUT FILE  ERROR`, writing an input file is `?NOT OUTPUT FILE  ERROR`, and opening a missing file to read is `?FILE NOT FOUND  ERROR`.
 
-See [`examples/022-data-files.bas`](../examples/022-data-files.bas) for every form.
+See [`examples/features/022-data-files.bas`](../examples/features/022-data-files.bas) for every form.
 
 ## Environment variables
 
@@ -845,7 +845,7 @@ ENVIRON "PATH=";ENVIRON$("PATH");":/opt/bin"
 - **Changes last for the session**, and programs c64sh starts see them; they do not change the shell that started c64sh.
 - **Errors.** Text without `=`, or with nothing before it, is `?ILLEGAL QUANTITY  ERROR`; a number is `?TYPE MISMATCH  ERROR`.
 
-See [`examples/031-environment.bas`](../examples/031-environment.bas) for every form, and [idiomatic BASIC](idioms.md#the-environment) for common patterns.
+See [`examples/features/031-environment.bas`](../examples/features/031-environment.bas) for every form, and [idiomatic BASIC](idioms.md#the-environment) for common patterns.
 
 ## Comments
 
@@ -974,7 +974,7 @@ These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
 These are planned; the [roadmap](https://github.com/bryanesmith/c64sh/issues/34) lists them in the order they will be added.
 
-Every form c64sh accepts is described in this guide, and shown in use in [`examples/`](../examples/).
+Every form c64sh accepts is described in this guide, and shown in use in [`examples/features/`](../examples/features/).
 
 ## Not planned
 

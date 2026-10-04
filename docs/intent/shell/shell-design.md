@@ -142,6 +142,22 @@ A `StorageError` from executing a line is reported as `c64sh: ` and the file, th
 
 `Main` sets `Config.Terminal` when stdout is a terminal, and `Config.NoColor` when the environment variable `NO_COLOR` is set to a non-empty value (the common convention for turning colors off). `Run` passes them to the interpreter (`SetScreen(cfg.Terminal, !cfg.NoColor)`), which translates the C64's screen control codes in program output (see the interpreter design). Colors stay set until a program changes them, as on a C64, so when the session ends, if stdout is a terminal, the shell writes `ESC[0m` to stdout, so that the user's own shell does not inherit a program's color.
 
+### Styling
+
+The shell colors its own text, so a session is easy to read at a glance: what was typed, what the program printed, and what went wrong. This is a c64sh extension; a C64 shows everything in one color. `Main` sets `Config.Styled` when stderr is a terminal and `Config.NoColor` is not set; without it, the shell writes no escape codes of its own.
+
+| Text | Style |
+|---|---|
+| Typed lines, in the line editor and echoed by `INPUT` at a terminal | cyan, `ESC[36m` |
+| The banner and `READY.` | green, `ESC[32m` |
+| BASIC errors, `BREAK`, storage failures, and the end-of-input message | red, `ESC[31m` |
+
+The styles are the terminal's own 16 theme colors, so they suit light and dark themes, and stay distinct from programs' colors, which are the C64's own as 24-bit colors. Program output (stdout) is never styled by the shell, so redirected output is unchanged.
+
+Each styled span ends with `ESC[0m` followed by the interpreter's `ScreenState`: the color and reverse video a program has left set. So a color a program sets stays in effect for its later output, as on a C64, even when the shell's styled text comes between.
+
+The line editor colors typing with its prompt: the prompt is the input style alone, which `term.Terminal` counts as zero columns wide, so every redraw of the line is in that color; after each line is read, the editor writes the end of the span. The `INPUT` echo writes each typed character as its own styled span.
+
 ## Clock
 
 The interpreter's clock (for `RND(0)`) is the system clock, unless `Config.Clock` is set: tests set a fixed clock, so that programs using it give the same output every run.
@@ -271,6 +287,7 @@ type Config struct {
     Clock       func() time.Time // the interpreter's clock; nil: the system clock
     Terminal    bool             // stdout is a terminal: screen codes become escape codes
     NoColor     bool             // NO_COLOR is set: no colors
+  Styled      bool             // stderr is a terminal and colors are on: the shell styles its own text
     HistoryFile string // line-editor history file; empty: none
 }
 ```
@@ -314,6 +331,9 @@ Functional tests live in `test/functional/` (package `functional_test`). Each te
 | History file location | `$C64SH_HISTORY`, else `~/.c64sh_history`; empty `C64SH_HISTORY` disables | A fixed path; an XDG state directory | Mirrors `bash`'s `HISTFILE`: a user can move or turn off the file, and tests can point it at a temporary directory. A single dotfile in the home directory is the long-standing shell convention. |
 | History file errors | One warning per session, then continue in memory | Silent; fail the session | History is a convenience; a read-only home directory should not stop anyone from using c64sh, but a silent failure would leave users wondering why history is missing. |
 | Concurrent sessions | Last session to save wins | File locking and merging | Simple and predictable; losing some history from overlapping sessions is a minor cost for an interactive convenience. |
+| Shell styling colors | The terminal's 16 theme colors: cyan typing, green `READY.`, red errors | The C64's own colors; bold and faint instead of colors | Theme colors are readable on light and dark terminals, and set the shell's text apart from programs' C64 colors. Red for errors and green for ready are near-universal terminal conventions. |
+| Styling condition | stderr a terminal and `NO_COLOR` unset | stdout a terminal; always in interactive mode | The styled text goes to stderr, so it is stderr that must be a terminal; a redirected stderr gets plain text. |
+| Typed-input color | The line editor's prompt holds the style | Fork or wrap `term.Terminal` to color its echo | `term.Terminal` skips escape codes when measuring the prompt, so a zero-width prompt colors the line with no change to the editor. |
 | Test seam | `Run(Config, …)` beside `Main` | Inject a terminal-detection function; a pseudo-terminal in tests | Keeps `Main` simple and makes interactive tests plain string-in, string-out. |
 
 ## Open Questions & Future Decisions

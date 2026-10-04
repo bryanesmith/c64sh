@@ -106,6 +106,21 @@ If the file cannot be read or written, c64sh prints one `c64sh: history: …` wa
 
 The banner and `READY.` are written to stderr, and program output to stdout, so `c64sh > out.txt` saves only what your BASIC lines print.
 
+### Shell colors
+
+*c64sh extension: a C64 shows everything in one color.*
+
+In a terminal, c64sh colors its own text so you can tell at a glance what you typed, what your program printed, and what went wrong:
+
+| Text | Color |
+|---|---|
+| What you type (including answers to `INPUT`) | cyan |
+| The banner and `READY.` | green |
+| Errors and `BREAK` | red |
+| What your program prints | your terminal's normal color, or the colors the program sets (see [Colors and the screen](#colors-and-the-screen)) |
+
+These are your terminal theme's own colors, so they suit light and dark themes. A color your program sets stays in effect after `READY.` and your typing, as on a C64. Set `NO_COLOR=1` to turn the shell's colors off (along with programs' colors). When stderr is redirected to a file, the shell writes plain text.
+
 ## Scripts
 
 A script is a text file of BASIC lines. c64sh handles them in order, each exactly as if you had typed it: a line with a line number is stored in the program (see [Programs](#programs)), and any other line runs at once:
@@ -833,6 +848,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 - **No screen emulation**: no 40-column wrapping or graphics characters; the screen's control codes, such as colors and clearing the screen, are translated to the terminal's own (see [Colors and the screen](#colors-and-the-screen)), and PETSCII graphics characters are not. So a print zone past column 40 stays on the same line: `PRINT 2,3,4,5,6` prints ` 6 ` at column 40, where a C64 would start a new screen line.
 - **Arithmetic uses standard 64-bit floating point**, rounded to the C64's 9 digits when printed. Results match a C64 in nearly every case; a C64's own rounding occasionally differs in the last digit. Rarely, a loop with a fractional `STEP`, such as `FOR I=0 TO 1 STEP .1`, runs a different number of times than on a C64.
 - **The banner** reads `C64SH BASIC V2`.
+- **The shell colors its own text** in a terminal (see [Shell colors](#shell-colors)); a C64 shows everything in the current color.
 - **Ctrl-C stops a program waiting in `INPUT`.** On a C64, the STOP key does nothing until Return is pressed.
 - **Typed input keeps lowercase letters**, where a C64 keyboard types uppercase.
 - **Programs are saved as text**, not as the C64's tokenized program files, and every device that holds programs is the current directory.

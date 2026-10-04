@@ -111,3 +111,11 @@ Design: `shell-design.md`
 
 - [x] **SHELL-SCREEN-001**: When `shell.Main` runs, it shall set `Config.Terminal` if stdout is a terminal, and `Config.NoColor` if the environment variable `NO_COLOR` is set to a non-empty value; `Run` shall set the interpreter's screen to `Config.Terminal`, with colors on unless `Config.NoColor` is set.
 - [x] **SHELL-SCREEN-002**: When a session ends and `Config.Terminal` is set, the shell shall write `ESC[0m` to stdout.
+
+## Styling
+
+- [x] **SHELL-STYLE-001**: When `shell.Main` runs, it shall set `Config.Styled` if stderr is a terminal and `Config.NoColor` is not set.
+- [x] **SHELL-STYLE-002**: While `Config.Styled` is set, the shell shall write the banner and each `READY.` in green (`ESC[32m`), and BASIC errors, `BREAK` messages, storage failures, and the end-of-input message in red (`ESC[31m`), each as a styled span.
+- [x] **SHELL-STYLE-003**: While `Config.Styled` is set, the shell shall show typed text in cyan (`ESC[36m`): in the line editor, by setting its prompt to `ESC[36m` and ending a styled span after each line read, and in the `INPUT` echo at a terminal, writing each typed character as a styled span.
+- [x] **SHELL-STYLE-004**: The shell shall end each styled span by writing `ESC[0m` followed by the interpreter's `ScreenState`.
+- [x] **SHELL-STYLE-005**: While `Config.Styled` is not set, the shell shall write no escape codes to stderr other than the line editor's own.

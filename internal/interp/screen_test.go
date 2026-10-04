@@ -19,15 +19,22 @@ func TestReturnAndCursorRight(t *testing.T) {
 	for _, terminal := range []bool{false, true} {
 		out, col := screenOutput(t, terminal, true, `PRINT "A";CHR$(13);"B";CHR$(29);"C";`)
 		want := "A\nB C"
-		if terminal {
-			want = "A\x1b[27m\nB C"
-		}
 		if out != want || col != 3 {
 			t.Errorf("terminal %v: %q, column %d; want %q, 3", terminal, out, col, want)
 		}
 	}
 	if out, _ := screenOutput(t, false, true, `PRINT "A";CHR$(141);"B"`); out != "A\nB\n" {
 		t.Errorf("CHR$(141): %q", out)
+	}
+	// Every Return turns reverse off, including the one ending a PRINT.
+	for _, tc := range []struct{ src, want string }{
+		{`PRINT CHR$(18);"A":PRINT "B"`, "\x1b[7mA\x1b[27m\nB\n"},
+		{`PRINT CHR$(18);"A";CHR$(13);"B";`, "\x1b[7mA\x1b[27m\nB"},
+		{`PRINT CHR$(18);"A";CHR$(141);CHR$(13);`, "\x1b[7mA\x1b[27m\n\n"},
+	} {
+		if out, _ := screenOutput(t, true, true, tc.src); out != tc.want {
+			t.Errorf("%s: %q; want %q", tc.src, out, tc.want)
+		}
 	}
 }
 
@@ -77,7 +84,7 @@ func TestScreenCodesLeftOut(t *testing.T) {
 	if out, col := screenOutput(t, false, true, `PRINT CHR$(147);CHR$(28);"A";CHR$(18);"B";CHR$(17);CHR$(157);`); out != "AB" || col != 2 {
 		t.Errorf("not a terminal: %q, column %d; want \"AB\", 2", out, col)
 	}
-	if out, _ := screenOutput(t, true, false, `PRINT CHR$(28);CHR$(18);"A"`); out != "\x1b[7mA\n" {
+	if out, _ := screenOutput(t, true, false, `PRINT CHR$(28);CHR$(18);"A"`); out != "\x1b[7mA\x1b[27m\n" {
 		t.Errorf("colors off: %q, want reverse kept and color left out", out)
 	}
 	if out, _ := screenOutput(t, false, true, `PRINT "A"+CHR$(9)+"B"`); out != "A\tB\n" {

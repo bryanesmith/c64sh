@@ -14,6 +14,9 @@ REM A color stays until another is printed, so set it back afterwards
 PRINT CHR$(158);"WARNING:";CHR$(154);" LOW FUEL":REM WARNING: LOW FUEL
 REM CHR$(18) turns reverse video on, CHR$(146) off
 PRINT CHR$(18);" MENU ";CHR$(146);" CHOOSE ONE":REM " MENU  CHOOSE ONE"
+REM Reverse also ends with the line, as every Return turns it off
+PRINT CHR$(18);"ALL OF THIS LINE":REM ALL OF THIS LINE
+PRINT "NONE OF THIS ONE":REM NONE OF THIS ONE
 REM CHR$(29) moves the cursor right, and becomes a space everywhere
 PRINT "A";CHR$(29);CHR$(29);"B":REM A  B
 REM CHR$(13) is Return: it starts a new line

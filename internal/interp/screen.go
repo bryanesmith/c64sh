@@ -46,11 +46,11 @@ func (in *Interp) translate(s string, col int) (string, int) {
 		raw := s[i : i+size] // an invalid byte is written as it is
 		i += size
 		switch r {
-		case '\n':
-			b, col = append(b, '\n'), 0
-		case 13, 141:
-			if in.terminal {
-				b = append(b, "\x1b[27m"...)
+		case '\n', 13, 141:
+			// Every Return turns reverse off on a C64, including the one
+			// ending a PRINT.
+			if in.reverse {
+				b, in.reverse = append(b, "\x1b[27m"...), false
 			}
 			b, col = append(b, '\n'), 0
 		case 29:
@@ -73,6 +73,8 @@ func (in *Interp) translate(s string, col int) (string, int) {
 			}
 			b = append(b, esc...)
 			switch r {
+			case 18, 146:
+				in.reverse = r == 18
 			case 157:
 				col = max(col-1, 0)
 			case 19, 147:

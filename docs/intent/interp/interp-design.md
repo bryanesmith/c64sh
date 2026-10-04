@@ -172,7 +172,7 @@ On a C64, printing certain characters controls the screen instead of showing a c
 
 | Code | On a C64 | Terminal | Not a terminal | Column |
 |---|---|---|---|---|
-| 13, 141 | Return: next line, reverse off | reverse off, `\n` | `\n` | 0 |
+| 13, 141, and the newline ending a `PRINT` | Return: next line, reverse off | `\n`, after `ESC[27m` if reverse is on | `\n` | 0 |
 | 29 | Cursor right | a space | a space | +1 |
 | 157 | Cursor left | `ESC[D` | left out | -1 (not below 0) on a terminal |
 | 17, 145 | Cursor down, up | `ESC[B`, `ESC[A` | left out | unchanged |
@@ -182,6 +182,8 @@ On a C64, printing certain characters controls the screen instead of showing a c
 | 144, 5, 28, 159, 156, 30, 31, 158, 129, 149, 150, 151, 152, 153, 154, 155 | The 16 colors, black to light gray | the color, as 24-bit `ESC[38;2;R;G;Bm` | left out | unchanged |
 
 Every other character is written as it is. The colors are the C64's own (the measured "Pepto" palette): black, white, red, cyan, purple, green, blue, yellow, orange, brown, light red, dark gray, gray, light green, light blue, light gray, in the order of the codes above. When colors are off, the color codes are left out even on a terminal; the other codes are still translated. As on a C64, a color stays in effect until another is printed; the interpreter does not reset it (see the shell design).
+
+The interpreter remembers whether reverse video is on (after `18`, until `146` or a Return), so that it writes `ESC[27m` at a Return only when it changes something; ordinary lines carry no escape codes.
 
 The cursor-right code becomes a space everywhere, as a comma's move to a print zone does: in a terminal, output only appears after the cursor, so a space looks the same.
 

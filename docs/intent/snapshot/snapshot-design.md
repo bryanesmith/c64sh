@@ -132,6 +132,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `026-print-formatting.bas` | `TAB` columns with a ruler, `TAB` past its column, `SPC`, a bar chart, a line left open by `TAB`, `POS(0)`, and `?ILLEGAL QUANTITY  ERROR` |
 | `027-arrays.bas` | `DIM` of number, string, and integer arrays, arrays separate from plain variables, a two-dimensional multiplication table, an array used without `DIM`, the largest-value and swap idioms, and `?REDIM'D ARRAY  ERROR IN 60` |
 | `028-data-statements.bas` | `READ` and `DATA`, a table ended by a marker value, filling an array from `DATA`, quoted items and keywords as text, `RESTORE`, and `?OUT OF DATA  ERROR IN 10` |
+| `029-clock.bas` | `TI` and `TI$` (with the fixed clock), setting `TI$`, a timer, seeding `RND(-TI)` after a key press (its key comes from `029-clock.input`), and `TI=0` as a `?SYNTAX  ERROR` |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

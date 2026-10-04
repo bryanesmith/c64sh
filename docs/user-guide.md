@@ -14,6 +14,7 @@ For hands-on examples, see the numbered scripts in [`examples/`](../examples/). 
 - [Arithmetic](#arithmetic)
 - [Number functions](#number-functions)
 - [String functions](#string-functions)
+- [The clock](#the-clock)
 - [Comparisons](#comparisons)
 - [Logic](#logic)
 - [IF … THEN](#if--then)
@@ -307,6 +308,27 @@ See [`examples/024-number-functions.bas`](../examples/024-number-functions.bas) 
 - **The function names break variable names that contain them**: `VALUE` contains `VAL`, and `LENGTH` contains `LEN`.
 
 See [`examples/025-string-functions.bas`](../examples/025-string-functions.bas) for every form.
+
+## The clock
+
+**`TI`** counts jiffies, sixtieths of a second, since c64sh started, as a C64's clock counts from when it is switched on. **`TI$`** is the same clock as six digits, `HHMMSS`:
+
+```
+TI$="000000"
+…
+PRINT "THAT TOOK";INT(TI/60);"SECONDS"
+```
+
+- **Set the clock** by assigning six digits to `TI$`; anything else is an `?ILLEGAL QUANTITY  ERROR`. `TI` itself cannot be assigned (`TI=0` is a `?SYNTAX  ERROR`). Both wrap to 0 after 24 hours.
+- **Seeding `RND`**: `X=RND(-TI)` starts a sequence that depends on the clock. Since a script starts the moment it runs, seed after waiting for a key, as C64 games did, so the player's timing makes each game different:
+
+  ```
+  10 PRINT "PRESS A KEY"
+  20 GET K$:IF K$="" THEN 20
+  30 X=RND(-TI)
+  ```
+
+See [`examples/029-clock.bas`](../examples/029-clock.bas) for every form.
 
 ## Comparisons
 
@@ -791,7 +813,6 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
-- The clock variables `TI` and `TI$`
 - `FRE`
 - `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands

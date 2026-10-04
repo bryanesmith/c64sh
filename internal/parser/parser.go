@@ -30,7 +30,7 @@ import (
 // @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
 // @spec PARSER-048, PARSER-049, PARSER-050, PARSER-051, PARSER-052, PARSER-053, PARSER-054
 // @spec PARSER-055, PARSER-056
-// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065, PARSER-066, PARSER-067, PARSER-068, PARSER-069, PARSER-070, PARSER-071, PARSER-072, PARSER-073, PARSER-074, PARSER-075, PARSER-076
+// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065, PARSER-066, PARSER-067, PARSER-068, PARSER-069, PARSER-070, PARSER-071, PARSER-072, PARSER-073, PARSER-074, PARSER-075, PARSER-076, PARSER-077
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -563,14 +563,10 @@ func (p *parser) parseLetStatement() (*ast.LetStmt, error) {
 
 // Variable = name [ "(" Expression { "," Expression } ")" ] .
 //
-// A name followed by "(" is an array element. The C64's clock (TI, TI$)
-// is not supported and is a SYNTAX error.
+// A name followed by "(" is an array element.
 func (p *parser) parseVariable() (*ast.VarRef, error) {
 	text := p.next().Value
 	v := &ast.VarRef{Name: variableIdentity(text), Text: text}
-	if v.Name == "TI" || v.Name == "TI$" {
-		return nil, syntaxError()
-	}
 	if p.accept(token.LParen) {
 		for {
 			sub, err := p.parseExpression()
@@ -613,10 +609,10 @@ func (p *parser) parseDimStatement() (ast.Stmt, error) {
 }
 
 // parseAssignable parses a variable that is assigned to, which cannot be
-// ST, the read-only I/O status.
+// ST or TI, the read-only I/O status and clock.
 func (p *parser) parseAssignable() (*ast.VarRef, error) {
 	v, err := p.parseVariable()
-	if err == nil && v.Name == "ST" {
+	if err == nil && (v.Name == "ST" || v.Name == "TI") {
 		return nil, syntaxError()
 	}
 	return v, err

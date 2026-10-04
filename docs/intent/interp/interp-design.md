@@ -67,8 +67,9 @@ var ErrInterrupted = errors.New("interrupted")
 // the console's input. It is not a BASIC error.
 var ErrEndOfInput = errors.New("end of input")
 
-// SetClock sets the clock that RND(0) reads. Without one, it is the
-// system clock.
+// SetClock sets the clock that RND(0), TI, and TI$ read, and starts TI
+// at 0 by it. Without one, it is the system clock, with TI starting at 0
+// when the Interp is created.
 func (in *Interp) SetClock(now func() time.Time)
 
 // SetConsole sets where INPUT and GET read. Without one, they find the
@@ -473,6 +474,12 @@ String functions evaluate their arguments in order; each must have its type (a s
 | `ASC(S$)` | The code of the first character (its Unicode code point); `ILLEGAL QUANTITY` for the empty string (`$B78B`). |
 | `STR$(X)` | `X` formatted as `PRINT` formats it, without the space after: `STR$(5)` is `" 5"`. |
 | `VAL(S$)` | The number `S$` starts with, read as `INPUT` reads a number (spaces skipped, stopping at the first character that cannot continue it); 0 if there is none; `OVERFLOW` if too large (`$B7AD`). |
+
+## The clock
+
+`TI` counts **jiffies**, sixtieths of a second, as the C64's clock does: it starts at 0 when the `Interp` is created (or a clock is set with `SetClock`), the counterpart of a C64's power-on, and counts the clock's time since, rounded down to whole jiffies. `TI$` is the same clock as six digits, hours, minutes, and seconds: `TI` of 216000 is `"010000"`. Both wrap to 0 after 24 hours (5184000 jiffies).
+
+Assigning to `TI$` sets the clock, as the ROM does (`$A9DA`): the value must be six characters, all digits (else `ILLEGAL QUANTITY`), read as `HHMMSS`, and the clock counts on from that many jiffies (hours, minutes, and seconds are not range-checked, as in the ROM, beyond wrapping at 24 hours). `TI` cannot be assigned (see the parser design).
 
 ## Variables
 

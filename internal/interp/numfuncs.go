@@ -14,9 +14,13 @@ import (
 // switched on.
 const initialSeed = 0x2545f4914f6cdd1d
 
-// SetClock sets the clock that RND(0) reads. Without one, it is the
-// system clock.
-func (in *Interp) SetClock(now func() time.Time) { in.clock = now }
+// SetClock sets the clock that RND(0), TI, and TI$ read, and starts TI
+// at 0 by it. Without one, it is the system clock, with TI starting at 0
+// when the Interp is created.
+func (in *Interp) SetClock(now func() time.Time) {
+	in.clock = now
+	in.tiStart, in.tiBase = now(), 0
+}
 
 // now returns the clock's time.
 func (in *Interp) now() time.Time {

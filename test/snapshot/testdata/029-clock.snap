@@ -1,0 +1,9 @@
+exit status: 1
+--- stdout ---
+ 0 000000
+123000 2700000 
+ELAPSED 0 SECONDS
+PRESS A KEY
+SEEDED
+--- stderr ---
+?SYNTAX  ERROR

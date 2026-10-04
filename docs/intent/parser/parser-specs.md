@@ -22,7 +22,7 @@ Design: `parser-design.md`
 - [x] **PARSER-021**: When a statement begins with a `Name` token, or with a `Let` token followed by a `Name` token, followed by `=` and an expression, the parser shall produce an `*ast.LetStmt` assigning that expression to the variable (`A=5` and `LET A=5` produce the same node).
 - [x] **PARSER-022**: When parsing a `Name` token as a variable, the parser shall produce an `*ast.VarRef` whose `Name` is the name's first character, its second character if it has one, and `$` or `%` if the name ends in `$` or `%`, and whose `Text` is the token's value (`HEIGHT` is `Name` `HE`, `NAME$` is `NA$`, `N$` is `N$`, `A1B` is `A1`, and `COUNT%` is `CO%`).
 - [x] **PARSER-023**: When a `Name` token appears where an operand is expected, the parser shall produce an `*ast.VarRef` as the operand.
-- [x] **PARSER-024**: If a variable's identity (`VarRef.Name`) is `TI` or `TI$`, then the parser shall return a SYNTAX error, whether the name is assigned or used as an operand (the C64's clock is not supported; `TI%` is an ordinary integer variable).
+- [x] **PARSER-024**: The parser shall accept `TI` and `TI$` as operands, and `TI$` as an assigned variable.
 - [x] **PARSER-025**: If a `LET` is not followed by a name, or an assignment's name is not followed by `=`, or `=` is not followed by an expression, then the parser shall return a SYNTAX error.
 - [x] **PARSER-026**: When parsing sums (`+` and `-` expressions) joined by a comparison operator, the parser shall produce left-associative `*ast.CompareExpr` nodes, binding more loosely than every arithmetic operator (`1+1=2` is `(1+1)=2`, and `1<2<3` is `(1<2)<3`).
 - [x] **PARSER-027**: When parsing a comparison operator, the parser shall read a run of one or more `Less`, `Equal`, and `Greater` tokens, in any order, adding `ast.RelLess`, `ast.RelEqual`, or `ast.RelGreater` to the operator's `Relation` for each (`<>` and `><` are less-or-greater, `<=` and `=<` less-or-equal, `>=` and `=>` greater-or-equal, and `<=>` all three); if a token repeats within one operator (`==`, `<<`), then it shall return a SYNTAX error.
@@ -119,3 +119,7 @@ Design: `parser-design.md`
 
 - [x] **PARSER-075**: When a statement is a `Data` token, the parser shall produce an `*ast.DataStmt` holding its text; when it is `READ` followed by one or more variables separated by commas, an `*ast.ReadStmt`; and when it is `RESTORE` followed by `:` or `EOL`, an `*ast.RestoreStmt`.
 - [x] **PARSER-076**: If `READ` lacks a variable or its list is not followed by `:` or `EOL`, or `RESTORE` is followed by anything other than `:` or `EOL`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.
+
+## Clock
+
+- [x] **PARSER-077**: If `TI` or `ST` is assigned, by `LET`, `FOR`, `INPUT`, `GET`, `INPUT#`, or `READ`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.

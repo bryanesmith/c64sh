@@ -555,11 +555,12 @@ func TestVariableOperands(t *testing.T) {
 }
 
 // @spec PARSER-024
-func TestUnsupportedNames(t *testing.T) {
+func TestSystemVariableNames(t *testing.T) {
 	runParseCases(t, []parseCase{
-		{"TI used", toks(pr, name("TI")), `PRINT[BAD(SYNTAX)]`, true},
-		{"TIME used", toks(pr, name("TIME")), `PRINT[BAD(SYNTAX)]`, true},
-		{"TI$ used", toks(pr, name("TI$")), `PRINT[BAD(SYNTAX)]`, true},
+		{"TI used", toks(pr, name("TI")), `PRINT[$TI[TI]]`, false},
+		{"TIME used", toks(pr, name("TIME")), `PRINT[$TI[TIME]]`, false},
+		{"TI$ used", toks(pr, name("TI$")), `PRINT[$TI$[TI$]]`, false},
+		{"TI$ assigned", toks(name("TI$"), eq, str("000000")), `LET $TI$[TI$]="000000"`, false},
 		{"ST is readable", toks(pr, name("STATUS")), `PRINT[$ST[STATUS]]`, false},
 		{"TI assigned", toks(name("TI"), eq, number("1")), `BADSTMT`, true},
 		{"T and I separately are fine", toks(pr, name("T"), semi, name("IT")), `PRINT[$T[T] ; $IT[IT]]`, false},
@@ -1019,7 +1020,7 @@ func TestStatusVariable(t *testing.T) {
 		{"read ST", toks(pr, name("ST")), `PRINT[$ST[ST]]`, false},
 		{"assign ST", toks(name("ST"), eq, number("1")), `BADSTMT`, true},
 		{"LET ST", toks(let, name("STATUS"), eq, number("1")), `BADSTMT`, true},
-		{"TI still reserved", toks(pr, name("TI")), `PRINT[BAD(SYNTAX)]`, true},
+		{"TI readable", toks(pr, name("TI")), `PRINT[$TI[TI]]`, false},
 	})
 }
 
@@ -1164,5 +1165,17 @@ func TestDataSyntaxErrors(t *testing.T) {
 		{"READ alone", toks(read), `BADSTMT`, true},
 		{"READ number", toks(read, number("1")), `BADSTMT`, true},
 		{"RESTORE line", toks(restore, number("100")), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-077
+func TestReadOnlySystemVariables(t *testing.T) {
+	read := token.Token{Kind: token.Read, Value: "READ"}
+	runParseCases(t, []parseCase{
+		{"LET TI", toks(name("TI"), eq, number("1")), `BADSTMT`, true},
+		{"FOR TI", toks(fork, name("TI"), eq, number("1"), tok, number("2")), `BADSTMT`, true},
+		{"INPUT TI", toks(input, name("TI")), `BADSTMT`, true},
+		{"READ ST", toks(read, name("ST")), `BADSTMT`, true},
+		{"TI% is ordinary", toks(name("TI%"), eq, number("1")), `LET $TI%[TI%]=#1`, false},
 	})
 }

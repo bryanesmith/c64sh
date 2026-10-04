@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bryanesmith/c64sh/internal/interp"
 	"github.com/bryanesmith/c64sh/internal/shell"
 )
 
@@ -283,7 +284,7 @@ func TestScreenCodes(t *testing.T) {
 	if got := run(shell.Config{Terminal: true}); got != "\x1b[38;2;104;55;43mX\n\x1b[0m" {
 		t.Errorf("terminal: %q", got)
 	}
-	if got := run(shell.Config{Terminal: true, NoColor: true}); got != "X\n\x1b[0m" {
+	if got := run(shell.Config{Terminal: true, Env: interp.MapEnvironment{"NO_COLOR": "1"}}); got != "X\n\x1b[0m" {
 		t.Errorf("NO_COLOR: %q", got)
 	}
 	if got := run(shell.Config{}); got != "X\n" {

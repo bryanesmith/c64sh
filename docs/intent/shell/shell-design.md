@@ -98,14 +98,15 @@ When interactive mode runs with **both stdin and stderr connected to a terminal*
 
 ### History File
 
-When the line editor is used and a history file is configured (`Config.HistoryFile`), the editor's history is kept in that file as well as in memory.
+When the line editor is used and there is a history file, the editor's history is kept in that file as well as in memory.
 
-- **Location.** `Main` uses the path in the environment variable `C64SH_HISTORY` if it is set; an empty value turns the history file off. Otherwise it uses `.c64sh_history` in the user's home directory. If the home directory cannot be determined, there is no history file.
+- **Location.** The setting `C64SH_HISTORY` names the file if it is set; an empty value turns the history file off. Otherwise it is `.c64sh_history` in the home directory (`Config.Home`). If the home directory is unknown, there is no history file.
 - **Format.** Plain text, one line of input per line, oldest first, each followed by `\n`. Lines never contain a line feed, since input is split at line feeds.
-- **Loading.** At the start of the session the file is read, a trailing `\r` is removed from each line (for a file edited on Windows), blank lines are skipped, and the most recent 100 lines become the history, so the up arrow recalls lines from earlier sessions. A missing file is an empty history.
-- **Saving.** Each time a line is added to history, the whole history (at most 100 lines) is written to a temporary file in the same directory, which is then renamed over the history file. The file is therefore never left half-written, and a session killed at any moment keeps every line added before that moment. The file is created with permissions `0600`, readable only by the user, since commands may contain private text.
+- **Loading.** At the start of the session the file is read, a trailing `\r` is removed from each line (for a file edited on Windows), blank lines are skipped, and the most recent lines, up to the history size (the setting `C64SH_HISTSIZE`, 100 by default), become the history, so the up arrow recalls lines from earlier sessions. A missing file is an empty history.
+- **Saving.** Each time a line is added to history, the whole history (at most the history size) is written to a temporary file in the same directory, which is then renamed over the history file. The file is therefore never left half-written, and a session killed at any moment keeps every line added before that moment. The file is created with permissions `0600`, readable only by the user, since commands may contain private text.
 - **Errors.** If the file exists but cannot be read, or cannot be written, the shell writes one warning, `c64sh: history: <reason>`, to stderr for the session and continues with the history in memory, retrying later saves silently.
 - **Several sessions at once.** Each session keeps its own history in memory and rewrites the file with it, so the session that saves last determines the file's contents; lines from a concurrent session that saved earlier may be lost from the file, though not from that session's memory.
+- **A history size of 0** keeps no history, and the file is neither read nor written, so turning history off for a while does not empty the file.
 - **Only for the line editor.** Script mode, pipes, and any input read without the editor never read or write the history file.
 
 **Raw mode.** Arrow keys and Ctrl-C reach the editor only when the terminal is in raw mode. The shell switches stdin to raw mode just before reading each line and restores the terminal's previous mode as soon as the line is read, before it runs. Program output, errors, and `READY.` are therefore written with the terminal in its normal mode, exactly as without line editing. The previous mode is restored on every path out of line reading, including errors.
@@ -140,19 +141,19 @@ A `StorageError` from executing a line is reported as `c64sh: ` and the file, th
 
 ## Terminal Output
 
-`Main` sets `Config.Terminal` when stdout is a terminal, and `Config.NoColor` when the environment variable `NO_COLOR` is set to a non-empty value (the common convention for turning colors off). `Run` passes them to the interpreter (`SetScreen(cfg.Terminal, !cfg.NoColor)`), which translates the C64's screen control codes in program output (see the interpreter design). Colors stay set until a program changes them, as on a C64, so when the session ends, if stdout is a terminal, the shell writes `ESC[0m` to stdout, so that the user's own shell does not inherit a program's color.
+`Main` sets `Config.Terminal` when stdout is a terminal. `Run` passes it to the interpreter, with colors on unless the setting `NO_COLOR` is non-empty (the common convention for turning colors off) (`SetScreen`), which translates the C64's screen control codes in program output (see the interpreter design). Colors stay set until a program changes them, as on a C64, so when the session ends, if stdout is a terminal, the shell writes `ESC[0m` to stdout, so that the user's own shell does not inherit a program's color.
 
 ### Styling
 
-The shell colors its own text, so a session is easy to read at a glance: what was typed, what the program printed, and what went wrong. This is a c64sh extension; a C64 shows everything in one color. `Main` sets `Config.Styled` when stderr is a terminal and `Config.NoColor` is not set; without it, the shell writes no escape codes of its own.
+The shell colors its own text, so a session is easy to read at a glance: what was typed, what the program printed, and what went wrong. This is a c64sh extension; a C64 shows everything in one color. `Main` sets `Config.StderrTerminal` when stderr is a terminal; the shell styles its text when that is set and the setting `NO_COLOR` is not, and otherwise writes no escape codes of its own.
 
-| Text | Style |
-|---|---|
-| Typed lines, in the line editor and echoed by `INPUT` at a terminal | cyan, `ESC[36m` |
-| The banner and `READY.` | green, `ESC[32m` |
-| BASIC errors, `BREAK`, storage failures, and the end-of-input message | red, `ESC[31m` |
+| Text | Setting | Default |
+|---|---|---|
+| Typed lines, in the line editor and echoed by `INPUT` at a terminal | `C64SH_INPUT_COLOR` | `36`, cyan |
+| The banner and `READY.` | `C64SH_READY_COLOR` | `32`, green |
+| BASIC errors, `BREAK`, storage failures, the end-of-input message, and errors in the run-commands file | `C64SH_ERROR_COLOR` | `31`, red |
 
-The styles are the terminal's own 16 theme colors, so they suit light and dark themes, and stay distinct from programs' colors, which are the C64's own as 24-bit colors. Program output (stdout) is never styled by the shell, so redirected output is unchanged.
+Each style is written as `ESC[` + the setting + `m`; an empty setting leaves that text unstyled. The default styles are the terminal's own 16 theme colors, so they suit light and dark themes, and stay distinct from programs' colors, which are the C64's own as 24-bit colors. Program output (stdout) is never styled by the shell, so redirected output is unchanged.
 
 Each styled span ends with `ESC[0m` followed by the interpreter's `ScreenState`: the color and reverse video a program has left set. So a color a program sets stays in effect for its later output, as on a C64, even when the shell's styled text comes between.
 
@@ -160,7 +161,32 @@ The line editor colors typing with its prompt: the prompt is the input style alo
 
 ## Environment
 
-`Config.Env` is the environment the interpreter's `ENVIRON$` and `ENVIRON` use (`SetEnvironment`); when it is nil, the interpreter keeps its own empty one. `Main` sets it to the process's own environment (`os.LookupEnv`, `os.Setenv`, `os.Unsetenv`, `os.Environ`), so that changes reach programs c64sh starts. Tests leave it nil or give a `MapEnvironment`.
+`Config.Env` is the environment the interpreter's `ENVIRON$` and `ENVIRON` use (`SetEnvironment`), and where the shell reads its settings; when it is nil, the interpreter keeps its own empty one, and every setting has its default. `Main` sets it to the process's own environment (`os.LookupEnv`, `os.Setenv`, `os.Unsetenv`, `os.Environ`), so that changes reach programs c64sh starts. Tests leave it nil or give a `MapEnvironment`.
+
+## Settings
+
+*c64sh extension.* The shell's settings are environment variables, so they can come from the user's own shell or be set in the run-commands file with `ENVIRON`; c64sh has no configuration format of its own.
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `NO_COLOR` | Non-empty: no colors, neither the shell's styling nor programs' colors | unset |
+| `C64SH_HISTORY` | The history file; empty: none | `~/.c64sh_history` |
+| `C64SH_HISTSIZE` | How many lines history keeps, a whole number from 0 | 100 |
+| `C64SH_INPUT_COLOR`, `C64SH_READY_COLOR`, `C64SH_ERROR_COLOR` | Styles of typed input, of the banner and `READY.`, and of errors: SGR parameters, digits separated by `;` (such as `1;31` or `38;2;108;94;181`); empty: unstyled | `36`, `32`, `31` |
+| `C64SH_RC` | The run-commands file; empty: none (read before the file runs, from the starting environment) | `~/.c64shrc` |
+
+The colors use the SGR-parameter convention of `GREP_COLORS`, `LS_COLORS`, and `GCC_COLORS`, which reaches every terminal color, including the C64's own as 24-bit colors. An empty color turns that styling off while programs keep their colors.
+
+`Run` reads the settings when it starts, and in an interactive session again after the run-commands file has run, so the file can set any of them; the second reading decides the session's settings, and a later change takes effect in the next session. A history size or color that is not valid is reported once, from the reading that decides, as `c64sh: NAME: invalid value "VALUE"`, and its default is used.
+
+## Run-commands file
+
+*c64sh extension*, like `~/.zshrc`. An interactive session runs the run-commands file first, before the banner: `C64SH_RC` if it is set (empty: none), otherwise `.c64shrc` in `Config.Home`. Scripts never run it, so a script behaves the same for everyone.
+
+- **Plain c64sh BASIC.** Each line is handled as if typed: a numbered line is stored, any other runs in direct mode; blank lines are skipped. No `READY.` is written after its lines. Variables and program lines it sets stay for the session.
+- **Errors.** The first error stops the file, as it stops a script, and is reported with the file and line number in front of the usual message, as compilers report errors: `c64sh: /Users/me/.c64shrc:3: ?SYNTAX  ERROR`. The session then starts normally. A storage failure is reported the same way, and end of input stops the session, as at the prompt.
+- **A missing file** is fine and says nothing; a file that exists but cannot be read is reported as `c64sh: FILE: reason`, and the session starts without it.
+- **Break glass.** `C64SH_RC= c64sh` starts a session without the file, for when the file itself is the problem.
 
 ## Clock
 
@@ -288,12 +314,11 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int
 type Config struct {
     Interactive bool
     File        string // empty: read from stdin
-    Clock       func() time.Time // the interpreter's clock; nil: the system clock
-    Terminal    bool             // stdout is a terminal: screen codes become escape codes
-    NoColor     bool             // NO_COLOR is set: no colors
-    Styled      bool             // stderr is a terminal and colors are on: the shell styles its own text
-    HistoryFile string // line-editor history file; empty: none
-    Env         interp.Environment // ENVIRON's environment; nil: the interpreter's own, empty
+    Clock          func() time.Time   // the interpreter's clock; nil: the system clock
+    Terminal       bool               // stdout is a terminal: screen codes become escape codes
+    StderrTerminal bool               // stderr is a terminal: the shell may style its own text
+    Env            interp.Environment // ENVIRON's environment and the shell's settings; nil: empty
+    Home           string             // home directory, for ~/.c64shrc and ~/.c64sh_history; empty: unknown
 }
 ```
 
@@ -339,6 +364,12 @@ Functional tests live in `test/functional/` (package `functional_test`). Each te
 | Shell styling colors | The terminal's 16 theme colors: cyan typing, green `READY.`, red errors | The C64's own colors; bold and faint instead of colors | Theme colors are readable on light and dark terminals, and set the shell's text apart from programs' C64 colors. Red for errors and green for ready are near-universal terminal conventions. |
 | Styling condition | stderr a terminal and `NO_COLOR` unset | stdout a terminal; always in interactive mode | The styled text goes to stderr, so it is stderr that must be a terminal; a redirected stderr gets plain text. |
 | Typed-input color | The line editor's prompt holds the style | Fork or wrap `term.Terminal` to color its echo | `term.Terminal` skips escape codes when measuring the prompt, so a zero-width prompt colors the line with no change to the editor. |
+| Configuration | Environment variables, set in a run-commands file of plain BASIC with `ENVIRON` | A separate config file format (TOML, `key=value`); command-line flags | One mechanism for everything: settings are ordinary environment variables, so they can come from anywhere, and the file is just BASIC, needing nothing new to learn. Flags would not reach a login shell. |
+| Run-commands file | `~/.c64shrc`, interactive sessions only, before the banner | `~/.c64sh` as a directory; also for scripts; after the banner | The `rc` suffix is the Unix convention for files of startup commands. Scripts skip it to stay reproducible. Running first lets it set the banner's colors. |
+| Settings reading | At start, and after the run-commands file; later changes wait for the next session | Re-read after every line | Keeps the history file and size fixed for the session, so history is never reloaded or truncated mid-session. |
+| Error in the run-commands file | Stop the file, report `c64sh: FILE:N: message`, start the session | Ignore errors and continue; end c64sh | Stopping matches scripts; a broken file must never lock the user out of their shell, which matters most when c64sh is the login shell. `FILE:N:` is the compilers' convention for naming a place. |
+| Color settings | SGR parameters | Color names (`cyan`); C64 color numbers | SGR is the convention of `GREP_COLORS` and `LS_COLORS`, reaching bold and 24-bit colors that names cannot; examples in the user guide cover the common ones. |
+| History size 0 | Keep none, and leave the file alone | Empty the file | Turning history off should not destroy the saved history. |
 | Test seam | `Run(Config, …)` beside `Main` | Inject a terminal-detection function; a pseudo-terminal in tests | Keeps `Main` simple and makes interactive tests plain string-in, string-out. |
 
 ## Open Questions & Future Decisions

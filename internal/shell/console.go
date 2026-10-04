@@ -56,7 +56,7 @@ func (c *lineConsole) ReadKey(stop func() bool) (string, error) {
 type ttyConsole struct {
 	in    io.Reader
 	echo  io.Writer // where ReadLine echoes typing
-	style style     // how echoed typing is styled
+	style *style    // how echoed typing is styled; nil: unstyled
 	buf   []byte    // bytes read but not yet returned as keys
 }
 
@@ -152,7 +152,10 @@ func (c *ttyConsole) ReadLine(stop func() bool) (string, bool, error) {
 		default:
 			if r, _ := utf8.DecodeRuneInString(key); r >= ' ' && (r < 0x80 || r > 0x9f) {
 				line = append(line, r)
-				io.WriteString(c.echo, c.style.paint(c.style.input, key))
+				if c.style != nil {
+					key = c.style.paint(c.style.input, key)
+				}
+				io.WriteString(c.echo, key)
 			}
 		}
 	}

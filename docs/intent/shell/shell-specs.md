@@ -32,7 +32,7 @@ Design: `shell-design.md`
 - [x] **SHELL-EDIT-001**: When interactive mode runs with both stdin and stderr connected to terminals, the shell shall read each line with the `golang.org/x/term` line editor, echoing keystrokes to stderr.
 - [x] **SHELL-EDIT-002**: If stdin or stderr is not a terminal, or the shell is in script mode, then the shell shall read lines without the line editor, as SHELL-LINE-001 to SHELL-LINE-003 specify.
 - [x] **SHELL-EDIT-003**: While a line is read with the line editor, the up arrow (or Ctrl-P) shall replace the line with the previous entry of the session's history, and the down arrow (or Ctrl-N) with the next, more recent entry, returning to the line being typed after the most recent entry.
-- [x] **SHELL-EDIT-004**: The shell shall add each line read with the line editor to the session's history, except blank lines and lines discarded with Ctrl-C, keeping the most recent 100 entries (including any loaded from the history file, SHELL-HIST-002).
+- [x] **SHELL-EDIT-004**: The shell shall add each line read with the line editor to the session's history, except blank lines and lines discarded with Ctrl-C, keeping the most recent entries up to the history size (SHELL-SET-002), including any loaded from the history file (SHELL-HIST-002); with a history size of 0, it shall keep none and neither read nor write the history file.
 - [x] **SHELL-EDIT-005**: When Ctrl-C is pressed while a line is read with the line editor, the shell shall discard that line without running it or adding it to history, and read a new line.
 - [x] **SHELL-EDIT-006**: When Ctrl-D is pressed on an empty line read with the line editor, the shell shall treat it as the end of input (SHELL-INT-006).
 - [x] **SHELL-EDIT-007**: The shell shall switch stdin to raw mode immediately before reading each line with the line editor and restore stdin's previous mode after the line is read, whether or not reading succeeded, so that each line runs with the terminal in its previous mode.
@@ -41,8 +41,8 @@ Design: `shell-design.md`
 
 ## History file
 
-- [x] **SHELL-HIST-001**: When `shell.Main` runs, it shall set `Config.HistoryFile` to the value of the environment variable `C64SH_HISTORY` if that variable is set (so an empty value means no history file), and otherwise to `.c64sh_history` in the user's home directory, or to empty if the home directory cannot be determined.
-- [x] **SHELL-HIST-002**: When the line editor is used and `Config.HistoryFile` is not empty, the shell shall start the session's history with the most recent 100 non-blank lines of that file (oldest first, one line per line of the file, with any trailing `\r` removed), so that the up arrow recalls lines from earlier sessions; a missing file shall give an empty history.
+- [x] **SHELL-HIST-001**: When the shell reads its settings, it shall take the history file from the setting `C64SH_HISTORY` if that variable is set (so an empty value means no history file), and otherwise `.c64sh_history` in `Config.Home`, or no history file if `Config.Home` is empty.
+- [x] **SHELL-HIST-002**: When the line editor is used and `Config.HistoryFile` is not empty, the shell shall start the session's history with the most recent non-blank lines of that file, up to the history size (SHELL-SET-002) (oldest first, one line per line of the file, with any trailing `\r` removed), so that the up arrow recalls lines from earlier sessions; a missing file shall give an empty history.
 - [x] **SHELL-HIST-003**: When a line is added to the history of a line editor with a history file, the shell shall write the whole history, oldest first, each line followed by `\n`, to a new temporary file in the history file's directory with permissions `0600`, and rename it over the history file.
 - [x] **SHELL-HIST-004**: If the history file exists but cannot be read, or cannot be written, then the shell shall write `c64sh: history: ` followed by the reason to stderr, at most once per session, and continue with the history in memory.
 - [x] **SHELL-HIST-005**: When lines are read without the line editor (script mode, pipes, or input that is not a terminal), the shell shall neither read nor write the history file.
@@ -109,17 +109,32 @@ Design: `shell-design.md`
 
 ## Environment
 
-- [x] **SHELL-ENV-001**: When `shell.Main` runs, it shall set `Config.Env` to the process's environment; when `Config.Env` is set, `Run` shall set it as the interpreter's environment.
+- [x] **SHELL-ENV-001**: When `shell.Main` runs, it shall set `Config.Env` to the process's environment and `Config.Home` to the user's home directory (empty if unknown); when `Config.Env` is set, `Run` shall set it as the interpreter's environment.
 
 ## Terminal output
 
-- [x] **SHELL-SCREEN-001**: When `shell.Main` runs, it shall set `Config.Terminal` if stdout is a terminal, and `Config.NoColor` if the environment variable `NO_COLOR` is set to a non-empty value; `Run` shall set the interpreter's screen to `Config.Terminal`, with colors on unless `Config.NoColor` is set.
+- [x] **SHELL-SCREEN-001**: When `shell.Main` runs, it shall set `Config.Terminal` if stdout is a terminal; whenever the shell reads its settings, it shall set the interpreter's screen to `Config.Terminal`, with colors on unless the setting `NO_COLOR` is non-empty.
 - [x] **SHELL-SCREEN-002**: When a session ends and `Config.Terminal` is set, the shell shall write `ESC[0m` to stdout.
 
 ## Styling
 
-- [x] **SHELL-STYLE-001**: When `shell.Main` runs, it shall set `Config.Styled` if stderr is a terminal and `Config.NoColor` is not set.
-- [x] **SHELL-STYLE-002**: While `Config.Styled` is set, the shell shall write the banner and each `READY.` in green (`ESC[32m`), and BASIC errors, `BREAK` messages, storage failures, and the end-of-input message in red (`ESC[31m`), each as a styled span.
-- [x] **SHELL-STYLE-003**: While `Config.Styled` is set, the shell shall show typed text in cyan (`ESC[36m`): in the line editor, by setting its prompt to `ESC[36m` and ending a styled span after each line read, and in the `INPUT` echo at a terminal, writing each typed character as a styled span.
+- [x] **SHELL-STYLE-001**: When `shell.Main` runs, it shall set `Config.StderrTerminal` if stderr is a terminal; the shell shall style its own text while `Config.StderrTerminal` is set and the setting `NO_COLOR` is not non-empty.
+- [x] **SHELL-STYLE-002**: While the shell styles its own text, it shall write the banner and each `READY.` in the ready style, and BASIC errors, `BREAK` messages, storage failures, the end-of-input message, and errors in the run-commands file in the error style, each as a styled span.
+- [x] **SHELL-STYLE-003**: While the shell styles its own text, it shall show typed text in the input style: in the line editor, by setting its prompt to the input style and ending a styled span after each line read, and in the `INPUT` echo at a terminal, writing each typed character as a styled span.
 - [x] **SHELL-STYLE-004**: The shell shall end each styled span by writing `ESC[0m` followed by the interpreter's `ScreenState`.
-- [x] **SHELL-STYLE-005**: While `Config.Styled` is not set, the shell shall write no escape codes to stderr other than the line editor's own.
+- [x] **SHELL-STYLE-005**: While the shell does not style its own text, it shall write no escape codes to stderr other than the line editor's own, and while it does, it shall write text whose style is empty with no escape codes.
+
+## Settings
+
+- [x] **SHELL-SET-001**: The shell shall read its settings from `Config.Env` (every setting at its default when it is nil) when `Run` starts, and in interactive mode again after the run-commands file has run, the second reading deciding the session's history file, history size, styles, and colors.
+- [x] **SHELL-SET-002**: When the shell reads its settings, it shall take the history size from `C64SH_HISTSIZE`, a whole number from 0 written in digits, or 100 if the variable is unset or empty.
+- [x] **SHELL-SET-003**: When the shell reads its settings, it shall take the input, ready, and error styles from `C64SH_INPUT_COLOR`, `C64SH_READY_COLOR`, and `C64SH_ERROR_COLOR`, each `ESC[` followed by the value and `m` when the value is one or more groups of digits separated by `;`, no style when the value is empty, and `ESC[36m`, `ESC[32m`, and `ESC[31m` respectively when the variable is unset.
+- [x] **SHELL-SET-004**: If the reading of the settings that decides them finds `C64SH_HISTSIZE` or a color setting with a value that is not valid, then the shell shall write `c64sh: NAME: invalid value "VALUE"` to stderr for each such variable and use that setting's default.
+
+## Run-commands file
+
+- [x] **SHELL-RC-001**: When an interactive session starts, before the banner, the shell shall run the run-commands file: the file named by `C64SH_RC` in `Config.Env` if it is set, none if its value is empty, and otherwise `.c64shrc` in `Config.Home`, or none if `Config.Home` is empty.
+- [x] **SHELL-RC-002**: While running the run-commands file, the shell shall handle each non-blank line as if typed in interactive mode (SHELL-MODE-004), with any trailing `\r` removed, writing no `READY.` after it.
+- [x] **SHELL-RC-003**: If a line of the run-commands file reports a BASIC error or a storage failure, then the shell shall write `c64sh: `, the file's path, `:`, the line's number in the file, `: `, and the message it would otherwise write (for a storage failure, without its `c64sh: `) to stderr, run no more of the file, and start the session.
+- [x] **SHELL-RC-004**: If the run-commands file does not exist, then the shell shall start the session without writing anything; if it exists but cannot be read, then the shell shall write `c64sh: `, its path, `: `, and the reason to stderr and start the session.
+- [x] **SHELL-RC-005**: In script mode, the shell shall not run the run-commands file.

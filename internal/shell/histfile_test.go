@@ -2,21 +2,28 @@ package shell
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/bryanesmith/c64sh/internal/interp"
 )
 
 // editorSession runs a line editor on keys with the given history file and
 // returns the lines read and the warnings written.
 func editorSession(t *testing.T, file, keys string) ([]string, string) {
 	t.Helper()
+	return editorSessionSized(t, file, defaultHistorySize, keys)
+}
+
+// editorSessionSized is editorSession with a history size.
+func editorSessionSized(t *testing.T, file string, size int, keys string) ([]string, string) {
+	t.Helper()
 	var warn bytes.Buffer
-	e := newEditorReader(strings.NewReader(keys), io.Discard, (&fakeRaw{}).raw, noSize, file, &warn)
+	e := newEditorReader(strings.NewReader(keys), io.Discard, (&fakeRaw{}).raw, noSize, file, size, &warn)
 	var lines []string
 	for {
 		line, err := e.ReadLine()
@@ -37,31 +44,6 @@ func readFile(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(data)
-}
-
-// @spec SHELL-HIST-001
-func TestDefaultHistoryFile(t *testing.T) {
-	env := func(vars map[string]string) func(string) (string, bool) {
-		return func(k string) (string, bool) { v, ok := vars[k]; return v, ok }
-	}
-	home := func() (string, error) { return "/home/me", nil }
-	noHome := func() (string, error) { return "", errors.New("no home") }
-	cases := []struct {
-		name string
-		env  map[string]string
-		home func() (string, error)
-		want string
-	}{
-		{"home directory", nil, home, filepath.Join("/home/me", ".c64sh_history")},
-		{"environment variable", map[string]string{"C64SH_HISTORY": "/tmp/h"}, home, "/tmp/h"},
-		{"empty environment variable disables", map[string]string{"C64SH_HISTORY": ""}, home, ""},
-		{"no home directory", nil, noHome, ""},
-	}
-	for _, c := range cases {
-		if got := defaultHistoryFile(env(c.env), c.home); got != c.want {
-			t.Errorf("%s: %q, want %q", c.name, got, c.want)
-		}
-	}
 }
 
 // @spec SHELL-HIST-002
@@ -164,11 +146,33 @@ func TestHistoryFileErrorsWarnOnce(t *testing.T) {
 func TestNoHistoryFileWithoutEditor(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "history")
 	var stdout, stderr bytes.Buffer
-	cfg := Config{Interactive: true, HistoryFile: file}
+	cfg := Config{Interactive: true, Env: interp.MapEnvironment{"C64SH_HISTORY": file}}
 	Run(cfg, strings.NewReader("PRINT 1\n"), &stdout, &stderr)
 	cfg.Interactive = false
 	Run(cfg, strings.NewReader("PRINT 2\n"), &stdout, &stderr)
 	if _, err := os.Stat(file); !os.IsNotExist(err) {
 		t.Errorf("history file exists after sessions without the line editor (err %v)", err)
+	}
+}
+
+// @spec SHELL-EDIT-004, SHELL-HIST-002
+func TestHistorySize(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "history")
+	os.WriteFile(file, []byte("A\nB\nC\n"), 0o600)
+	lines, _ := editorSessionSized(t, file, 2, strings.Repeat(keyUp, 5)+keyEnter)
+	if len(lines) != 1 || lines[0] != "B" {
+		t.Errorf("oldest recalled %q, want B (size 2 loads the last 2)", lines)
+	}
+	if got := readFile(t, file); got != "C\nB\n" {
+		t.Errorf("file %q, want %q (the 2 most recent lines)", got, "C\nB\n")
+	}
+
+	os.WriteFile(file, []byte("KEEP\n"), 0o600)
+	lines, _ = editorSessionSized(t, file, 0, "X"+keyEnter+keyUp+keyEnter)
+	if strings.Join(lines, "|") != "X|" {
+		t.Errorf("size 0: lines %q, want no history to recall", lines)
+	}
+	if got := readFile(t, file); got != "KEEP\n" {
+		t.Errorf("size 0: file %q, want it untouched", got)
 	}
 }

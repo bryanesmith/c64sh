@@ -14,8 +14,9 @@ import (
 	"golang.org/x/term"
 )
 
-// historySize is how many lines the line editor's history keeps.
-const historySize = 100
+// defaultHistorySize is how many lines the line editor's history keeps
+// unless C64SH_HISTSIZE says otherwise.
+const defaultHistorySize = 100
 
 // ctrlC is the byte a terminal in raw mode sends for Ctrl-C.
 const ctrlC = 0x03
@@ -99,8 +100,9 @@ type editorReader struct {
 
 // newEditorReader returns a line editor reading keystrokes from in and
 // echoing to echo. raw switches the terminal to raw mode around each line;
-// size reports the terminal's size.
-func newEditorReader(in io.Reader, echo io.Writer, raw rawModeFunc, size sizeFunc, historyFile string, warn io.Writer) *editorReader {
+// size reports the terminal's size. History keeps historySize lines, saved
+// in historyFile.
+func newEditorReader(in io.Reader, echo io.Writer, raw rawModeFunc, size sizeFunc, historyFile string, historySize int, warn io.Writer) *editorReader {
 	filter := &cancelFilter{r: in}
 	t := term.NewTerminal(struct {
 		io.Reader
@@ -109,7 +111,11 @@ func newEditorReader(in io.Reader, echo io.Writer, raw rawModeFunc, size sizeFun
 	h := &history{
 		skip: func() bool { return filter.cancelled },
 		file: historyFile,
+		size: historySize,
 		warn: warn,
+	}
+	if historySize == 0 {
+		h.file = "" // keeping none leaves the file alone
 	}
 	h.load()
 	t.History = h
@@ -124,22 +130,6 @@ func newEditorReader(in io.Reader, echo io.Writer, raw rawModeFunc, size sizeFun
 func (e *editorReader) setStyle(st style) {
 	e.style = st
 	e.term.SetPrompt(st.input)
-}
-
-// defaultHistoryFile returns the history file Main uses: $C64SH_HISTORY if
-// set (empty turns the file off), otherwise ~/.c64sh_history, or none if
-// the home directory is unknown.
-//
-// @spec SHELL-HIST-001
-func defaultHistoryFile(lookupEnv func(string) (string, bool), homeDir func() (string, error)) string {
-	if path, ok := lookupEnv("C64SH_HISTORY"); ok {
-		return path
-	}
-	home, err := homeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".c64sh_history")
 }
 
 // ReadLine returns the next line entered, skipping lines discarded with
@@ -228,7 +218,7 @@ func (f *cancelFilter) Read(p []byte) (int, error) {
 }
 
 // history is the line editor's history of lines entered in the session. It
-// keeps the most recent historySize lines and ignores blank lines and lines
+// keeps the most recent size lines and ignores blank lines and lines
 // being discarded with Ctrl-C. With a history file, it starts from the
 // file's lines and saves itself to the file after each line is added.
 //
@@ -237,17 +227,18 @@ type history struct {
 	entries []string // oldest first
 	skip    func() bool
 	file    string    // history file; empty: none
+	size    int       // how many entries it keeps
 	warn    io.Writer // where a history-file problem is reported
 	warned  bool      // whether it has been reported this session
 }
 
 func (h *history) Add(entry string) {
-	if isBlank(entry) || (h.skip != nil && h.skip()) {
+	if isBlank(entry) || (h.skip != nil && h.skip()) || h.size == 0 {
 		return
 	}
 	h.entries = append(h.entries, entry)
-	if len(h.entries) > historySize {
-		h.entries = h.entries[len(h.entries)-historySize:]
+	if len(h.entries) > h.size {
+		h.entries = h.entries[len(h.entries)-h.size:]
 	}
 	h.save()
 }
@@ -274,8 +265,8 @@ func (h *history) load() {
 			h.entries = append(h.entries, line)
 		}
 	}
-	if len(h.entries) > historySize {
-		h.entries = h.entries[len(h.entries)-historySize:]
+	if len(h.entries) > h.size {
+		h.entries = h.entries[len(h.entries)-h.size:]
 	}
 }
 

@@ -99,7 +99,7 @@ While typing a line you can edit it and recall earlier lines:
 | Ctrl-C | Discard the line you are typing |
 | Ctrl-D | On an empty line, end the session |
 
-History holds the last 100 lines you ran (blank lines are skipped), and is **saved between sessions** in `~/.c64sh_history`, so after restarting c64sh the up arrow still recalls earlier commands. The file is plain text, one command per line, readable only by you.
+History holds the last 100 lines you ran (see [Settings](#settings) to change that) (blank lines are skipped), and is **saved between sessions** in `~/.c64sh_history`, so after restarting c64sh the up arrow still recalls earlier commands. The file is plain text, one command per line, readable only by you.
 
 To keep history somewhere else, set `C64SH_HISTORY` to a file path; to turn saving off, set it to an empty value:
 
@@ -125,7 +125,62 @@ In a terminal, c64sh colors its own text so you can tell at a glance what you ty
 | Errors and `BREAK` | red |
 | What your program prints | your terminal's normal color, or the colors the program sets (see [Colors and the screen](#colors-and-the-screen)) |
 
-These are your terminal theme's own colors, so they suit light and dark themes. A color your program sets stays in effect after `READY.` and your typing, as on a C64. Set `NO_COLOR=1` to turn the shell's colors off (along with programs' colors). When stderr is redirected to a file, the shell writes plain text.
+These are your terminal theme's own colors, so they suit light and dark themes, and you can choose others (see [Settings](#settings)). A color your program sets stays in effect after `READY.` and your typing, as on a C64. Set `NO_COLOR=1` to turn the shell's colors off (along with programs' colors). When stderr is redirected to a file, the shell writes plain text.
+
+### Startup file: ~/.c64shrc
+
+*c64sh extension: a C64 has no startup file.*
+
+When an interactive session starts, c64sh first runs `~/.c64shrc`, if it exists, as `zsh` runs `~/.zshrc`. It holds ordinary c64sh BASIC, each line handled as if you typed it, so it can set [settings](#settings) with [`ENVIRON`](#environment-variables), define variables, store program lines, or print a greeting. Scripts never run it.
+
+A sample `~/.c64shrc` with every setting:
+
+```
+REM ~/.c64shrc: run at the start of every interactive c64sh session
+REM How many lines history keeps (default 100)
+ENVIRON "C64SH_HISTSIZE=500"
+REM Where history is saved (default ~/.c64sh_history; empty: not saved)
+ENVIRON "C64SH_HISTORY=";ENVIRON$("HOME");"/.c64sh_history"
+REM Colors: SGR codes, as in GREP_COLORS (empty: no color)
+ENVIRON "C64SH_INPUT_COLOR=36"
+ENVIRON "C64SH_READY_COLOR=32"
+ENVIRON "C64SH_ERROR_COLOR=1;31"
+REM Uncomment to turn all colors off
+REM ENVIRON "NO_COLOR=1"
+REM Anything else you like: a variable, a greeting
+RE$=CHR$(28)
+PRINT "HELLO, ";ENVIRON$("USER")
+```
+
+- **Storing a program line clears variables**, as on a C64, so set variables after any program lines.
+- **An error stops the file**, naming the file and line, such as `c64sh: /Users/me/.c64shrc:3: ?SYNTAX  ERROR`, and the session starts anyway.
+- **Break glass:** `C64SH_RC= c64sh` starts a session without the file; `C64SH_RC=/path/to/file` runs a different one.
+- Settings take effect when the file has run; changing one later in a session takes effect in the next session.
+
+### Settings
+
+*c64sh extension.*
+
+c64sh's settings are environment variables. Set them in [`~/.c64shrc`](#startup-file-c64shrc) with `ENVIRON`, or in the environment c64sh starts in (`export C64SH_HISTSIZE=500`).
+
+| Variable | Does | Default |
+|---|---|---|
+| `NO_COLOR` | Any value but empty turns off all colors: the shell's and programs' | unset |
+| `C64SH_HISTORY` | The file history is saved in; empty: history is not saved | `~/.c64sh_history` |
+| `C64SH_HISTSIZE` | How many lines history keeps; `0` keeps none (and leaves the file alone) | `100` |
+| `C64SH_INPUT_COLOR` | Color of what you type | `36` (cyan) |
+| `C64SH_READY_COLOR` | Color of the banner and `READY.` | `32` (green) |
+| `C64SH_ERROR_COLOR` | Color of errors and `BREAK` | `31` (red) |
+| `C64SH_RC` | The startup file; empty: none | `~/.c64shrc` |
+
+Colors are SGR codes, as in `GREP_COLORS` and `LS_COLORS`, joined with `;`:
+
+| Code | Color | Code | Color |
+|---|---|---|---|
+| `30`–`37` | black, red, green, yellow, blue, magenta, cyan, white | `90`–`97` | bright versions of the same |
+| `1` | bold (`1;31` is bold red) | `38;2;R;G;B` | any 24-bit color (`38;2;108;94;181` is the C64's light blue) |
+
+An empty color, such as `ENVIRON "C64SH_INPUT_COLOR="`, leaves that text uncolored; set all three empty to turn off the shell's colors while programs keep theirs. A value c64sh can't read is reported once (`c64sh: C64SH_HISTSIZE: invalid value "LOTS"`) and the default is used.
 
 ## Scripts
 
@@ -882,6 +937,8 @@ These features are c64sh's own: they are not part of Commodore 64 BASIC V2 and d
 |---|---|
 | [Editing and history](#editing-and-history) | Edit the line you are typing, and recall earlier lines, even from earlier sessions |
 | [Shell colors](#shell-colors) | Color what you type, `READY.`, and errors differently |
+| [Startup file](#startup-file-c64shrc) | Run `~/.c64shrc` at the start of every interactive session |
+| [Settings](#settings) | Choose history size, history file, and colors with environment variables |
 
 **Language**
 

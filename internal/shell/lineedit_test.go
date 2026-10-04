@@ -37,7 +37,7 @@ func noSize() (int, int, bool) { return 0, 0, false }
 func readAll(t *testing.T, keys string) []string {
 	t.Helper()
 	fr := &fakeRaw{}
-	e := newEditorReader(strings.NewReader(keys), io.Discard, fr.raw, noSize, "", io.Discard)
+	e := newEditorReader(strings.NewReader(keys), io.Discard, fr.raw, noSize, "", defaultHistorySize, io.Discard)
 	var lines []string
 	for i := 0; i < 1000; i++ {
 		line, err := e.ReadLine()
@@ -64,7 +64,7 @@ func checkLines(t *testing.T, name, keys string, want ...string) {
 // @spec SHELL-EDIT-001
 func TestEditorEchoesToGivenWriter(t *testing.T) {
 	var echo bytes.Buffer
-	e := newEditorReader(strings.NewReader("HELLO"+keyEnter), &echo, (&fakeRaw{}).raw, noSize, "", io.Discard)
+	e := newEditorReader(strings.NewReader("HELLO"+keyEnter), &echo, (&fakeRaw{}).raw, noSize, "", defaultHistorySize, io.Discard)
 	if line, err := e.ReadLine(); err != nil || line != "HELLO" {
 		t.Fatalf("ReadLine = %q, %v; want HELLO", line, err)
 	}
@@ -123,7 +123,7 @@ func TestHistoryNavigation(t *testing.T) {
 // @spec SHELL-EDIT-004
 func TestHistoryContents(t *testing.T) {
 	checkLines(t, "blank lines are not added", "A"+keyEnter+keyEnter+"  "+keyEnter+keyUp+keyEnter, "A", "", "  ", "A")
-	h := &history{}
+	h := &history{size: defaultHistorySize}
 	for i := 0; i < 101; i++ {
 		h.Add(strings.Repeat("x", i+1))
 	}
@@ -156,7 +156,7 @@ func TestCtrlDEndsInputOnEmptyLine(t *testing.T) {
 // @spec SHELL-EDIT-007
 func TestRawModeOnlyWhileReading(t *testing.T) {
 	fr := &fakeRaw{}
-	e := newEditorReader(strings.NewReader("A"+keyEnter+"B"+keyEnter), io.Discard, fr.raw, noSize, "", io.Discard)
+	e := newEditorReader(strings.NewReader("A"+keyEnter+"B"+keyEnter), io.Discard, fr.raw, noSize, "", defaultHistorySize, io.Discard)
 	for i := 1; i <= 2; i++ {
 		if _, err := e.ReadLine(); err != nil {
 			t.Fatal(err)
@@ -173,7 +173,7 @@ func TestRawModeOnlyWhileReading(t *testing.T) {
 	}
 
 	failing := func() (func(), error) { return nil, errors.New("not a terminal") }
-	e = newEditorReader(strings.NewReader("A"+keyEnter), io.Discard, failing, noSize, "", io.Discard)
+	e = newEditorReader(strings.NewReader("A"+keyEnter), io.Discard, failing, noSize, "", defaultHistorySize, io.Discard)
 	if _, err := e.ReadLine(); err == nil {
 		t.Errorf("ReadLine with a failing raw-mode switch returned no error")
 	}

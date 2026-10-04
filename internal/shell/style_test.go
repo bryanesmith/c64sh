@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/bryanesmith/c64sh/internal/interp"
 )
 
 const (
@@ -26,7 +28,7 @@ func runStyled(t *testing.T, cfg Config, stdin string) (string, string) {
 
 // @spec SHELL-STYLE-002, SHELL-STYLE-004
 func TestStyledSession(t *testing.T) {
-	stdout, stderr := runStyled(t, Config{Interactive: true, Styled: true}, "PRINT \"HI\"\nX\n10 GOTO 10\n")
+	stdout, stderr := runStyled(t, Config{Interactive: true, StderrTerminal: true}, "PRINT \"HI\"\nX\n10 GOTO 10\n")
 	want := "\n" + green + "    **** C64SH BASIC V2 ****\n\nREADY." + reset + "\n" +
 		green + "READY." + reset + "\n" +
 		red + "?SYNTAX  ERROR" + reset + "\n" +
@@ -38,7 +40,7 @@ func TestStyledSession(t *testing.T) {
 	if stdout != "HI\n" {
 		t.Errorf("stdout %q: program output is not styled", stdout)
 	}
-	_, stderr = runStyled(t, Config{Styled: true}, "10 PRINT 1/0\n")
+	_, stderr = runStyled(t, Config{StderrTerminal: true}, "10 PRINT 1/0\n")
 	if want := red + "?DIVISION BY ZERO  ERROR IN 10" + reset + "\n"; stderr != want {
 		t.Errorf("error in a line: %q; want %q", stderr, want)
 	}
@@ -46,7 +48,7 @@ func TestStyledSession(t *testing.T) {
 
 // @spec SHELL-STYLE-002
 func TestStyledFailures(t *testing.T) {
-	_, stderr := runStyled(t, Config{Styled: true}, "10 INPUT A\n")
+	_, stderr := runStyled(t, Config{StderrTerminal: true}, "10 INPUT A\n")
 	if want := red + "c64sh: stdin: end of input" + reset + "\n"; stderr != want {
 		t.Errorf("end of input: %q; want %q", stderr, want)
 	}
@@ -55,7 +57,7 @@ func TestStyledFailures(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(".", "P.bas"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, stderr = runStyled(t, Config{Styled: true}, "10 END\nSAVE \"P\",8\n")
+	_, stderr = runStyled(t, Config{StderrTerminal: true}, "10 END\nSAVE \"P\",8\n")
 	if want := red + "c64sh: P.bas: file exists (use SAVE \"@0:P\" to replace it)" + reset + "\n"; stderr != want {
 		t.Errorf("storage failure: %q; want %q", stderr, want)
 	}
@@ -63,7 +65,7 @@ func TestStyledFailures(t *testing.T) {
 
 // @spec SHELL-STYLE-004
 func TestStyleKeepsProgramScreenState(t *testing.T) {
-	_, stderr := runStyled(t, Config{Interactive: true, Styled: true, Terminal: true}, "PRINT CHR$(28);\n")
+	_, stderr := runStyled(t, Config{Interactive: true, StderrTerminal: true, Terminal: true}, "PRINT CHR$(28);\n")
 	want := green + "READY." + reset + "\x1b[38;2;104;55;43m\n"
 	if !strings.Contains(stderr, want) {
 		t.Errorf("stderr %q; want it to contain %q", stderr, want)
@@ -76,6 +78,11 @@ func TestUnstyledWritesNoEscapes(t *testing.T) {
 	if strings.Contains(stderr, "\x1b") {
 		t.Errorf("stderr %q has escape codes", stderr)
 	}
+	env := interp.MapEnvironment{"C64SH_READY_COLOR": "", "C64SH_ERROR_COLOR": ""}
+	_, stderr = runStyled(t, Config{Interactive: true, StderrTerminal: true, Env: env}, "X\n")
+	if want := "\n    **** C64SH BASIC V2 ****\n\nREADY.\n?SYNTAX  ERROR\nREADY.\n\n"; stderr != want {
+		t.Errorf("empty styles: stderr %q, want %q", stderr, want)
+	}
 }
 
 // @spec SHELL-STYLE-003
@@ -83,7 +90,7 @@ func TestStyledTyping(t *testing.T) {
 	st := style{input: cyan, end: func() string { return "<END>" }}
 
 	var echo bytes.Buffer
-	e := newEditorReader(strings.NewReader("HI"+keyEnter), &echo, (&fakeRaw{}).raw, noSize, "", io.Discard)
+	e := newEditorReader(strings.NewReader("HI"+keyEnter), &echo, (&fakeRaw{}).raw, noSize, "", defaultHistorySize, io.Discard)
 	e.setStyle(st)
 	if line, err := e.ReadLine(); err != nil || line != "HI" {
 		t.Fatalf("ReadLine = %q, %v", line, err)
@@ -93,7 +100,7 @@ func TestStyledTyping(t *testing.T) {
 	}
 
 	echo.Reset()
-	c := &ttyConsole{in: &chunkReader{chunks: []string{"AB\x7f\r"}}, echo: &echo, style: st}
+	c := &ttyConsole{in: &chunkReader{chunks: []string{"AB\x7f\r"}}, echo: &echo, style: &st}
 	if line, _, err := c.ReadLine(never); err != nil || line != "A" {
 		t.Fatalf("console ReadLine = %q, %v", line, err)
 	}
@@ -104,18 +111,12 @@ func TestStyledTyping(t *testing.T) {
 
 // @spec SHELL-STYLE-001
 func TestStyledCondition(t *testing.T) {
-	if styled(io.Discard, false) {
-		t.Error("styled(io.Discard, false) = true")
+	_, stderr := runStyled(t, Config{Interactive: true, StderrTerminal: true}, "")
+	if !strings.Contains(stderr, green) {
+		t.Errorf("stderr %q: want styling when stderr is a terminal", stderr)
 	}
-	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
-	if err != nil {
-		t.Skipf("no controlling terminal: %v", err)
-	}
-	defer tty.Close()
-	if !styled(tty, false) {
-		t.Error("styled(tty, false) = false")
-	}
-	if styled(tty, true) {
-		t.Error("styled(tty, true) = true: NO_COLOR turns styling off")
+	_, stderr = runStyled(t, Config{Interactive: true, StderrTerminal: true, Env: interp.MapEnvironment{"NO_COLOR": "1"}}, "X\n")
+	if strings.Contains(stderr, "\x1b") {
+		t.Errorf("stderr %q: NO_COLOR turns styling off", stderr)
 	}
 }

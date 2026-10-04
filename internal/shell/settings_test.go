@@ -189,3 +189,47 @@ func TestScriptsSkipRunCommands(t *testing.T) {
 		t.Errorf("stdout %q: a script must not run the run-commands file", stdout)
 	}
 }
+
+// @spec SHELL-SET-005
+func TestStringLimitSetting(t *testing.T) {
+	cases := []struct {
+		value   string
+		set     bool
+		want    int
+		invalid bool
+	}{
+		{"", false, -1, false},
+		{"", true, -1, false},
+		{"-1", true, -1, false},
+		{"255", true, 255, false},
+		{"0", true, 0, false},
+		{"-2", true, -1, true},
+		{"LOTS", true, -1, true},
+		{"+5", true, -1, true},
+	}
+	for _, c := range cases {
+		env := interp.MapEnvironment{}
+		if c.set {
+			env["C64SH_STRING_LIMIT"] = c.value
+		}
+		s := readSettings(env, "")
+		if s.stringLimit != c.want || (len(s.invalid) == 1) != c.invalid {
+			t.Errorf("%q: limit %d, invalid %v; want %d, invalid %v", c.value, s.stringLimit, s.invalid, c.want, c.invalid)
+		}
+	}
+
+	long := "A$=\"\"\nFOR I=1 TO 300:A$=A$+\"X\":NEXT\nPRINT LEN(A$)\n"
+	stdout, stderr := runStyled(t, Config{}, long)
+	if stdout != " 300 \n" || stderr != "" {
+		t.Errorf("unlimited by default: stdout %q, stderr %q", stdout, stderr)
+	}
+	_, stderr = runStyled(t, Config{Env: interp.MapEnvironment{"C64SH_STRING_LIMIT": "255"}}, long)
+	if stderr != "?STRING TOO LONG  ERROR\n" {
+		t.Errorf("limit 255: stderr %q", stderr)
+	}
+	home := rcFixture(t, "ENVIRON \"C64SH_STRING_LIMIT=255\"\n")
+	_, stderr = runStyled(t, Config{Interactive: true, Home: home, Env: interp.MapEnvironment{}}, long)
+	if !strings.Contains(stderr, "?STRING TOO LONG  ERROR") {
+		t.Errorf("limit set in the run-commands file: stderr %q", stderr)
+	}
+}

@@ -129,7 +129,8 @@ Design: `shell-design.md`
 - [x] **SHELL-SET-001**: The shell shall read its settings from `Config.Env` (every setting at its default when it is nil) when `Run` starts, and in interactive mode again after the run-commands file has run, the second reading deciding the session's history file, history size, styles, and colors.
 - [x] **SHELL-SET-002**: When the shell reads its settings, it shall take the history size from `C64SH_HISTSIZE`, a whole number from 0 written in digits, or 100 if the variable is unset or empty.
 - [x] **SHELL-SET-003**: When the shell reads its settings, it shall take the input, ready, and error styles from `C64SH_INPUT_COLOR`, `C64SH_READY_COLOR`, and `C64SH_ERROR_COLOR`, each `ESC[` followed by the value and `m` when the value is one or more groups of digits separated by `;`, no style when the value is empty, and `ESC[36m`, `ESC[32m`, and `ESC[31m` respectively when the variable is unset.
-- [x] **SHELL-SET-004**: If the reading of the settings that decides them finds `C64SH_HISTSIZE` or a color setting with a value that is not valid, then the shell shall write `c64sh: NAME: invalid value "VALUE"` to stderr for each such variable and use that setting's default.
+- [x] **SHELL-SET-005**: When the shell reads its settings, it shall set the interpreter's string limit to `C64SH_STRING_LIMIT`, -1 or a whole number from 0 written in digits, or -1 (no limit) if the variable is unset or empty.
+- [x] **SHELL-SET-004**: If the reading of the settings that decides them finds `C64SH_HISTSIZE`, `C64SH_STRING_LIMIT`, or a color setting with a value that is not valid, then the shell shall write `c64sh: NAME: invalid value "VALUE"` to stderr for each such variable and use that setting's default.
 
 ## Run-commands file
 

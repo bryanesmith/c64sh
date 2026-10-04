@@ -169,11 +169,13 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 // apply puts the shell's settings into effect: colors in program output,
-// unless NO_COLOR, and the shell's styles, when stderr is a terminal.
+// unless NO_COLOR, the string limit, and the shell's styles, when stderr
+// is a terminal.
 //
 // @spec SHELL-SCREEN-001, SHELL-STYLE-001
 func (s *session) apply(cfg Config, set settings) {
 	s.interp.SetScreen(cfg.Terminal, !set.noColor)
+	s.interp.SetStringLimit(set.stringLimit)
 	s.style = style{}
 	if cfg.StderrTerminal && !set.noColor {
 		s.style = newStyle(s.interp, set)

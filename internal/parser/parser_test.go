@@ -179,11 +179,7 @@ func dumpStmt(s ast.Stmt) string {
 	case *ast.RestoreStmt:
 		return "RESTORE"
 	case *ast.EnvironStmt:
-		var parts []string
-		for _, e := range s.Parts {
-			parts = append(parts, dumpExpr(e))
-		}
-		return "ENVIRON " + strings.Join(parts, ";")
+		return "ENVIRON " + dumpExpr(s.Value)
 	case *ast.DimStmt:
 		return "DIM " + dumpVars(s.Arrays)
 	case *ast.ListStmt:
@@ -1179,7 +1175,7 @@ func TestEnviron(t *testing.T) {
 	environ := token.Token{Kind: token.Environ, Value: "ENVIRON"}
 	runParseCases(t, []parseCase{
 		{"one part", toks(environ, str("A=1")), `ENVIRON "A=1"`, false},
-		{"parts", toks(environ, str("P="), semi, fun("ENVIRON$"), lp, str("P"), rp, semi, str(":X")), `ENVIRON "P=";ENVIRON$("P");":X"`, false},
+		{"expression", toks(environ, str("P="), plus, fun("ENVIRON$"), lp, str("P"), rp), `ENVIRON ("P="+ENVIRON$("P"))`, false},
 		{"then a statement", toks(environ, str("A="), colon, pr), `ENVIRON "A=" : PRINT[]`, false},
 		{"ENVIRON$ of a number", toks(pr, fun("ENVIRON$"), lp, number("1"), rp), `PRINT[ENVIRON$(#1)]`, false},
 	})
@@ -1190,7 +1186,7 @@ func TestEnvironSyntaxErrors(t *testing.T) {
 	environ := token.Token{Kind: token.Environ, Value: "ENVIRON"}
 	runParseCases(t, []parseCase{
 		{"alone", toks(environ), `BADSTMT`, true},
-		{"trailing semicolon", toks(environ, str("A=1"), semi), `BADSTMT`, true},
+		{"semicolon", toks(environ, str("A="), semi, str("1")), `BADSTMT`, true},
 		{"comma", toks(environ, str("A=1"), comma, str("B")), `BADSTMT`, true},
 		{"ENVIRON$ with two arguments", toks(pr, fun("ENVIRON$"), lp, str("A"), comma, str("B"), rp), `PRINT[BAD(SYNTAX)]`, true},
 	})

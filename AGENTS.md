@@ -31,6 +31,8 @@ c64sh is BASIC V2 plus a few marked extensions (HLD tenet *BASIC V2, plus marked
 - The tutorial and the guide to idiomatic BASIC call it a c64sh extension where they use it.
 - Its design doc and EARS specs say it is an extension and why it exists, and the HLD's goal for it says so.
 
+**Settings.** The sample `~/.c64shrc` in the user guide (*Startup file*) sets every setting to its default value, so it doubles as a reference for all configuration. When a setting is added or a default changes, update the sample and the *Settings* table in the same change.
+
 ## Linked-Intent Development (MANDATORY)
 
 **Consult the `linked-intent-dev` skill for ALL code changes.** All changes flow through the arrow of intent in one direction:

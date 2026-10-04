@@ -47,6 +47,7 @@ func TestSyntaxErrorAfterPartialExecution(t *testing.T) {
 // @spec SHELL-LINE-006
 func TestRuntimeErrorWinsOverLaterSyntaxError(t *testing.T) {
 	long := strings.Repeat("x", 200)
+	t.Setenv("C64SH_STRING_LIMIT", "255")
 	input := "PRINT \"" + long + "\"+\"" + long + "\":@\n"
 	check(t, "string too long then syntax", runMain(t, input),
 		result{"", "?STRING TOO LONG  ERROR\n", 1})

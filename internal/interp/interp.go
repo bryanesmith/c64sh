@@ -15,9 +15,9 @@ import (
 	"github.com/bryanesmith/c64sh/internal/basicerr"
 )
 
-// maxStringLen is the longest string, in characters, that a C64 can
-// produce at run time.
-const maxStringLen = 255
+// c64StringLimit is the longest string, in characters, that a C64 can
+// hold; positions in strings are bytes up to this limit.
+const c64StringLimit = 255
 
 // zoneWidth is the width of a C64 print zone, the columns "," moves between.
 const zoneWidth = 10
@@ -45,6 +45,7 @@ type Interp struct {
 	reverse     bool                    // reverse video is on in the terminal
 	ink         string                  // escape code of the last color written to the terminal
 	env         Environment             // ENVIRON's environment variables
+	stringLimit int                     // the most characters a string may hold; -1: no limit
 	arrays      map[string]*array       // arrays, by identity
 	data        dataPos                 // the data pointer: the next DATA item
 	printing    bool                    // a PRINT to the screen is evaluating an item
@@ -61,7 +62,7 @@ type Interp struct {
 //
 // @spec INTERP-002
 func New(out io.Writer) *Interp {
-	return &Interp{out: out, vars: map[string]value{}, arrays: map[string]*array{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed, tiStart: time.Now(), env: MapEnvironment{}}
+	return &Interp{out: out, vars: map[string]value{}, arrays: map[string]*array{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed, tiStart: time.Now(), env: MapEnvironment{}, stringLimit: -1}
 }
 
 // Interrupt asks the interpreter to stop, as the C64's STOP key does: the
@@ -120,7 +121,7 @@ func (in *Interp) assign(ref *ast.VarRef, v value) error {
 	if isString == v.isNum {
 		return &basicerr.Error{Kind: basicerr.TypeMismatch}
 	}
-	if isString && utf8.RuneCountInString(v.str) > maxStringLen {
+	if isString && in.tooLong(utf8.RuneCountInString(v.str)) {
 		return &basicerr.Error{Kind: basicerr.StringTooLong}
 	}
 	if strings.HasSuffix(name, "%") {
@@ -403,7 +404,7 @@ func (in *Interp) eval(e ast.Expr) (value, error) {
 		if err != nil {
 			return value{}, err
 		}
-		return binary(e.Op, l, r)
+		return in.binary(e.Op, l, r)
 	case *ast.NotExpr:
 		x, err := in.eval(e.X)
 		if err != nil {
@@ -434,7 +435,7 @@ func (in *Interp) eval(e ast.Expr) (value, error) {
 }
 
 // binary applies op to two evaluated operands.
-func binary(op ast.Op, l, r value) (value, error) {
+func (in *Interp) binary(op ast.Op, l, r value) (value, error) {
 	switch op {
 	case ast.Add:
 		switch {
@@ -442,7 +443,7 @@ func binary(op ast.Op, l, r value) (value, error) {
 			return inRange(l.num + r.num)
 		case !l.isNum && !r.isNum:
 			// RuneCountInString counts each invalid UTF-8 byte as one character.
-			if utf8.RuneCountInString(l.str)+utf8.RuneCountInString(r.str) > maxStringLen {
+			if in.tooLong(utf8.RuneCountInString(l.str) + utf8.RuneCountInString(r.str)) {
 				return value{}, &basicerr.Error{Kind: basicerr.StringTooLong}
 			}
 			return stringValue(l.str + r.str), nil

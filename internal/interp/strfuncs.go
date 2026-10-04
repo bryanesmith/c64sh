@@ -1,6 +1,7 @@
 package interp
 
 import (
+	"math"
 	"strings"
 	"unicode/utf8"
 
@@ -36,7 +37,7 @@ func (in *Interp) callString(e *ast.CallExpr) (value, error) {
 	runes := []rune(s)
 	var nums []int
 	for _, a := range e.Args[1:] {
-		n, err := in.evalByte(a)
+		n, err := in.evalPosition(a)
 		if err != nil {
 			return value{}, err
 		}
@@ -73,6 +74,24 @@ func (in *Interp) callString(e *ast.CallExpr) (value, error) {
 		return stringValue(string(runes[start-1 : end])), nil
 	}
 	panic("interp: unhandled function " + e.Name)
+}
+
+// evalPosition evaluates a position or length in a string, rounded down:
+// a byte while strings are limited to 255 characters or fewer, as on a
+// C64, and otherwise any number from 0 up to the string limit, if any.
+func (in *Interp) evalPosition(e ast.Expr) (int, error) {
+	if in.stringLimit >= 0 && in.stringLimit <= c64StringLimit {
+		return in.evalByte(e)
+	}
+	x, err := in.evalNumber(e)
+	if err != nil {
+		return 0, err
+	}
+	x = math.Floor(x)
+	if x < 0 || (in.stringLimit >= 0 && x > float64(in.stringLimit)) {
+		return 0, &basicerr.Error{Kind: basicerr.IllegalQuantity}
+	}
+	return int(min(x, math.MaxInt32)), nil
 }
 
 // evalString evaluates e, which must be a string.

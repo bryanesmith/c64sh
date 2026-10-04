@@ -15,6 +15,7 @@ type settings struct {
 	noColor            bool     // NO_COLOR: no colors at all
 	historyFile        string   // C64SH_HISTORY; empty: none
 	historySize        int      // C64SH_HISTSIZE
+	stringLimit        int      // C64SH_STRING_LIMIT; -1: no limit
 	input, ready, fail string   // the styles' escape codes; empty: unstyled
 	invalid            []string // reports of values not valid, defaults used instead
 }
@@ -33,7 +34,7 @@ func lookup(env interp.Environment, name string) (string, bool) {
 // readSettings reads the shell's settings from env, with home as the home
 // directory ("" if unknown).
 //
-// @spec SHELL-HIST-001, SHELL-SET-002, SHELL-SET-003
+// @spec SHELL-HIST-001, SHELL-SET-002, SHELL-SET-003, SHELL-SET-005
 func readSettings(env interp.Environment, home string) settings {
 	var s settings
 	v, _ := lookup(env, "NO_COLOR")
@@ -51,6 +52,15 @@ func readSettings(env interp.Environment, home string) settings {
 			s.historySize = n
 		} else {
 			s.invalid = append(s.invalid, invalidValue("C64SH_HISTSIZE", v))
+		}
+	}
+
+	s.stringLimit = -1
+	if v, _ := lookup(env, "C64SH_STRING_LIMIT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= -1 && v[0] != '+' {
+			s.stringLimit = n
+		} else {
+			s.invalid = append(s.invalid, invalidValue("C64SH_STRING_LIMIT", v))
 		}
 	}
 

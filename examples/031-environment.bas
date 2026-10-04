@@ -11,10 +11,10 @@ PRINT ENVIRON$("EQUATION"):REM 1+1=2
 REM The name and value can come from expressions
 N$="PLANET":ENVIRON N$+"=EARTH"
 PRINT ENVIRON$(N$):REM EARTH
-REM Parts separated by ; are joined, with no 255-character limit, so a
-REM long PATH can be extended
+REM Extend PATH by joining with +; strings are unlimited by default, so
+REM this works even for a PATH longer than a C64 string's 255 characters
 ENVIRON "PATH=/usr/bin"
-ENVIRON "PATH=";ENVIRON$("PATH");":/opt/c64/bin"
+ENVIRON "PATH="+ENVIRON$("PATH")+":/opt/c64/bin"
 PRINT ENVIRON$("PATH"):REM /usr/bin:/opt/c64/bin
 REM ENVIRON$(N) is the Nth variable as NAME=VALUE, in order of name,
 REM and the empty string past the last

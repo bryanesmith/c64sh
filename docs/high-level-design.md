@@ -84,7 +84,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 - The lexer, parser, and interpreter each have unit tests; functional tests run the whole shell on given input and assert on captured stdout and stderr.
 - `examples/` holds numbered, executable BASIC scripts (`001-hello-world.bas`, …) that show each language feature in many forms, commented for readers. Snapshot tests run every example and compare its stdout, stderr, and exit status with a recorded snapshot, so any change in behavior appears as a reviewable diff.
 - `make build`, `make run`, and `make install` build the binary, build and start the shell, and install `c64sh` into `~/bin`.
-- A tutorial in `docs/tutorial/` teaches the language by building a text adventure, chapter by chapter, with the idioms experienced BASIC programmers used; it grows with the language, and tests run every listing in it.
+- A tutorial in `docs/tutorial/` teaches the language by building a text adventure, chapter by chapter, with the idioms experienced BASIC programmers used; it grows with the language, and tests run every listing in it. A companion guide, `docs/idioms.md`, collects the idiomatic patterns with the reason for each.
 - `README.md` gives a short description, build and run instructions, and one example, and links to a user guide at `docs/user-guide.md`.
 
 ## Non-Goals

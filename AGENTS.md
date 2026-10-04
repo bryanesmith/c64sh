@@ -18,6 +18,10 @@ Example scripts follow these conventions (the snapshot tests enforce them):
 - A script may show an error. Scripts stop at their first error, so lines after it do not run; the snapshot records exactly what happens.
 - Hidden files such as `.DS_Store` are ignored; nothing else but example scripts belongs in `examples/`.
 
+## Tutorial
+
+`docs/tutorial/` teaches the language by building a text adventure, chapter by chapter, in idiomatic BASIC. **When adding or changing a feature, update the tutorial in the same change where the feature belongs**: work it into the game or a project, or show it in the chapter that uses it, as the user guide is updated. Each chapter ends with its complete program in a ```` ```basic ```` block; earlier ```` ```basic ```` blocks are excerpts of it. The tests in `test/tutorial/` run every listing with input from `test/tutorial/testdata/<page>.input` and compare it with `<page>.snap`; run `make update-snapshots` and review the diff.
+
 ## Linked-Intent Development (MANDATORY)
 
 **Consult the `linked-intent-dev` skill for ALL code changes.** All changes flow through the arrow of intent in one direction:

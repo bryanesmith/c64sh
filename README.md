@@ -22,4 +22,4 @@ $ echo 'PRINT "HELLO, ";"WORLD"' | c64sh
 HELLO, WORLD
 ```
 
-See the [user guide](docs/user-guide.md) for everything else.
+To learn the language, work through the [tutorial](docs/tutorial/index.md), which builds a text adventure step by step. See the [user guide](docs/user-guide.md) for everything else.

@@ -38,3 +38,10 @@ Type in **uppercase**: BASIC V2 keywords are uppercase, and the game compares wh
 7. [Keeping score](07-keeping-score.md): counting moves, the clock, and a score formula
 8. [Saving the game](08-saving-the-game.md): data files with `OPEN`, `PRINT#`, and `INPUT#`
 9. [Where next](09-where-next.md): ideas for growing the game, and the idioms you have learned
+
+## Projects
+
+Shorter programs to type in and study once you have finished the game:
+
+- [Hammurabi](projects/hammurabi.md): rule an ancient city for ten years; a classic of 1970s BASIC, built on `INPUT`, validation, and `RND`.
+- [Battleship](projects/battleship.md): sink three hidden ships; two-dimensional arrays, `ASC` and `VAL`, and random placement.

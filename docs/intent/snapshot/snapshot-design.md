@@ -7,7 +7,9 @@ prefix: SNAPSHOT
 
 ## Context and Design Philosophy
 
-`examples/` is a set of numbered BASIC scripts that show every language feature in many forms. They are documentation first: a user learning c64sh reads them to see how lines are read, what each form prints, and where the C64's rules produce surprising results. Each script is also executable, so running it shows the same thing live.
+`examples/features/` is a set of numbered BASIC scripts that show every language feature in many forms. They are documentation first: a user learning c64sh reads them to see how lines are read, what each form prints, and where the C64's rules produce surprising results. Each script is also executable, so running it shows the same thing live.
+
+The rest of `examples/` holds other programs for readers, such as complete games, and files such as an index. They are outside this design: no conventions apply to them and no tests run them.
 
 Snapshot tests make the examples trustworthy. Each script is run through the shell and its complete result is compared with a recorded snapshot. Any change in behavior, intended or not, shows up as a failing test and, once accepted, as a reviewable diff of a plain text file. The snapshots are never written without a deliberate update command.
 
@@ -15,12 +17,12 @@ Snapshot tests make the examples trustworthy. Each script is run through the she
 
 ### Naming
 
-Each example is a file directly in `examples/` named `NNN-words.bas`:
+Each example is a file directly in `examples/features/` named `NNN-words.bas`:
 
 - `NNN` is a three-digit number. Numbers start at `001` and run sequentially with no gaps or duplicates.
 - `words` is one or more lowercase ASCII letter-or-digit words joined by single hyphens, describing the topic (`hello-world`, `concat-strings`).
 
-`examples/` holds only example scripts: no other files and no subdirectories. Hidden files (names beginning with `.`, such as the `.DS_Store` files macOS creates) are ignored. Numbering is the reading order, from the simplest feature to the most involved.
+`examples/features/` holds only example scripts and, optionally, a file named exactly `README.md`: no other files and no subdirectories. Hidden files (names beginning with `.`, such as the `.DS_Store` files macOS creates) are ignored. Numbering is the reading order, from the simplest feature to the most involved. If `examples/features/` holds no examples, or does not exist, there are no snapshot tests to run.
 
 ### Contents
 
@@ -36,7 +38,18 @@ PRINT "HELLO ";"WORLD":REM HELLO WORLD
 - **Later lines** exercise the topic in many forms. `REM` lines introduce groups of related forms.
 - **Every line containing a `PRINT` ends with a comment showing what it prints**, written `:REM …` because `PRINT` ends only at `:` or the end of the line. Where an end-of-line comment is impossible (after an unclosed string, which runs to the end of the line) or awkward, the comment goes on its own `REM` line immediately before. Spaces are written exactly as printed and a missing newline as `(no newline)`; an example about print zones may print a ruler line of column digits so the zones can be checked by eye. A line demonstrating a mistake still ends with a comment, saying what goes wrong.
 - **Errors may be shown.** A script stops at its first error, so lines after it do not run; the snapshot records exactly what happens.
-- The file is **executable** (owner execute permission set), so `./examples/001-hello-world.bas` runs.
+- The file is **executable** (owner execute permission set), so `./examples/features/001-hello-world.bas` runs.
+
+### README
+
+`examples/features/README.md` tells a contributor, in a few paragraphs, what the directory is and how it is maintained:
+
+- **What the scripts are:** one or more per language feature, numbered in reading order, written as documentation, and each runnable directly.
+- **How one is added during development:** every change that adds or changes a feature adds a script or extends one, in the same change; a new script takes the next number, or an inserted one renumbers those after it; and the conventions of *Contents* apply, briefly listed.
+- **How they are tested:** the snapshot tests run every script and compare its output with `test/snapshot/testdata/<name>.snap`; `make update-snapshots` records new output, and the diff is reviewed before committing; a script that reads input gets it from a hand-written `<name>.input` there; and the tests also check the conventions.
+- Where the full rules live: this design and the project's `AGENTS.md`.
+
+The README is optional, and the tests ignore it, whatever it contains.
 
 ## Snapshot Tests
 
@@ -44,9 +57,9 @@ PRINT "HELLO ";"WORLD":REM HELLO WORLD
 
 The tests live in `test/snapshot/` (package `snapshot_test`). One test function runs a subtest per example, named after the example's file name without `.bas`.
 
-Each example is run in-process with `shell.Main([]string{path}, stdin, stdout, stderr)`, exactly as `c64sh FILE` runs it. This makes the snapshot record what a user sees when running the file, including the skipped `#!` line and script-mode behavior.
+Each example is run in-process with `shell.Run`, with `Config.File` set to the example, exactly as `c64sh FILE` runs it. This makes the snapshot record what a user sees when running the file, including the skipped `#!` line and script-mode behavior.
 
-**The clock** is fixed, so an example using `RND(0)` (or, later, the time) gives the same output every run. Examples run through `shell.Run` with `File` set to the example, which runs it as `c64sh FILE` does, and `Clock` set to the fixed clock.
+**The clock** is fixed, so an example using `RND(0)` or the time gives the same output every run: `Config.Clock` is set to a fixed time.
 
 **The current directory** is a new, empty temporary directory for each example, so an example that saves files (`SAVE`) starts with none and leaves nothing behind in the repository.
 
@@ -97,7 +110,7 @@ If one version has fewer lines, the missing line is shown as `(end of snapshot)`
 
 ### Convention Checks
 
-The same package checks every file in `examples/` against the conventions above: the name pattern, sequential numbering from `001`, the exact `#!` first line, a `REM` second line with text, the owner execute permission, and the absence of other files or directories. A failure names the file and the rule it breaks.
+The same package checks every file in `examples/features/` against the conventions above: the name pattern, sequential numbering from `001`, the exact `#!` first line, a `REM` second line with text, the owner execute permission, and the absence of other files (besides `README.md`) or directories. A failure names the file and the rule it breaks.
 
 The PRINT-comment convention is checked with the lexer: for every line of an example after the first, if the line's tokens include a `Print` token, the last token before `EOL` must be a `Rem` token, or the line immediately before must be a comment line (only a `Rem` token before `EOL`). Lines whose `PRINT` is not recognized as a keyword (such as a lowercase `print` shown as a mistake) are not checked.
 
@@ -109,6 +122,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `002-concat-strings.bas` | Joining strings with `;`, `+`, and no separator, and combinations of them |
 | `003-print-separators.bas` | `,` moving to the next 10-column print zone (with a printed ruler), the column carrying over between PRINTs, trailing `;` and `,` suppressing the newline, bare `PRINT`, several statements with `:`, empty statements |
 | `004-comments.bas` | `REM` as a whole line, after `:`, without a space (`REMARK`), with colons and quotes inside, and `"REM"` inside a string |
+| `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 | `006-numbers.bas` | Number literals (decimals, `E` notation, a lone `.`), C64 number printing (sign and trailing spaces, 9 digits, scientific notation), spaces inside numbers, numbers mixed with strings and in zones, `+` on numbers, the number range, and `?TYPE MISMATCH  ERROR` |
 | `007-arithmetic.bas` | `+ - * /`, precedence and left-to-right evaluation, parentheses, negation and a leading `+`, division's 9 digits, underflow to zero, items side by side, and `?DIVISION BY ZERO  ERROR` |
 | `008-exponents.bas` | `^` and `↑`, roots and negative exponents, `^` above negation and the other operators, left-to-right `^`, signs in exponents, the C64's special cases (`0^0`, `0^-1`, negative bases), and `?ILLEGAL QUANTITY  ERROR` |
@@ -136,7 +150,6 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `030-screen-codes.bas` | Clearing the screen, colors, reverse video, cursor right, Return, and codes in variables, as plain output (the snapshot is not a terminal) |
 | `031-environment.bas` | `ENVIRON` and `ENVIRON$` (a c64sh extension): setting, reading, unset variables, values with `=`, names from expressions, extending `PATH` with `+`, listing by number, removing, and an error |
 | `032-string-length.bas` | Strings longer than 255 characters (the default, unlimited string limit), positions past 255 in `LEFT$`, `RIGHT$`, and `MID$`, and a negative position as `?ILLEGAL QUANTITY  ERROR` |
-| `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives
 
@@ -148,9 +161,12 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | Snapshot contents | Exit status, stdout, and stderr in one file | stdout only | Examples may end in an error to demonstrate it; the error text and exit status are part of what the reader should see. |
 | Obsolete snapshots | Failing check; deleted by the update run | Leave them for manual cleanup | A snapshot without an example documents behavior nothing exercises, and renumbering examples would otherwise leave stale files behind. |
 | Failure report | First differing line, Go-quoted | A full diff | Pinpoints the change and makes tabs visible; `make update-snapshots` followed by `git diff` shows the complete change. |
-| Input for examples that read it | An optional `.input` file beside the snapshot, used as stdin | Answers inside the example file; no examples of `INPUT` and `GET` | The example file must stay a plain BASIC script that a user can run and answer. Keeping the answers next to the snapshot keeps `examples/` to example scripts only, while the snapshot still records a real run. |
-| How examples run | In-process `shell.Main` with the file argument | Execute each file through its `#!` line with a built binary | In-process runs are fast and need no build; `#!` execution is already covered by the shell's functional tests. |
+| Input for examples that read it | An optional `.input` file beside the snapshot, used as stdin | Answers inside the example file; no examples of `INPUT` and `GET` | The example file must stay a plain BASIC script that a user can run and answer. Keeping the answers next to the snapshot keeps `examples/features/` to example scripts only, while the snapshot still records a real run. |
+| How examples run | In-process `shell.Run` with `File` set to the example | Execute each file through its `#!` line with a built binary | In-process runs are fast and need no build; `#!` execution is already covered by the shell's functional tests. |
 | PRINT comments | Required on every line with a `PRINT`, and checked | Optional, where useful | Showing the output beside each form is what makes the examples teach; checking it keeps new examples consistent. |
+| Where the examples live | `examples/features/`, leaving the rest of `examples/` free | `examples/` itself, holding nothing else; a top-level `features/` | Keeps the feature scripts where readers look for examples, while `examples/` also holds complete programs, such as games, that follow none of the scripts' conventions. |
+| Programs elsewhere in `examples/` | Not checked or run | Parse check of every `.bas`; run with input files like the feature scripts | They are complete, often interactive programs, still being written; checks would constrain them without showing a reader anything new. |
+| A README among the scripts | An optional `README.md`, allowed by exact name and otherwise ignored | No README; a README only at `examples/` | Contributors adding a script find the rules where they add it. |
 | Example numbering | Sequential, no gaps, three digits | Free-form names; numbering with gaps for insertion | A fixed reading order from simple to involved suits documentation. Inserting an example renumbers those after it, which is a rename in version control. |
 
 ## Open Questions & Future Decisions

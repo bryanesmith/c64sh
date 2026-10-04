@@ -6,7 +6,7 @@
 
 ## Examples and Snapshot Tests
 
-Every language feature is shown in a script in `examples/`, and each script's output is recorded by a snapshot test in `test/snapshot/`. **When adding or changing a feature, add a new example or extend an existing one in the same change**, then run `make update-snapshots` and review the snapshot diff before committing.
+Every language feature is shown in a script in `examples/features/`, and each script's output is recorded by a snapshot test in `test/snapshot/`. **When adding or changing a feature, add a new example or extend an existing one in the same change**, then run `make update-snapshots` and review the snapshot diff before committing.
 
 Example scripts follow these conventions (the snapshot tests enforce them):
 
@@ -16,7 +16,7 @@ Example scripts follow these conventions (the snapshot tests enforce them):
 - End every line containing a `PRINT` with a comment saying what it prints, with spaces exactly as printed (write a missing newline as `(no newline)`). To make print-zone columns easy to check, an example may print a ruler line such as `0123456789012345678901234567890`. The comment needs a colon before `REM`, because `PRINT` only ends at `:` or the end of the line: `PRINT "HI":REM HI`, not `PRINT "HI" REM HI` (a syntax error, as on a C64). Where an end-of-line comment is impossible, such as after an unclosed string (`PRINT "HI`, which runs to the end of the line), put the comment on its own `REM` line immediately before.
 - A script that reads input (`INPUT`, `GET`) gets its stdin from `test/snapshot/testdata/NNN-lowercase-words.input`, written by hand; its comments name the answers the snapshot uses, and its `PRINT` comments describe the output for them.
 - A script may show an error. Scripts stop at their first error, so lines after it do not run; the snapshot records exactly what happens.
-- Hidden files such as `.DS_Store` are ignored; nothing else but example scripts belongs in `examples/`.
+- Hidden files such as `.DS_Store` are ignored; nothing else but example scripts and an optional `README.md` belongs in `examples/features/`. The rest of `examples/` (such as `examples/games/`) holds other programs, with no conventions and no tests.
 
 ## Tutorial
 

@@ -1,5 +1,5 @@
-// Package snapshot_test runs every script in examples/ and compares its
-// result with a recorded snapshot, and checks that the examples follow
+// Package snapshot_test runs every script in examples/features/ and
+// compares its result with a recorded snapshot, and checks that the examples follow
 // their conventions. Run `make update-snapshots` to rewrite the snapshots
 // after an intended change, then review the diff.
 package snapshot_test
@@ -22,9 +22,10 @@ import (
 )
 
 const (
-	examplesDir = "../../examples"
+	examplesDir = "../../examples/features"
 	snapshotDir = "testdata"
 	shebang     = "#!/usr/bin/env c64sh"
+	readme      = "README.md" // the one file besides examples allowed in examplesDir
 )
 
 // examplePattern matches an example file name and captures its number.
@@ -35,12 +36,15 @@ func updating() bool {
 	return os.Getenv("UPDATE_SNAPS") == "true"
 }
 
-// entries returns the non-hidden entries of examples/.
-func entries(t *testing.T) []os.DirEntry {
-	t.Helper()
-	all, err := os.ReadDir(examplesDir)
+// entries returns the non-hidden entries of dir, in order of name; a
+// missing dir has none.
+func entries(dir string) ([]os.DirEntry, error) {
+	all, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
 	if err != nil {
-		t.Fatalf("reading examples: %v", err)
+		return nil, err
 	}
 	var visible []os.DirEntry
 	for _, e := range all {
@@ -48,20 +52,67 @@ func entries(t *testing.T) []os.DirEntry {
 			visible = append(visible, e)
 		}
 	}
-	return visible
+	return visible, nil
 }
 
-// examples returns the file names in examples/ that match the example
-// naming pattern, in order.
-func examples(t *testing.T) []string {
-	t.Helper()
+// examplesIn returns the file names in dir that match the example naming
+// pattern, in order. A missing dir holds no examples.
+//
+// @spec SNAPSHOT-012, SNAPSHOT-014
+func examplesIn(dir string) ([]string, error) {
+	es, err := entries(dir)
 	var names []string
-	for _, e := range entries(t) {
+	for _, e := range es {
 		if !e.IsDir() && examplePattern.MatchString(e.Name()) {
 			names = append(names, e.Name())
 		}
 	}
+	return names, err
+}
+
+// examples returns the examples in examplesDir.
+func examples(t *testing.T) []string {
+	t.Helper()
+	names, err := examplesIn(examplesDir)
+	if err != nil {
+		t.Fatalf("reading examples: %v", err)
+	}
 	return names
+}
+
+// nameProblems returns the names of the entries in dir that do not belong
+// there: directories, and files other than README.md not named like an
+// example. Hidden entries are ignored.
+//
+// @spec SNAPSHOT-002
+func nameProblems(dir string) []string {
+	es, err := entries(dir)
+	if err != nil {
+		return []string{err.Error()}
+	}
+	var bad []string
+	for _, e := range es {
+		if e.IsDir() || (e.Name() != readme && !examplePattern.MatchString(e.Name())) {
+			bad = append(bad, e.Name())
+		}
+	}
+	return bad
+}
+
+// staleSnapshots returns the snapshot files in dir whose example does not
+// exist: those not in want, which holds the snapshot file names of the
+// examples.
+//
+// @spec SNAPSHOT-013
+func staleSnapshots(dir string, want map[string]bool) ([]string, error) {
+	stored, err := filepath.Glob(filepath.Join(dir, "*.snap"))
+	var stale []string
+	for _, path := range stored {
+		if !want[filepath.Base(path)] {
+			stale = append(stale, path)
+		}
+	}
+	return stale, err
 }
 
 // lines returns the lines of an example, without line terminators.
@@ -144,7 +195,7 @@ func firstDifference(got, want string) (int, string, string) {
 	}
 }
 
-// @spec SNAPSHOT-001, SNAPSHOT-008, SNAPSHOT-009, SNAPSHOT-010, SNAPSHOT-011
+// @spec SNAPSHOT-001, SNAPSHOT-008, SNAPSHOT-009, SNAPSHOT-010, SNAPSHOT-011, SNAPSHOT-013
 func TestExamples(t *testing.T) {
 	files := examples(t)
 	want := map[string]bool{}
@@ -167,21 +218,18 @@ func TestExamples(t *testing.T) {
 	}
 
 	// Snapshots whose example no longer exists.
-	stored, err := filepath.Glob(filepath.Join(snapshotDir, "*.snap"))
+	stale, err := staleSnapshots(snapshotDir, want)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range stored {
-		if want[filepath.Base(path)] {
-			continue
-		}
+	for _, path := range stale {
 		if updating() {
 			if err := os.Remove(path); err != nil {
 				t.Error(err)
 			}
 			continue
 		}
-		t.Errorf("snapshot %s has no example in examples/; run `make update-snapshots` to delete it", path)
+		t.Errorf("snapshot %s has no example in examples/features/; run `make update-snapshots` to delete it", path)
 	}
 
 	// Input files, written by hand, whose example no longer exists.
@@ -191,7 +239,7 @@ func TestExamples(t *testing.T) {
 	}
 	for _, path := range inputs {
 		if !want[strings.TrimSuffix(filepath.Base(path), ".input")+".snap"] {
-			t.Errorf("input file %s has no example in examples/; delete it", path)
+			t.Errorf("input file %s has no example in examples/features/; delete it", path)
 		}
 	}
 }
@@ -221,13 +269,8 @@ func inTempDir(t *testing.T, f func() int) int {
 
 // @spec SNAPSHOT-002
 func TestExampleNames(t *testing.T) {
-	for _, e := range entries(t) {
-		switch {
-		case e.IsDir():
-			t.Errorf("examples/%s: directories do not belong in examples/", e.Name())
-		case !examplePattern.MatchString(e.Name()):
-			t.Errorf("examples/%s: name must look like 001-lowercase-words.bas", e.Name())
-		}
+	for _, name := range nameProblems(examplesDir) {
+		t.Errorf("examples/features/%s: only examples named like 001-lowercase-words.bas, and README.md, belong in examples/features/", name)
 	}
 }
 
@@ -251,7 +294,7 @@ func TestExampleNumbering(t *testing.T) {
 func TestExampleShebang(t *testing.T) {
 	for _, file := range examples(t) {
 		if first := lines(t, file)[0]; first != shebang {
-			t.Errorf("examples/%s: first line is %q, want %q", file, first, shebang)
+			t.Errorf("examples/features/%s: first line is %q, want %q", file, first, shebang)
 		}
 	}
 }
@@ -261,7 +304,7 @@ func TestExampleDescription(t *testing.T) {
 	for _, file := range examples(t) {
 		ls := lines(t, file)
 		if len(ls) < 2 || !strings.HasPrefix(ls[1], "REM") || strings.TrimSpace(ls[1][3:]) == "" {
-			t.Errorf("examples/%s: second line must be a REM comment explaining the file", file)
+			t.Errorf("examples/features/%s: second line must be a REM comment explaining the file", file)
 		}
 	}
 }
@@ -274,7 +317,7 @@ func TestExampleIsExecutable(t *testing.T) {
 			t.Fatal(err)
 		}
 		if info.Mode().Perm()&0o100 == 0 {
-			t.Errorf("examples/%s: not executable; run chmod +x examples/%s", file, file)
+			t.Errorf("examples/features/%s: not executable; run chmod +x examples/features/%s", file, file)
 		}
 	}
 }
@@ -298,7 +341,7 @@ func TestExamplePrintComments(t *testing.T) {
 			if endsWithComment || isCommentLine(lexer.Lex(ls[i-1])) {
 				continue
 			}
-			t.Errorf("examples/%s:%d: end the line with :REM and what it prints, or put a REM line before it", file, i+1)
+			t.Errorf("examples/features/%s:%d: end the line with :REM and what it prints, or put a REM line before it", file, i+1)
 		}
 	}
 }

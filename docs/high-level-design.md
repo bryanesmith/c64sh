@@ -22,7 +22,7 @@ Each stage is its own Go package with its own unit tests beside the code, so eac
 
 The syntax c64sh accepts is defined in one place: the hand-written lexer and parser. The parser is a recursive-descent parser with one function per grammar rule, and each function carries its rule, in Extended Backus-Naur Form (the notation of the Go language specification), as a comment directly above it. The lexer documents each token rule the same way. Read together, those comments are the grammar, kept beside the code that implements each rule.
 
-The lexer and parser unit tests pin down exactly what is accepted. For users, the user guide describes the syntax in prose and `examples/` shows it in use.
+The lexer and parser unit tests pin down exactly what is accepted. For users, the user guide describes the syntax in prose and `examples/features/` shows it in use.
 
 ### Direct mode and program mode
 
@@ -47,7 +47,7 @@ prints `2` and `4` as those lines are read, then runs the program: `3`, `1`, `5`
 
 ### Incremental language growth
 
-The language grows one feature at a time. The language currently supports `PRINT` with string and number arguments, arithmetic, number functions (`INT`, `RND`, `SIN`, …), string functions (`LEN`, `MID$`, `CHR$`, …), environment variables (`ENVIRON$`, `ENVIRON`, a c64sh extension), comparisons, logical operators, arrays (`DIM`), `DATA` statements (`READ`, `RESTORE`), the clock (`TI`, `TI$`), `IF … THEN`, `FOR … NEXT` loops, `GOSUB` subroutines, keyboard input (`INPUT`, `GET`), user-defined functions (`DEF FN`), variables, and `REM` comments, in direct mode and in stored programs (`RUN`, `LIST`, `NEW`, `END`, `GOTO`, `ON … GOTO`), which can be saved and loaded (`SAVE`, `LOAD`, `VERIFY`), and data files (`OPEN`, `PRINT#`, `INPUT#`, `GET#`, `CMD`, `CLOSE`, `ST`). Each new feature (`STOP` and `CONT`, screen control codes) extends the lexer and parser, with their rule comments, then the interpreter, and gets its own tests at every layer. It also adds or extends a numbered example script in `examples/` that exercises the feature in many ways, with a snapshot test recording that script's exact output.
+The language grows one feature at a time. The language currently supports `PRINT` with string and number arguments, arithmetic, number functions (`INT`, `RND`, `SIN`, …), string functions (`LEN`, `MID$`, `CHR$`, …), environment variables (`ENVIRON$`, `ENVIRON`, a c64sh extension), comparisons, logical operators, arrays (`DIM`), `DATA` statements (`READ`, `RESTORE`), the clock (`TI`, `TI$`), `IF … THEN`, `FOR … NEXT` loops, `GOSUB` subroutines, keyboard input (`INPUT`, `GET`), user-defined functions (`DEF FN`), variables, and `REM` comments, in direct mode and in stored programs (`RUN`, `LIST`, `NEW`, `END`, `GOTO`, `ON … GOTO`), which can be saved and loaded (`SAVE`, `LOAD`, `VERIFY`), and data files (`OPEN`, `PRINT#`, `INPUT#`, `GET#`, `CMD`, `CLOSE`, `ST`). Each new feature (`STOP` and `CONT`, screen control codes) extends the lexer and parser, with their rule comments, then the interpreter, and gets its own tests at every layer. It also adds or extends a numbered example script in `examples/features/` that exercises the feature in many ways, with a snapshot test recording that script's exact output.
 
 ## Target Users
 
@@ -86,7 +86,7 @@ The language grows one feature at a time. The language currently supports `PRINT
 - `REM` comments behave as they do on a C64: everything after `REM` to the end of the line is ignored, including colons, so comments can document scripts and follow other statements (`PRINT "A":REM SHOW A`).
 - Input the shell does not accept produces the error a C64 would print for it (for example `?SYNTAX  ERROR`).
 - The lexer, parser, and interpreter each have unit tests; functional tests run the whole shell on given input and assert on captured stdout and stderr.
-- `examples/` holds numbered, executable BASIC scripts (`001-hello-world.bas`, …) that show each language feature in many forms, commented for readers. Snapshot tests run every example and compare its stdout, stderr, and exit status with a recorded snapshot, so any change in behavior appears as a reviewable diff.
+- `examples/` holds BASIC programs for readers. `examples/features/` holds numbered, executable scripts (`001-hello-world.bas`, …) that show each language feature in many forms, commented for readers, with a `README.md` explaining how they are added and tested. Snapshot tests run every one and compare its stdout, stderr, and exit status with a recorded snapshot, so any change in behavior appears as a reviewable diff. Other directories in `examples/` (such as `examples/games/`) hold complete programs, free of those conventions and not tested, as are files directly in `examples/`.
 - `make build`, `make run`, and `make install` build the binary, build and start the shell, and install `c64sh` into `~/bin`.
 - A tutorial in `docs/tutorial/` teaches the language by building a text adventure, chapter by chapter, with the idioms experienced BASIC programmers used; it grows with the language, and tests run every listing in it. A companion guide, `docs/idioms.md`, collects the idiomatic patterns with the reason for each.
 - `README.md` gives a short description, build and run instructions, and one example, and links to a user guide at `docs/user-guide.md`.
@@ -140,7 +140,7 @@ A BASIC error (such as `SYNTAX`) is an ordinary Go error value that carries the 
 - **Unit tests** live beside the code in each package (`lexer_test.go`, `parser_test.go`, …).
 - **Functional tests** in `test/functional/` run the shell in-process with given input, capture stdout and stderr, and assert on them. One test builds the real `c64sh` binary and runs a script through its `#!/usr/bin/env c64sh` line.
 - **Tutorial tests** in `test/tutorial/` run the complete program of each tutorial chapter and project with recorded input, compare its output with a recorded snapshot, and check that the excerpts in each chapter are lines of its program.
-- **Snapshot tests** in `test/snapshot/` run each script in `examples/` through the shell, as `c64sh FILE` does, and compare the result with a recorded snapshot in `test/snapshot/testdata/`. `make update-snapshots` rewrites the snapshots from current behavior; the resulting diff is reviewed like code. The same tests check that the examples follow their conventions (numbered names, `#!` line, a leading `REM` comment).
+- **Snapshot tests** in `test/snapshot/` run each script in `examples/features/` through the shell, as `c64sh FILE` does, and compare the result with a recorded snapshot in `test/snapshot/testdata/`. `make update-snapshots` rewrites the snapshots from current behavior; the resulting diff is reviewed like code. The same tests check that the examples follow their conventions (numbered names, `#!` line, a leading `REM` comment).
 
 ### Build and installation
 
@@ -171,9 +171,10 @@ internal/parser/
 internal/interp/
 internal/shell/
 test/functional/     end-to-end tests
-test/snapshot/       snapshot tests of examples/ (snapshots in testdata/)
+test/snapshot/       snapshot tests of examples/features/ (snapshots in testdata/)
 test/tutorial/       tests of the tutorial's programs (snapshots in testdata/)
-examples/            numbered example scripts, one or more per feature
+examples/            BASIC programs for readers
+examples/features/   numbered feature scripts, one or more per feature
 docs/                design docs (HLD, docs/intent/), user-guide.md, and tutorial/
 README.md
 ```
@@ -206,9 +207,9 @@ README.md
 ## Success Metrics
 
 - Every example in the user guide produces exactly the documented output when run through `c64sh`. Falsified by any documented example that does not.
-- Every language feature is shown in at least one script in `examples/`, and every script's output matches its snapshot. Falsified by a feature with no example, or a failing snapshot test.
+- Every language feature is shown in at least one script in `examples/features/`, and every script's output matches its snapshot. Falsified by a feature with no example, or a failing snapshot test.
 - Every `PRINT` and `REM` form listed under Goals produces the same text a C64 would, with spaces in place of the C64's cursor-right moves. Falsified by any difference in functional tests.
-- Adding a new statement touches only the lexer, parser, interpreter, their tests, and `examples/`, not the shell. Falsified if a language feature requires shell changes.
+- Adding a new statement touches only the lexer, parser, interpreter, their tests, and `examples/features/`, not the shell. Falsified if a language feature requires shell changes.
 
 ## References
 

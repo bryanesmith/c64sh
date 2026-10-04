@@ -91,3 +91,29 @@ func TestScreenCodesLeftOut(t *testing.T) {
 		t.Errorf("other characters: %q", out)
 	}
 }
+
+// @spec INTERP-150
+func TestScreenState(t *testing.T) {
+	cases := []struct {
+		terminal, color bool
+		src, want       string
+	}{
+		{true, true, `PRINT "A"`, ""},
+		{true, true, `PRINT CHR$(28);"A"`, "\x1b[38;2;104;55;43m"},
+		{true, true, `PRINT CHR$(28);CHR$(158);`, "\x1b[38;2;184;199;111m"},
+		{true, true, `PRINT CHR$(28);CHR$(18);`, "\x1b[38;2;104;55;43m\x1b[7m"},
+		{true, true, `PRINT CHR$(18);"A"`, ""}, // the Return turned reverse off
+		{true, false, `PRINT CHR$(28);CHR$(18);`, "\x1b[7m"},
+		{false, true, `PRINT CHR$(28);CHR$(18);`, ""},
+	}
+	for _, c := range cases {
+		in := New(&recorder{})
+		in.SetScreen(c.terminal, c.color)
+		if err := enter(in, c.src); err != nil {
+			t.Fatal(err)
+		}
+		if got := in.ScreenState(); got != c.want {
+			t.Errorf("terminal %v, color %v, %s: %q; want %q", c.terminal, c.color, c.src, got, c.want)
+		}
+	}
+}

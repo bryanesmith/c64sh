@@ -54,9 +54,10 @@ func (c *lineConsole) ReadKey(stop func() bool) (string, error) {
 // read returns at once, with no bytes (or io.EOF, as os.File reports it)
 // when no key is waiting.
 type ttyConsole struct {
-	in   io.Reader
-	echo io.Writer // where ReadLine echoes typing
-	buf  []byte    // bytes read but not yet returned as keys
+	in    io.Reader
+	echo  io.Writer // where ReadLine echoes typing
+	style style     // how echoed typing is styled
+	buf   []byte    // bytes read but not yet returned as keys
 }
 
 // pollInterval is how long ReadLine waits between checks for a key.
@@ -127,7 +128,7 @@ func (c *ttyConsole) key() (string, bool) {
 // Backspace, and returns interp.ErrInterrupted if stop becomes true while
 // it waits.
 //
-// @spec SHELL-KEY-005
+// @spec SHELL-KEY-005, SHELL-STYLE-003
 func (c *ttyConsole) ReadLine(stop func() bool) (string, bool, error) {
 	var line []rune
 	for {
@@ -151,7 +152,7 @@ func (c *ttyConsole) ReadLine(stop func() bool) (string, bool, error) {
 		default:
 			if r, _ := utf8.DecodeRuneInString(key); r >= ' ' && (r < 0x80 || r > 0x9f) {
 				line = append(line, r)
-				io.WriteString(c.echo, key)
+				io.WriteString(c.echo, c.style.paint(c.style.input, key))
 			}
 		}
 	}

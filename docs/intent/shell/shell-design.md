@@ -138,6 +138,10 @@ In interactive mode the shell also gives the interpreter stderr for the C64's ta
 
 A `StorageError` from executing a line is reported as `c64sh: ` and the file, then: for a disk file that may not be replaced, `file exists (use REPLACE to replace it)`, with the error's `Replace` (such as `SAVE "@0:HELLO"`); otherwise the reason. When the session ends, the shell calls the interpreter's `CloseFiles`, so that data files a program left open are written, and reports any `StorageError` from it the same way. In interactive mode the shell then writes `READY.` and continues; in script mode it stops with exit status 1, like a BASIC error.
 
+## Terminal Output
+
+`Main` sets `Config.Terminal` when stdout is a terminal, and `Config.NoColor` when the environment variable `NO_COLOR` is set to a non-empty value (the common convention for turning colors off). `Run` passes them to the interpreter (`SetScreen(cfg.Terminal, !cfg.NoColor)`), which translates the C64's screen control codes in program output (see the interpreter design). Colors stay set until a program changes them, as on a C64, so when the session ends, if stdout is a terminal, the shell writes `ESC[0m` to stdout, so that the user's own shell does not inherit a program's color.
+
 ## Clock
 
 The interpreter's clock (for `RND(0)`) is the system clock, unless `Config.Clock` is set: tests set a fixed clock, so that programs using it give the same output every run.
@@ -265,6 +269,8 @@ type Config struct {
     Interactive bool
     File        string // empty: read from stdin
     Clock       func() time.Time // the interpreter's clock; nil: the system clock
+    Terminal    bool             // stdout is a terminal: screen codes become escape codes
+    NoColor     bool             // NO_COLOR is set: no colors
     HistoryFile string // line-editor history file; empty: none
 }
 ```

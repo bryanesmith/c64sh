@@ -207,3 +207,10 @@ Design: `interp-design.md`
 - [x] **INTERP-143**: When evaluating `TI`, the interpreter shall return the whole jiffies (sixtieths of a second) of clock time since the interpreter was created or its clock was last set, plus the jiffies `TI$` was last set to, modulo 5184000.
 - [x] **INTERP-144**: When evaluating `TI$`, the interpreter shall return the value of `TI` as hours, minutes, and seconds, each as two digits.
 - [x] **INTERP-145**: When assigning to `TI$`, the interpreter shall fail with ILLEGAL QUANTITY unless the value is six characters, all digits, and otherwise read them as `HHMMSS` and make `TI` count on from that many jiffies.
+
+## Screen control codes
+
+- [x] **INTERP-146**: When writing program output, the interpreter shall write `CHR$(13)` and `CHR$(141)` as a newline (preceded on a terminal by `ESC[27m`) and set the column to 0, and write `CHR$(29)` as a space, advancing the column by 1.
+- [x] **INTERP-147**: When writing program output to a terminal, the interpreter shall write `CHR$(157)` as `ESC[D` (reducing the column by 1, not below 0), `CHR$(17)` as `ESC[B`, `CHR$(145)` as `ESC[A`, `CHR$(19)` as `ESC[H` (column 0), `CHR$(147)` as `ESC[2J` and `ESC[H` (column 0), `CHR$(18)` as `ESC[7m`, and `CHR$(146)` as `ESC[27m`.
+- [x] **INTERP-148**: When writing program output to a terminal with colors on, the interpreter shall write each of the 16 C64 color codes as `ESC[38;2;R;G;Bm` with that color's red, green, and blue values from the Pepto palette, without changing the column.
+- [x] **INTERP-149**: When writing program output that is not to a terminal, or with colors off for the color codes, the interpreter shall leave out the codes of INTERP-147 and INTERP-148, without changing the column, and write every other character as it is.

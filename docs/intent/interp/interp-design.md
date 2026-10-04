@@ -72,6 +72,11 @@ var ErrEndOfInput = errors.New("end of input")
 // when the Interp is created.
 func (in *Interp) SetClock(now func() time.Time)
 
+// SetScreen sets whether program output goes to a terminal, which gets
+// the screen control codes as escape codes, and whether colors are
+// shown there. Without it, output is not a terminal.
+func (in *Interp) SetScreen(terminal, color bool)
+
 // SetConsole sets where INPUT and GET read. Without one, they find the
 // end of input.
 func (in *Interp) SetConsole(c Console)
@@ -160,6 +165,25 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 ```
 
 A panic here means a node type was added to `internal/ast` without interpreter support, which is a programming error, not a user error. Unit tests cover every node type so such a gap is caught before release.
+
+## Screen control codes
+
+On a C64, printing certain characters controls the screen instead of showing a character. The interpreter translates them in all program output (everything it writes: `PRINT`, `LIST`, `INPUT` prompts and echoes, `CMD` to the screen or printer), as `SetScreen` says:
+
+| Code | On a C64 | Terminal | Not a terminal | Column |
+|---|---|---|---|---|
+| 13, 141 | Return: next line, reverse off | reverse off, `\n` | `\n` | 0 |
+| 29 | Cursor right | a space | a space | +1 |
+| 157 | Cursor left | `ESC[D` | left out | -1 (not below 0) on a terminal |
+| 17, 145 | Cursor down, up | `ESC[B`, `ESC[A` | left out | unchanged |
+| 19 | Home | `ESC[H` | left out | 0 on a terminal |
+| 147 | Clear the screen | `ESC[2J ESC[H` | left out | 0 on a terminal |
+| 18, 146 | Reverse on, off | `ESC[7m`, `ESC[27m` | left out | unchanged |
+| 144, 5, 28, 159, 156, 30, 31, 158, 129, 149, 150, 151, 152, 153, 154, 155 | The 16 colors, black to light gray | the color, as 24-bit `ESC[38;2;R;G;Bm` | left out | unchanged |
+
+Every other character is written as it is. The colors are the C64's own (the measured "Pepto" palette): black, white, red, cyan, purple, green, blue, yellow, orange, brown, light red, dark gray, gray, light green, light blue, light gray, in the order of the codes above. When colors are off, the color codes are left out even on a terminal; the other codes are still translated. As on a C64, a color stays in effect until another is printed; the interpreter does not reset it (see the shell design).
+
+The cursor-right code becomes a space everywhere, as a comma's move to a print zone does: in a terminal, output only appears after the cursor, so a space looks the same.
 
 ## PRINT
 
@@ -624,6 +648,7 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Rounding for output | Round to 9 significant digits in decimal, then choose notation | Scale by 10 in binary as the ROM does | Decimal rounding gives the same 9 digits for all but rare boundary cases, and is simple and exact with `strconv`. |
 | Dispatch | Type switch with panicking `default` | Visitor pattern | See HLD *Key Design Decisions*. One pass over the tree; no `Accept`/`Visit` boilerplate. |
 | Comma | Spaces to the next 10-column print zone, a full zone when already at a zone start | Tab character; cursor-right control codes | Print zones are C64 language behavior, and programs lay out columns with them. The count `10 - (column % 10)`, never 0, is what the C64 ROM's PRINT computes (`$AAE8`). Spaces are the terminal equivalent of the C64's on-screen cursor-right moves, and the characters the C64 itself sends to files and printers. |
+| Screen codes | Translated in the interpreter's single writer, which also keeps the column | Translate in the shell's output stream | The column must follow the codes' meaning (clear and home return it to 0, colors take no column), and only the interpreter keeps the column. |
 | Cursor column owner | The interpreter, which writes all program output | The shell's output wrapper, queried by the interpreter; separate counts in both, kept in step by the shell | One owner means one count that cannot drift, and the interpreter is where a C64 program's cursor lives. `FreshLine` lets the shell start errors and `READY.` on a new line without tracking output itself. The C64's `POS()` function will read the same column. |
 | Trailing `;` or `,` | Suppresses the newline | Always end with a newline | C64 BASIC V2 behavior. Scripts rely on it to build one line of output from several statements. |
 | 255-character limit | Enforced on concatenation results | No limit | Tenet *C64 language, Unix I/O*: string semantics are language behavior. Enforcing it now avoids a behavior change when string functions arrive. |

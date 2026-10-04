@@ -57,3 +57,26 @@ func TestTerminalIsTerminal(t *testing.T) {
 		t.Errorf("isTerminal(/dev/tty) = false, want true")
 	}
 }
+
+// @spec SHELL-SCREEN-001
+func TestNoColor(t *testing.T) {
+	env := func(m map[string]string) func(string) (string, bool) {
+		return func(k string) (string, bool) { v, ok := m[k]; return v, ok }
+	}
+	cases := []struct {
+		env  map[string]string
+		want bool
+	}{
+		{map[string]string{}, false},
+		{map[string]string{"NO_COLOR": ""}, false},
+		{map[string]string{"NO_COLOR": "1"}, true},
+	}
+	for _, c := range cases {
+		if got := noColor(env(c.env)); got != c.want {
+			t.Errorf("noColor(%v) = %v, want %v", c.env, got, c.want)
+		}
+	}
+	if isTerminal(io.Discard) {
+		t.Error("isTerminal(io.Discard) = true")
+	}
+}

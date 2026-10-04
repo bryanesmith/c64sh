@@ -173,11 +173,12 @@ The line editor colors typing with its prompt: the prompt is the input style alo
 | `C64SH_HISTORY` | The history file; empty: none | `~/.c64sh_history` |
 | `C64SH_HISTSIZE` | How many lines history keeps, a whole number from 0 | 100 |
 | `C64SH_INPUT_COLOR`, `C64SH_READY_COLOR`, `C64SH_ERROR_COLOR` | Styles of typed input, of the banner and `READY.`, and of errors: SGR parameters, digits separated by `;` (such as `1;31` or `38;2;108;94;181`); empty: unstyled | `36`, `32`, `31` |
+| `C64SH_STRING_LIMIT` | The interpreter's string limit (`SetStringLimit`): -1 for none, or a whole number from 0 | -1 |
 | `C64SH_RC` | The run-commands file; empty: none (read before the file runs, from the starting environment) | `~/.c64shrc` |
 
 The colors use the SGR-parameter convention of `GREP_COLORS`, `LS_COLORS`, and `GCC_COLORS`, which reaches every terminal color, including the C64's own as 24-bit colors. An empty color turns that styling off while programs keep their colors.
 
-`Run` reads the settings when it starts, and in an interactive session again after the run-commands file has run, so the file can set any of them; the second reading decides the session's settings, and a later change takes effect in the next session. A history size or color that is not valid is reported once, from the reading that decides, as `c64sh: NAME: invalid value "VALUE"`, and its default is used.
+`Run` reads the settings when it starts, and in an interactive session again after the run-commands file has run, so the file can set any of them; the second reading decides the session's settings (a script's are decided by the first), and a later change takes effect in the next session. A history size or color that is not valid is reported once, from the reading that decides, as `c64sh: NAME: invalid value "VALUE"`, and its default is used.
 
 ## Run-commands file
 

@@ -554,10 +554,10 @@ SAVE "@0:GAME",8
 ### Extend PATH
 
 ```basic
-ENVIRON "PATH=";ENVIRON$("PATH");":/opt/bin"
+ENVIRON "PATH="+ENVIRON$("PATH")+":/opt/bin"
 ```
 
-**Why:** `PATH` is often longer than a BASIC string's 255 characters, so `ENVIRON "PATH="+ENVIRON$("PATH")+":/opt/bin"` can fail with `STRING TOO LONG`. `ENVIRON` joins parts separated by `;` without that limit, so the whole value is never stored in a string variable.
+**Why:** `PATH` is a list of directories separated by `:`, searched in order, so adding to the end makes a directory a last resort, and `ENVIRON "PATH=/opt/bin:"+ENVIRON$("PATH")` puts it first. `PATH` is usually longer than a C64 string's 255 characters; c64sh's strings are unlimited by default, so this works unless `C64SH_STRING_LIMIT` is set.
 
 ### List every variable
 

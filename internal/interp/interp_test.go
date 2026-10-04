@@ -52,6 +52,15 @@ func exec(l *ast.Line) (*recorder, error) {
 	return rec, err
 }
 
+// execC64 is exec with the C64's 255-character string limit.
+func execC64(l *ast.Line) (*recorder, error) {
+	rec := &recorder{}
+	in := New(rec)
+	in.SetStringLimit(255)
+	err := in.Exec(l)
+	return rec, err
+}
+
 type printCase struct {
 	name string
 	line *ast.Line
@@ -78,7 +87,7 @@ func TestStatementsRunInOrderAndStopAtFailure(t *testing.T) {
 	})
 
 	long := strings.Repeat("x", 200)
-	rec, err := exec(line(
+	rec, err := execC64(line(
 		printStmt(item(str("A"))),
 		printStmt(item(cat(str(long), str(long)))),
 		printStmt(item(str("B"))),
@@ -196,7 +205,7 @@ func TestFailingItemWritesEarlierItems(t *testing.T) {
 			"A", basicerr.StringTooLong},
 	}
 	for _, c := range cases {
-		rec, err := exec(c.line)
+		rec, err := execC64(c.line)
 		if !isKind(err, c.wantErr) {
 			t.Errorf("%s: error = %v, want kind %d", c.name, err, c.wantErr)
 		}
@@ -240,7 +249,7 @@ func TestConcatLongerThan255IsStringTooLong(t *testing.T) {
 		{"256 with invalid bytes", strings.Repeat("\xff", 200), strings.Repeat("y", 56), true},
 	}
 	for _, c := range cases {
-		rec, err := exec(line(printStmt(item(cat(str(c.left), str(c.right))))))
+		rec, err := execC64(line(printStmt(item(cat(str(c.left), str(c.right))))))
 		if c.wantErr {
 			if !isKind(err, basicerr.StringTooLong) {
 				t.Errorf("%s: error = %v, want STRING TOO LONG", c.name, err)
@@ -697,6 +706,7 @@ func TestAssignWrongTypeIsTypeMismatch(t *testing.T) {
 func TestAssignLongStringIsStringTooLong(t *testing.T) {
 	rec := &recorder{}
 	in := New(rec)
+	in.SetStringLimit(255)
 	if err := in.Exec(line(let("A$", str(strings.Repeat("x", 255))))); err != nil {
 		t.Fatalf("255 characters: unexpected error %v", err)
 	}

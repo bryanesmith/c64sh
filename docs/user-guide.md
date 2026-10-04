@@ -133,23 +133,27 @@ These are your terminal theme's own colors, so they suit light and dark themes, 
 
 When an interactive session starts, c64sh first runs `~/.c64shrc`, if it exists, as `zsh` runs `~/.zshrc`. It holds ordinary c64sh BASIC, each line handled as if you typed it, so it can set [settings](#settings) with [`ENVIRON`](#environment-variables), define variables, store program lines, or print a greeting. Scripts never run it.
 
-A sample `~/.c64shrc` with every setting:
+A sample `~/.c64shrc` that sets every [setting](#settings) to its default, so copying it changes nothing until you edit a value:
 
 ```
 REM ~/.c64shrc: run at the start of every interactive c64sh session
-REM How many lines history keeps (default 100)
-ENVIRON "C64SH_HISTSIZE=500"
-REM Where history is saved (default ~/.c64sh_history; empty: not saved)
-ENVIRON "C64SH_HISTORY=";ENVIRON$("HOME");"/.c64sh_history"
-REM Colors: SGR codes, as in GREP_COLORS (empty: no color)
+REM Every setting, at its default value
+REM How many lines history keeps; 0 keeps none
+ENVIRON "C64SH_HISTSIZE=100"
+REM Where history is saved; empty: not saved
+ENVIRON "C64SH_HISTORY="+ENVIRON$("HOME")+"/.c64sh_history"
+REM Colors of typing, READY., and errors: SGR codes, as in GREP_COLORS
+REM (36 cyan, 32 green, 31 red, 1;31 bold red); empty: no color
 ENVIRON "C64SH_INPUT_COLOR=36"
 ENVIRON "C64SH_READY_COLOR=32"
-ENVIRON "C64SH_ERROR_COLOR=1;31"
-REM Uncomment to turn all colors off
+ENVIRON "C64SH_ERROR_COLOR=31"
+REM The most characters a string may hold; -1 is unlimited, 255 is a C64's
+ENVIRON "C64SH_STRING_LIMIT=-1"
+REM Not set by default; any value but empty turns off all colors
 REM ENVIRON "NO_COLOR=1"
-REM Anything else you like: a variable, a greeting
-RE$=CHR$(28)
-PRINT "HELLO, ";ENVIRON$("USER")
+REM C64SH_RC (this file's location) must be set before c64sh starts
+REM Anything else you like, such as a greeting:
+REM PRINT "HELLO, ";ENVIRON$("USER")
 ```
 
 - **Storing a program line clears variables**, as on a C64, so set variables after any program lines.
@@ -171,7 +175,8 @@ c64sh's settings are environment variables. Set them in [`~/.c64shrc`](#startup-
 | `C64SH_INPUT_COLOR` | Color of what you type | `36` (cyan) |
 | `C64SH_READY_COLOR` | Color of the banner and `READY.` | `32` (green) |
 | `C64SH_ERROR_COLOR` | Color of errors and `BREAK` | `31` (red) |
-| `C64SH_RC` | The startup file; empty: none | `~/.c64shrc` |
+| `C64SH_STRING_LIMIT` | The most characters a string may hold; `-1` is unlimited, `255` is a C64's (see [Strings](#print)) | `-1` |
+| `C64SH_RC` | The startup file; empty: none (set it before c64sh starts) | `~/.c64shrc` |
 
 Colors are SGR codes, as in `GREP_COLORS` and `LS_COLORS`, joined with `;`:
 
@@ -283,7 +288,7 @@ prints `HELLO, WORLD`.
 
 **Strings.** A string is text between double quotes. Everything inside is printed exactly as written, including spaces and punctuation. The closing quote may be left off at the end of a line: `PRINT "HI` prints `HI`. A string cannot contain a double quote.
 
-A string made by joining with `+` may hold at most 255 characters; longer results cause `?STRING TOO LONG  ERROR`.
+On a C64 a string holds at most 255 characters, and longer results cause `?STRING TOO LONG  ERROR`. c64sh's strings are unlimited by default; set [`C64SH_STRING_LIMIT`](#settings) to `255` for the C64's limit, to check that a program will run on one. See [`examples/032-string-length.bas`](../examples/032-string-length.bas).
 
 **Keywords are uppercase.** `PRINT` must be typed in capitals; `print` is a syntax error. Text inside quotes can use any case.
 
@@ -835,11 +840,10 @@ ENVIRON "PATH=";ENVIRON$("PATH");":/opt/bin"
 | `ENVIRON$("NAME")` | The variable's value, or `""` if it is not set |
 | `ENVIRON$(N)` | The `N`th variable (from 1, in order of name) as `NAME=VALUE`, or `""` past the last |
 | `ENVIRON "NAME=VALUE"` | Sets the variable; an empty value (`ENVIRON "NAME="`) removes it |
-| `ENVIRON A$;B$;…` | Joins the parts, then sets the variable as above |
 
-- **Long values.** Environment values can be longer than a BASIC string's 255 characters, and `PATH` often is. `PRINT ENVIRON$("PATH")` shows the whole value. Storing it in a variable or joining it with `+` is `?STRING TOO LONG  ERROR`, so a value is never cut short. To extend a long value, join the parts with `;`, which has no limit: `ENVIRON "PATH=";ENVIRON$("PATH");":/opt/bin"`.
+- **Long values.** Environment values are often longer than a C64 string's 255 characters, and `PATH` usually is. c64sh's strings are unlimited by default, so `ENVIRON "PATH="+ENVIRON$("PATH")+":/opt/bin"` works. With [`C64SH_STRING_LIMIT`](#settings) set to `255`, `PRINT ENVIRON$("PATH")` still shows the whole value, but storing it in a variable or joining it with `+` is `?STRING TOO LONG  ERROR`, so a value is never cut short.
 - **Changes last for the session**, and programs c64sh starts see them; they do not change the shell that started c64sh.
-- **Errors.** Text without `=`, or with nothing before it, is `?ILLEGAL QUANTITY  ERROR`; a number among `ENVIRON`'s parts is `?TYPE MISMATCH  ERROR`.
+- **Errors.** Text without `=`, or with nothing before it, is `?ILLEGAL QUANTITY  ERROR`; a number is `?TYPE MISMATCH  ERROR`.
 
 See [`examples/031-environment.bas`](../examples/031-environment.bas) for every form, and [idiomatic BASIC](idioms.md#the-environment) for common patterns.
 
@@ -873,7 +877,7 @@ Errors are reported the way a C64 reports them, on stderr:
 | Error | Cause |
 |---|---|
 | `?SYNTAX  ERROR` | c64sh cannot understand the line: a misspelled or lowercase keyword, a stray character, or a part of BASIC that c64sh does not support yet. |
-| `?STRING TOO LONG  ERROR` | Joining strings with `+` produced more than 255 characters. |
+| `?STRING TOO LONG  ERROR` | With a string limit set (`C64SH_STRING_LIMIT`), a string grew longer than the limit. |
 | `?TYPE MISMATCH  ERROR` | A string compared with a number or used with `AND`, `OR`, or `NOT`, `+` given a string and a number, or `-`, `*`, `/`, `^`, or a minus sign in front was given a string. |
 | `?OVERFLOW  ERROR` | A number, or the result of a calculation, is larger than 1.70141183E+38. |
 | `?DIVISION BY ZERO  ERROR` | Dividing by zero. |
@@ -953,6 +957,7 @@ These features are c64sh's own: they are not part of Commodore 64 BASIC V2 and d
 - **No screen emulation**: no 40-column wrapping or graphics characters; the screen's control codes, such as colors and clearing the screen, are translated to the terminal's own (see [Colors and the screen](#colors-and-the-screen)), and PETSCII graphics characters are not. So a print zone past column 40 stays on the same line: `PRINT 2,3,4,5,6` prints ` 6 ` at column 40, where a C64 would start a new screen line.
 - **Arithmetic uses standard 64-bit floating point**, rounded to the C64's 9 digits when printed. Results match a C64 in nearly every case; a C64's own rounding occasionally differs in the last digit. Rarely, a loop with a fractional `STEP`, such as `FOR I=0 TO 1 STEP .1`, runs a different number of times than on a C64.
 - **The banner** reads `C64SH BASIC V2`.
+- **Strings have no length limit** by default, where a C64's hold 255 characters. No C64 program can catch `?STRING TOO LONG`, so this never changes how a working program behaves; set `C64SH_STRING_LIMIT=255` to get the C64's limit back.
 - **The shell colors its own text** in a terminal (see [Shell colors](#shell-colors)); a C64 shows everything in the current color.
 - **Ctrl-C stops a program waiting in `INPUT`.** On a C64, the STOP key does nothing until Return is pressed.
 - **Typed input keeps lowercase letters**, where a C64 keyboard types uppercase.

@@ -6,10 +6,12 @@ import (
 	"github.com/bryanesmith/c64sh/internal/basicerr"
 )
 
+// checkErrs runs each line with the C64's string limit, so positions are
+// bytes, and checks its error.
 func checkErrs(t *testing.T, cases map[string]basicerr.Kind) {
 	t.Helper()
 	for l, k := range cases {
-		if _, err := exec(sline(l)); !isKind(err, k) {
+		if _, err := execC64(sline(l)); !isKind(err, k) {
 			t.Errorf("%s: error %v, want kind %d", l, err, k)
 		}
 	}
@@ -63,4 +65,40 @@ func TestStrVal(t *testing.T) {
 		{"VAL", sline(`PRINT VAL("12");VAL(" 3.5 ");VAL("-7XYZ");VAL("ABC");VAL("");VAL("1E3");VAL("1 2")`), " 12  3.5 -7  0  0  1000  12 \n"},
 	})
 	checkErrs(t, map[string]basicerr.Kind{`PRINT VAL("1E99")`: basicerr.Overflow})
+}
+
+// @spec INTERP-156, INTERP-126
+func TestStringLimit(t *testing.T) {
+	run := func(limit int, src string) (string, error) {
+		rec := &recorder{}
+		in := New(rec)
+		if limit != 0 {
+			in.SetStringLimit(limit)
+		}
+		err := enter(in, src)
+		return rec.String(), err
+	}
+	long := `A$="":FOR I=1 TO 300:A$=A$+"X":NEXT:`
+	// No limit by default, or with -1: long strings, sliced past 255.
+	for _, limit := range []int{0, -1} {
+		out, err := run(limit, long+`PRINT LEN(A$);LEN(MID$(A$,290));LEN(LEFT$(A$,280));LEN(RIGHT$(A$,1000))`)
+		if err != nil || out != " 300  11  280  300 \n" {
+			t.Errorf("limit %d: %q, %v", limit, out, err)
+		}
+		_, err = run(limit, `PRINT LEFT$("A",-1)`)
+		wantKind(t, "negative position", err, basicerr.IllegalQuantity)
+	}
+	// The C64's limit, with positions as bytes.
+	_, err := run(255, long)
+	wantKind(t, "limit 255", err, basicerr.StringTooLong)
+	_, err = run(255, `PRINT MID$("A",256)`)
+	wantKind(t, "limit 255, position 256", err, basicerr.IllegalQuantity)
+	// A limit above 255 allows positions up to it.
+	if out, err := run(400, long+`PRINT LEN(MID$(A$,300))`); err != nil || out != " 1 \n" {
+		t.Errorf("limit 400: %q, %v", out, err)
+	}
+	_, err = run(400, `PRINT MID$("A",401)`)
+	wantKind(t, "limit 400, position 401", err, basicerr.IllegalQuantity)
+	_, err = run(10, `A$="12345678901"`)
+	wantKind(t, "limit 10", err, basicerr.StringTooLong)
 }

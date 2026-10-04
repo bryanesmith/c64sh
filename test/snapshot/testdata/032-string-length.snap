@@ -1,0 +1,8 @@
+exit status: 1
+--- stdout ---
+ 300 
+0123456789
+ 280 
+ 300 
+--- stderr ---
+?ILLEGAL QUANTITY  ERROR

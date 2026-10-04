@@ -29,7 +29,7 @@ Design: `interp-design.md`
 
 - [x] **INTERP-009**: When evaluating a `StringLit`, the interpreter shall return its value unchanged.
 - [x] **INTERP-010**: When evaluating an `ast.BinaryExpr` with `Op` `Add` whose operands are both strings, the interpreter shall return the left string followed by the right string.
-- [x] **INTERP-011**: If joining two strings with `+` would produce a string longer than 255 characters, counted as Unicode code points with each byte that is not valid UTF-8 counting as one, then the interpreter shall fail with a STRING TOO LONG error (the `basicerr.StringTooLong` kind).
+- [x] **INTERP-011**: If a string limit is set and joining two strings with `+` would produce a string longer than the limit, counted as Unicode code points with each byte that is not valid UTF-8 counting as one, then the interpreter shall fail with a STRING TOO LONG error (the `basicerr.StringTooLong` kind).
 - [x] **INTERP-012**: The interpreter shall evaluate a `StringLit` of any length without error when it is not an operand of `+`.
 
 ## Output errors
@@ -54,7 +54,7 @@ Design: `interp-design.md`
 - [x] **INTERP-032**: When executing an `ast.LetStmt` whose value has the variable's type (a string for a name ending in `$`, otherwise a number), the interpreter shall store the value (for an integer variable, as INTERP-037 converts it) under the variable's identity (`VarRef.Name`), where it remains for later statements and later calls to `Exec` until assigned again.
 - [x] **INTERP-033**: When evaluating an `ast.VarRef`, the interpreter shall return the value stored under its identity, or, for a variable never assigned, 0 for a number or integer variable and the empty string for a string variable.
 - [x] **INTERP-034**: If an `ast.LetStmt` assigns a number to a string variable or a string to a number or integer variable, then the interpreter shall fail with a TYPE MISMATCH error and leave the variable unchanged.
-- [x] **INTERP-035**: If an `ast.LetStmt` assigns a string longer than 255 characters (counted as for INTERP-011) to a string variable, then the interpreter shall fail with a STRING TOO LONG error and leave the variable unchanged.
+- [x] **INTERP-035**: If a string limit is set and an `ast.LetStmt` assigns a string longer than the limit (counted as for INTERP-011) to a string variable, then the interpreter shall fail with a STRING TOO LONG error and leave the variable unchanged.
 - [x] **INTERP-036**: If evaluating an `ast.LetStmt`'s value fails, then the interpreter shall return that error and leave the variable unchanged.
 - [x] **INTERP-037**: When an `ast.LetStmt` assigns a number to an integer variable (a name ending in `%`), the interpreter shall store the number rounded down to a whole number (`3.7` stores 3, and `-3.7` stores -4).
 - [x] **INTERP-038**: If an `ast.LetStmt` assigns to an integer variable a number whose size is not less than 32768, other than exactly -32768, then the interpreter shall fail with an ILLEGAL QUANTITY error and leave the variable unchanged (so -32768.5 fails, while -32767.5 stores -32768 and 32767.9 stores 32767).
@@ -175,7 +175,7 @@ Design: `interp-design.md`
 
 ## String functions
 
-- [x] **INTERP-126**: When evaluating a string function, the interpreter shall fail with TYPE MISMATCH for an argument of the wrong type, and with ILLEGAL QUANTITY for a position, length, or character code that, rounded down, is below 0 or above 255.
+- [x] **INTERP-126**: When evaluating a string function, the interpreter shall fail with TYPE MISMATCH for an argument of the wrong type, and with ILLEGAL QUANTITY for a character code that, rounded down, is below 0 or above 255, or for a position or length (of `LEFT$`, `RIGHT$`, or `MID$`) that, rounded down, is below 0 or above the larger of 255 and the string limit, with no upper bound while strings are unlimited.
 - [x] **INTERP-127**: The interpreter shall return for `LEN(S$)` the number of characters of `S$`; for `LEFT$(S$,N)` and `RIGHT$(S$,N)` its first or last `N` characters, or all of it if shorter; and for `MID$(S$,P,N)` the `N` characters (all, if `N` is omitted) from position `P`, counting from 1, or the empty string if `P` is past the end; `MID$` with `P` of 0 shall fail with ILLEGAL QUANTITY.
 - [x] **INTERP-128**: The interpreter shall return for `CHR$(N)` the one-character string whose code is `N`, and for `ASC(S$)` the code of the first character of `S$`, failing with ILLEGAL QUANTITY for the empty string.
 - [x] **INTERP-129**: The interpreter shall return for `STR$(X)` `X` formatted as `PRINT` formats a number, without the trailing space, and for `VAL(S$)` the number at the start of `S$`, read as `INPUT` reads a number, or 0 if there is none, failing with OVERFLOW if it is too large.
@@ -220,6 +220,10 @@ Design: `interp-design.md`
 
 - [x] **INTERP-151**: When evaluating `ENVIRON$(S$)` with a string, the interpreter shall return the value of the environment variable named `S$`, whatever its length, or the empty string if it is not set (a c64sh extension).
 - [x] **INTERP-152**: When evaluating `ENVIRON$(N)` with a number, the interpreter shall return the `N`th environment variable (counting from 1, in order of name) as `NAME=VALUE`, or the empty string if there are fewer than `N`; `N` is rounded down and must be from 1 to 255, else `ILLEGAL QUANTITY`.
-- [x] **INTERP-153**: When executing an `ast.EnvironStmt`, the interpreter shall join its parts, which must be strings (else `TYPE MISMATCH`), with no length limit, split the text at its first `=`, and set the environment variable named by the text before it to the text after it, or remove the variable if that text is empty.
-- [x] **INTERP-154**: If the joined text of an `ast.EnvironStmt` has no `=`, or nothing before it, or the environment refuses the name or value, then the interpreter shall return an `ILLEGAL QUANTITY` error and leave the environment unchanged.
+- [x] **INTERP-153**: When executing an `ast.EnvironStmt`, the interpreter shall evaluate its value, which must be a string (else `TYPE MISMATCH`), split it at its first `=`, and set the environment variable named by the text before it to the text after it, or remove the variable if that text is empty.
+- [x] **INTERP-154**: If the value of an `ast.EnvironStmt` has no `=`, or nothing before it, or the environment refuses the name or value, then the interpreter shall return an `ILLEGAL QUANTITY` error and leave the environment unchanged.
 - [x] **INTERP-155**: The interpreter shall use the `Environment` given to `SetEnvironment`, or else an empty `MapEnvironment` of its own.
+
+## String limit
+
+- [x] **INTERP-156**: The interpreter shall apply the string limit given to `SetStringLimit` (INTERP-011, INTERP-035, INTERP-126), with -1 meaning no limit, and no limit when none has been given.

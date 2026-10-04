@@ -17,6 +17,7 @@ func shellMain(stdin io.Reader, stdout, stderr io.Writer) int {
 func TestErrorFormat(t *testing.T) {
 	check(t, "syntax", runMain(t, "@\n"), result{"", "?SYNTAX  ERROR\n", 1})
 	long := strings.Repeat("x", 200)
+	t.Setenv("C64SH_STRING_LIMIT", "255")
 	check(t, "string too long", runMain(t, "PRINT \""+long+"\"+\""+long+"\"\n"),
 		result{"", "?STRING TOO LONG  ERROR\n", 1})
 }

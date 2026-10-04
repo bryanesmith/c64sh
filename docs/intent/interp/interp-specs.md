@@ -215,3 +215,11 @@ Design: `interp-design.md`
 - [x] **INTERP-148**: When writing program output to a terminal with colors on, the interpreter shall write each of the 16 C64 color codes as `ESC[38;2;R;G;Bm` with that color's red, green, and blue values from the Pepto palette, without changing the column.
 - [x] **INTERP-149**: When writing program output that is not to a terminal, or with colors off for the color codes, the interpreter shall leave out the codes of INTERP-147 and INTERP-148, without changing the column, and write every other character as it is.
 - [x] **INTERP-150**: When `ScreenState` is called, the interpreter shall return the escape code of the last color it wrote to the terminal, if any, followed by `ESC[7m` if reverse video is on in the terminal, or the empty string if neither.
+
+## Environment
+
+- [x] **INTERP-151**: When evaluating `ENVIRON$(S$)` with a string, the interpreter shall return the value of the environment variable named `S$`, whatever its length, or the empty string if it is not set (a c64sh extension).
+- [x] **INTERP-152**: When evaluating `ENVIRON$(N)` with a number, the interpreter shall return the `N`th environment variable (counting from 1, in order of name) as `NAME=VALUE`, or the empty string if there are fewer than `N`; `N` is rounded down and must be from 1 to 255, else `ILLEGAL QUANTITY`.
+- [x] **INTERP-153**: When executing an `ast.EnvironStmt`, the interpreter shall join its parts, which must be strings (else `TYPE MISMATCH`), with no length limit, split the text at its first `=`, and set the environment variable named by the text before it to the text after it, or remove the variable if that text is empty.
+- [x] **INTERP-154**: If the joined text of an `ast.EnvironStmt` has no `=`, or nothing before it, or the environment refuses the name or value, then the interpreter shall return an `ILLEGAL QUANTITY` error and leave the environment unchanged.
+- [x] **INTERP-155**: The interpreter shall use the `Environment` given to `SetEnvironment`, or else an empty `MapEnvironment` of its own.

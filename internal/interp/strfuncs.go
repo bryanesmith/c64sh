@@ -14,6 +14,8 @@ import (
 // @spec INTERP-126, INTERP-127, INTERP-128, INTERP-129
 func (in *Interp) callString(e *ast.CallExpr) (value, error) {
 	switch e.Name {
+	case "ENVIRON$":
+		return in.environ(e.Args[0])
 	case "CHR$":
 		n, err := in.evalByte(e.Args[0])
 		if err != nil {

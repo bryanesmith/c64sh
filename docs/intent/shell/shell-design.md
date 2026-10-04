@@ -158,6 +158,10 @@ Each styled span ends with `ESC[0m` followed by the interpreter's `ScreenState`:
 
 The line editor colors typing with its prompt: the prompt is the input style alone, which `term.Terminal` counts as zero columns wide, so every redraw of the line is in that color; after each line is read, the editor writes the end of the span. The `INPUT` echo writes each typed character as its own styled span.
 
+## Environment
+
+`Config.Env` is the environment the interpreter's `ENVIRON$` and `ENVIRON` use (`SetEnvironment`); when it is nil, the interpreter keeps its own empty one. `Main` sets it to the process's own environment (`os.LookupEnv`, `os.Setenv`, `os.Unsetenv`, `os.Environ`), so that changes reach programs c64sh starts. Tests leave it nil or give a `MapEnvironment`.
+
 ## Clock
 
 The interpreter's clock (for `RND(0)`) is the system clock, unless `Config.Clock` is set: tests set a fixed clock, so that programs using it give the same output every run.
@@ -287,8 +291,9 @@ type Config struct {
     Clock       func() time.Time // the interpreter's clock; nil: the system clock
     Terminal    bool             // stdout is a terminal: screen codes become escape codes
     NoColor     bool             // NO_COLOR is set: no colors
-  Styled      bool             // stderr is a terminal and colors are on: the shell styles its own text
+    Styled      bool             // stderr is a terminal and colors are on: the shell styles its own text
     HistoryFile string // line-editor history file; empty: none
+    Env         interp.Environment // ENVIRON's environment; nil: the interpreter's own, empty
 }
 ```
 

@@ -38,20 +38,21 @@ const banner = "    **** C64SH BASIC V2 ****\n\nREADY."
 
 // Config selects how Run behaves.
 type Config struct {
-	Interactive bool             // banner, READY., continue after errors
-	File        string           // input file; empty means stdin
-	HistoryFile string           // line-editor history file; empty: none
-	Clock       func() time.Time // the interpreter's clock; nil: the system clock
-	Terminal    bool             // stdout is a terminal: screen codes become escape codes
-	NoColor     bool             // NO_COLOR is set: no colors
-	Styled      bool             // stderr is a terminal and colors are on: the shell styles its own text
+	Interactive bool               // banner, READY., continue after errors
+	File        string             // input file; empty means stdin
+	HistoryFile string             // line-editor history file; empty: none
+	Clock       func() time.Time   // the interpreter's clock; nil: the system clock
+	Terminal    bool               // stdout is a terminal: screen codes become escape codes
+	NoColor     bool               // NO_COLOR is set: no colors
+	Styled      bool               // stderr is a terminal and colors are on: the shell styles its own text
+	Env         interp.Environment // ENVIRON's environment; nil: the interpreter's own, empty
 }
 
 // Main runs c64sh with the given command-line arguments and streams and
 // returns the process exit status.
 //
 // @spec SHELL-CLI-002, SHELL-CLI-003, SHELL-CLI-004, SHELL-MODE-001, SHELL-MODE-002
-// @spec SHELL-HIST-001, SHELL-HIST-005, SHELL-STYLE-001
+// @spec SHELL-HIST-001, SHELL-HIST-005, SHELL-STYLE-001, SHELL-ENV-001
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var files []string
 	for _, arg := range args {
@@ -74,6 +75,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	cfg.Terminal = isTerminal(stdout)
 	cfg.NoColor = noColor(os.LookupEnv)
 	cfg.Styled = styled(stderr, cfg.NoColor)
+	cfg.Env = osEnvironment{}
 	if len(files) == 1 {
 		cfg.File = files[0]
 	} else {
@@ -106,7 +108,7 @@ func noColor(lookup func(string) (string, bool)) bool {
 // Interactive selects the behavior; File, or stdin when File is empty,
 // selects the input.
 //
-// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004, SHELL-CLOCK-001, SHELL-SCREEN-001, SHELL-SCREEN-002
+// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004, SHELL-CLOCK-001, SHELL-SCREEN-001, SHELL-SCREEN-002, SHELL-ENV-001
 func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	input, name := stdin, "stdin"
 	if cfg.File != "" {
@@ -133,6 +135,9 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 		s.interp.SetClock(cfg.Clock)
 	}
 	s.interp.SetScreen(cfg.Terminal, !cfg.NoColor)
+	if cfg.Env != nil {
+		s.interp.SetEnvironment(cfg.Env)
+	}
 	s.interp.SetStorage(dirStorage{})
 	if cfg.Interactive {
 		s.interp.SetMessages(stderr)

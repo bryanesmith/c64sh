@@ -117,7 +117,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OnStatement | DimStatement | DataStatement | ReadStatement | RestoreStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OnStatement | DimStatement | DataStatement | ReadStatement | RestoreStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | EnvironStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -195,6 +195,8 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return p.parseFilePrint()
 	case token.InputFile:
 		return p.parseInputFileStatement()
+	case token.Environ:
+		return p.parseEnvironStatement()
 	case token.Def:
 		stmt, err := p.parseDefStatement()
 		if err != nil {
@@ -516,6 +518,29 @@ func isDigit(c byte) bool { return '0' <= c && c <= '9' }
 // so the command does not run, as on a C64 ($A642, $A69C, $A831).
 func (p *parser) parseCommand(stmt ast.Stmt) (ast.Stmt, error) {
 	p.next()
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return stmt, nil
+}
+
+// EnvironStatement = environ Expression { ";" Expression } .
+//
+// ENVIRON is a c64sh extension. GW-BASIC's takes one string; the parts
+// after ";" let a value longer than a BASIC string be built.
+func (p *parser) parseEnvironStatement() (ast.Stmt, error) {
+	p.next()
+	stmt := &ast.EnvironStmt{}
+	for {
+		part, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+		stmt.Parts = append(stmt.Parts, part)
+		if !p.accept(token.Semicolon) {
+			break
+		}
+	}
 	if k := p.peek(); k != token.Colon && k != token.EOL {
 		return nil, syntaxError()
 	}
@@ -1042,6 +1067,7 @@ var arity = map[string][2]int{
 	"EXP": {1, 1}, "SIN": {1, 1}, "COS": {1, 1}, "TAN": {1, 1}, "ATN": {1, 1},
 	"LEN": {1, 1}, "CHR$": {1, 1}, "ASC": {1, 1}, "STR$": {1, 1}, "VAL": {1, 1},
 	"LEFT$": {2, 2}, "RIGHT$": {2, 2}, "MID$": {2, 3}, "POS": {1, 1},
+	"ENVIRON$": {1, 1},
 }
 
 // Call = function "(" Expression { "," Expression } ")" .

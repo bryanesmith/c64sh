@@ -32,6 +32,7 @@ To learn the language by building a game, start with the [tutorial](tutorial/ind
 - [User-defined functions](#user-defined-functions)
 - [Saving programs](#saving-programs)
 - [Data files](#data-files)
+- [Environment variables](#environment-variables)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -762,6 +763,31 @@ prints `ALICE 12 `, and leaves the file `SCORES` in the current directory.
 
 See [`examples/022-data-files.bas`](../examples/022-data-files.bas) for every form.
 
+## Environment variables
+
+*c64sh extension: not part of C64 BASIC V2. The words are GW-BASIC's, a later Microsoft BASIC.*
+
+Programs can read and set environment variables, such as `HOME`, `USER`, and `PATH`:
+
+```
+PRINT ENVIRON$("HOME")
+ENVIRON "GREETING=HELLO"
+ENVIRON "PATH=";ENVIRON$("PATH");":/opt/bin"
+```
+
+| Form | Does |
+|---|---|
+| `ENVIRON$("NAME")` | The variable's value, or `""` if it is not set |
+| `ENVIRON$(N)` | The `N`th variable (from 1, in order of name) as `NAME=VALUE`, or `""` past the last |
+| `ENVIRON "NAME=VALUE"` | Sets the variable; an empty value (`ENVIRON "NAME="`) removes it |
+| `ENVIRON A$;B$;…` | Joins the parts, then sets the variable as above |
+
+- **Long values.** Environment values can be longer than a BASIC string's 255 characters, and `PATH` often is. `PRINT ENVIRON$("PATH")` shows the whole value. Storing it in a variable or joining it with `+` is `?STRING TOO LONG  ERROR`, so a value is never cut short. To extend a long value, join the parts with `;`, which has no limit: `ENVIRON "PATH=";ENVIRON$("PATH");":/opt/bin"`.
+- **Changes last for the session**, and programs c64sh starts see them; they do not change the shell that started c64sh.
+- **Errors.** Text without `=`, or with nothing before it, is `?ILLEGAL QUANTITY  ERROR`; a number among `ENVIRON`'s parts is `?TYPE MISMATCH  ERROR`.
+
+See [`examples/031-environment.bas`](../examples/031-environment.bas) for every form, and [idiomatic BASIC](idioms.md#the-environment) for common patterns.
+
 ## Comments
 
 `REM` starts a comment. Everything after it, to the end of the line, is ignored:
@@ -857,7 +883,11 @@ These features are c64sh's own: they are not part of Commodore 64 BASIC V2 and d
 | [Editing and history](#editing-and-history) | Edit the line you are typing, and recall earlier lines, even from earlier sessions |
 | [Shell colors](#shell-colors) | Color what you type, `READY.`, and errors differently |
 
-**Language**: none yet.
+**Language**
+
+| Extension | What it does |
+|---|---|
+| [Environment variables](#environment-variables) | `ENVIRON$` reads and `ENVIRON` sets environment variables such as `PATH` |
 
 ## Differences from a real C64
 

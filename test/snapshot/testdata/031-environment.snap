@@ -1,0 +1,16 @@
+exit status: 1
+--- stdout ---
+HELLO
+[]
+1+1=2
+EARTH
+/usr/bin:/opt/c64/bin
+EQUATION=1+1=2
+[]
+EQUATION=1+1=2
+GREETING=HELLO
+PATH=/usr/bin:/opt/c64/bin
+PLANET=EARTH
+[]
+--- stderr ---
+?ILLEGAL QUANTITY  ERROR

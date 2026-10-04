@@ -109,6 +109,10 @@ type ReadStmt struct{ Vars []*VarRef }
 // RestoreStmt is RESTORE.
 type RestoreStmt struct{}
 
+// EnvironStmt is ENVIRON Expression { ; Expression }, a c64sh extension:
+// set or remove an environment variable.
+type EnvironStmt struct{ Parts []Expr }
+
 // IfStmt is IF Cond THEN. It guards the rest of its line: the statements
 // after it run only when Cond is true.
 type IfStmt struct{ Cond Expr }
@@ -304,6 +308,10 @@ A `VarRef`'s `Name` is the variable's identity, as on a C64: the first character
 
 A `Data` token is a `DataStmt` holding its text; the items in it are read by `READ` when it runs. `READ` is followed by one or more variables, separated by commas, as for `INPUT`. `RESTORE` takes no arguments; anything after it other than `:` or the end of the line is a SYNTAX error in place of the statement.
 
+### ENVIRON
+
+*c64sh extension.* `ENVIRON` is followed by one or more expressions separated by `;`, which `EnvironStmt` keeps in order; the interpreter joins them into one `NAME=VALUE` text. `ENVIRON$` is an ordinary function, taking one argument. GW-BASIC's `ENVIRON` takes a single string; the `;`-separated form is c64sh's, so that a value longer than a BASIC string, such as a long `PATH`, can be built from parts. A missing expression, or anything after the last one other than `:` or the end of the line, is a SYNTAX error in place of the statement.
+
 ### Reserved keywords
 
 A `Reserved` token (a BASIC V2 keyword c64sh does not support, see the lexer design) is a SYNTAX error wherever it appears: at the start of a statement, where an operand is expected, or anywhere else.
@@ -353,7 +361,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OnStatement \| DimStatement \| DataStatement \| ReadStatement \| RestoreStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OnStatement \| DimStatement \| DataStatement \| ReadStatement \| RestoreStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| EnvironStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," \| tab Expression ")" \| spc Expression ")" .` | `parsePrintItem` | `ast.PrintItem` |
@@ -397,6 +405,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `DataStatement = data .` | `parseStatement` | `*ast.DataStmt` |
 | `ReadStatement = read Variable { "," Variable } .` | `parseStatement` | `*ast.ReadStmt` |
 | `RestoreStatement = restore .` | `parseCommand` | `*ast.RestoreStmt` |
+| `EnvironStatement = environ Expression { ";" Expression } .` | `parseEnvironStatement` | `*ast.EnvironStmt` |
 | `DimStatement = dim Variable { "," Variable } .` | `parseDimStatement` | `*ast.DimStmt` |
 | `Operand = string \| number \| pi \| Variable \| "(" Expression ")" \| not Comparison \| fn FunctionName "(" Expression ")" \| Call .` | `parseOperand` | `ast.Expr` |
 

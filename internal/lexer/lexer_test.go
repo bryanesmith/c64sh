@@ -563,6 +563,15 @@ func TestDataText(t *testing.T) {
 	})
 }
 
+// @spec LEXER-045
+func TestEnvironKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"ENVIRON$", `ENVIRON$("HOME")`, []token.Token{tok(token.Function, "ENVIRON$", 0), tok(token.LParen, "(", 8), tok(token.String, "HOME", 9), tok(token.RParen, ")", 15), eol(16)}},
+		{"ENVIRON", `ENVIRON"A=1"`, []token.Token{tok(token.Environ, "ENVIRON", 0), tok(token.String, "A=1", 7), eol(12)}},
+		{"ENVIRON then a name", "ENVIRONX", []token.Token{tok(token.Environ, "ENVIRON", 0), name("X", 7), eol(8)}},
+	})
+}
+
 // @spec LEXER-044
 func TestReadRestoreKeywords(t *testing.T) {
 	runLexCases(t, []lexCase{

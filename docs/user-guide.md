@@ -4,6 +4,8 @@ c64sh is a shell that speaks Commodore 64 BASIC V2. It runs in an ordinary termi
 
 c64sh is being built one command at a time. This guide describes what works today.
 
+c64sh is Commodore 64 BASIC V2, plus a few **extensions** for working in a modern terminal. Every section about an extension begins with *c64sh extension*, so you know it won't work on a real C64; [Extensions](#extensions) lists them all.
+
 To learn the language by building a game, start with the [tutorial](tutorial/index.md); for the patterns experienced BASIC programmers used, see [idiomatic BASIC](idioms.md). For hands-on examples, see the numbered scripts in [`examples/`](../examples/). Each one shows a feature in many forms, with a comment beside every `PRINT` saying what it prints, and each can be run directly: `./examples/001-hello-world.bas`.
 
 - [Installing](#installing)
@@ -33,6 +35,7 @@ To learn the language by building a game, start with the [tutorial](tutorial/ind
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
+- [Extensions](#extensions)
 - [Differences from a real C64](#differences-from-a-real-c64)
 - [Not yet supported](#not-yet-supported)
 - [Not planned](#not-planned)
@@ -79,6 +82,8 @@ Each line you type runs as soon as you press Return; this is the C64's *direct m
 End the session with **Ctrl-D** at the start of a line.
 
 ### Editing and history
+
+*c64sh extension: a C64 has a full-screen editor instead, with no history.*
 
 While typing a line you can edit it and recall earlier lines:
 
@@ -840,6 +845,19 @@ An error in a running program adds the number of the line it happened in, as on 
 | 130 | A script was stopped by Ctrl-C (`BREAK`) |
 
 For example, `c64sh build.bas && echo done` prints `done` only if the script ran without errors.
+
+## Extensions
+
+These features are c64sh's own: they are not part of Commodore 64 BASIC V2 and do not work on a real C64. Each is marked *c64sh extension* where it is described.
+
+**Shell**
+
+| Extension | What it does |
+|---|---|
+| [Editing and history](#editing-and-history) | Edit the line you are typing, and recall earlier lines, even from earlier sessions |
+| [Shell colors](#shell-colors) | Color what you type, `READY.`, and errors differently |
+
+**Language**: none yet.
 
 ## Differences from a real C64
 

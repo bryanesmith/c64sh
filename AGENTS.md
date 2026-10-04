@@ -22,6 +22,15 @@ Example scripts follow these conventions (the snapshot tests enforce them):
 
 `docs/tutorial/` teaches the language by building a text adventure, chapter by chapter, in idiomatic BASIC. **When adding or changing a feature, update the tutorial in the same change where the feature belongs**: work it into the game or a project, or show it in the chapter that uses it, as the user guide is updated. Each chapter ends with its complete program in a ```` ```basic ```` block; earlier ```` ```basic ```` blocks are excerpts of it. The tests in `test/tutorial/` run every listing with input from `test/tutorial/testdata/<page>.input` and compare it with `<page>.snap`; run `make update-snapshots` and review the diff. Add any pattern a feature makes standard to the guide to idiomatic BASIC, `docs/idioms.md`, whose code blocks must parse as c64sh BASIC.
 
+## Extensions
+
+c64sh is BASIC V2 plus a few marked extensions (HLD tenet *BASIC V2, plus marked extensions*). **Every extension must be marked as one wherever it appears**, so no one mistakes it for BASIC V2:
+
+- The user guide's section for it begins with an italic line starting *c64sh extension*, and it is listed in the guide's **Extensions** section, under Shell or Language, with a link.
+- Its example script's `REM` header (second line) says it is a c64sh extension.
+- The tutorial and the guide to idiomatic BASIC call it a c64sh extension where they use it.
+- Its design doc and EARS specs say it is an extension and why it exists, and the HLD's goal for it says so.
+
 ## Linked-Intent Development (MANDATORY)
 
 **Consult the `linked-intent-dev` skill for ALL code changes.** All changes flow through the arrow of intent in one direction:

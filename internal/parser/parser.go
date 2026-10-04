@@ -524,27 +524,19 @@ func (p *parser) parseCommand(stmt ast.Stmt) (ast.Stmt, error) {
 	return stmt, nil
 }
 
-// EnvironStatement = environ Expression { ";" Expression } .
+// EnvironStatement = environ Expression .
 //
-// ENVIRON is a c64sh extension. GW-BASIC's takes one string; the parts
-// after ";" let a value longer than a BASIC string be built.
+// ENVIRON is a c64sh extension, in GW-BASIC's form.
 func (p *parser) parseEnvironStatement() (ast.Stmt, error) {
 	p.next()
-	stmt := &ast.EnvironStmt{}
-	for {
-		part, err := p.parseExpression()
-		if err != nil {
-			return nil, err
-		}
-		stmt.Parts = append(stmt.Parts, part)
-		if !p.accept(token.Semicolon) {
-			break
-		}
+	value, err := p.parseExpression()
+	if err != nil {
+		return nil, err
 	}
 	if k := p.peek(); k != token.Colon && k != token.EOL {
 		return nil, syntaxError()
 	}
-	return stmt, nil
+	return &ast.EnvironStmt{Value: value}, nil
 }
 
 // IfStatement = if Expression ( then [ LineNumber ] | /* goto, parsed as the next statement */ ) .

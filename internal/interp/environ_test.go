@@ -12,8 +12,15 @@ import (
 // the first error.
 func envRun(t *testing.T, env Environment, lines ...string) (string, error) {
 	t.Helper()
+	return envRunLimit(t, env, -1, lines...)
+}
+
+// envRunLimit is envRun with a string limit.
+func envRunLimit(t *testing.T, env Environment, limit int, lines ...string) (string, error) {
+	t.Helper()
 	rec := &recorder{}
 	in := New(rec)
+	in.SetStringLimit(limit)
 	if env != nil {
 		in.SetEnvironment(env)
 	}
@@ -44,10 +51,13 @@ func TestEnvironByName(t *testing.T) {
 	if want := "/home/c64\n[]\n 400 \n" + long + "\n"; out != want {
 		t.Errorf("output %q; want %q", out, want)
 	}
-	_, err = envRun(t, env, `P$=ENVIRON$("PATH")`)
-	wantKind(t, "storing a long value", err, basicerr.StringTooLong)
-	_, err = envRun(t, env, `PRINT ENVIRON$("PATH")+":"`)
-	wantKind(t, "joining a long value with +", err, basicerr.StringTooLong)
+	_, err = envRunLimit(t, env, 255, `P$=ENVIRON$("PATH")`)
+	wantKind(t, "storing a long value with a limit", err, basicerr.StringTooLong)
+	_, err = envRunLimit(t, env, 255, `PRINT ENVIRON$("PATH")+":"`)
+	wantKind(t, "joining a long value with + with a limit", err, basicerr.StringTooLong)
+	if out, err := envRunLimit(t, env, 255, `PRINT LEN(ENVIRON$("PATH"))`); err != nil || out != " 400 \n" {
+		t.Errorf("with a limit, ENVIRON$ still returns the whole value: %q, %v", out, err)
+	}
 }
 
 // @spec INTERP-152
@@ -69,7 +79,7 @@ func TestEnvironByNumber(t *testing.T) {
 // @spec INTERP-153
 func TestEnvironSets(t *testing.T) {
 	env := MapEnvironment{"OLD": "1", "PATH": strings.Repeat("/X", 200)}
-	_, err := envRun(t, env, `ENVIRON "GREETING=HELLO=WORLD"`, `ENVIRON "OLD="`, `N$="NAME":ENVIRON N$;"=";"C";"64"`, `ENVIRON "PATH=";ENVIRON$("PATH");":/OPT"`)
+	_, err := envRun(t, env, `ENVIRON "GREETING=HELLO=WORLD"`, `ENVIRON "OLD="`, `N$="NAME":ENVIRON N$+"="+"C"+"64"`, `ENVIRON "PATH="+ENVIRON$("PATH")+":/OPT"`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,8 +92,8 @@ func TestEnvironSets(t *testing.T) {
 	if want := strings.Repeat("/X", 200) + ":/OPT"; env["PATH"] != want {
 		t.Errorf("PATH is %d characters; want %d", len(env["PATH"]), len(want))
 	}
-	_, err = envRun(t, env, `ENVIRON "X=";1`)
-	wantKind(t, "a number part", err, basicerr.TypeMismatch)
+	_, err = envRun(t, env, `ENVIRON 1`)
+	wantKind(t, "a number", err, basicerr.TypeMismatch)
 }
 
 // refusing is an environment that refuses every change.

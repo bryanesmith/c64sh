@@ -119,6 +119,10 @@ type MapEnvironment map[string]string
 // one, they use an empty MapEnvironment.
 func (in *Interp) SetEnvironment(e Environment)
 
+// SetStringLimit sets the most characters a string may hold: -1 for no
+// limit (the default), or a whole number from 0, such as the C64's 255.
+func (in *Interp) SetStringLimit(n int)
+
 // SetMessages sets where the C64's tape and disk messages (SAVING NAME,
 // LOADING, …) are written, for statements executed in direct mode.
 // Without a writer, no messages are written.
@@ -511,14 +515,14 @@ Results are limited to the C64's range like any other number (see *Values*).
 
 ## String functions
 
-String functions evaluate their arguments in order; each must have its type (a string or a number, below, else `TYPE MISMATCH`), and each number marked *byte* is rounded down and must be from 0 to 255 (else `ILLEGAL QUANTITY`), as the ROM reads them (`$B79E`). Characters are Unicode characters, counted as for the 255-character limit.
+String functions evaluate their arguments in order; each must have its type (a string or a number, below, else `TYPE MISMATCH`), and each number marked *byte* is rounded down and must be from 0 to 255 (else `ILLEGAL QUANTITY`), as the ROM reads them (`$B79E`). A *position* (the numbers of `LEFT$`, `RIGHT$`, and `MID$`) is a byte while the string limit is 255 or less, as on a C64; when strings may be longer, it is rounded down and must be from 0 to the string limit, or simply not negative when strings are unlimited, so a long string can be sliced anywhere. Characters are Unicode characters, counted as for the string limit.
 
 | Function | Value |
 |---|---|
 | `LEN(S$)` | The number of characters in `S$`. |
-| `LEFT$(S$, N)` | The first `N` (byte) characters, or all of `S$` if it is shorter. |
-| `RIGHT$(S$, N)` | The last `N` (byte) characters, or all of `S$`. |
-| `MID$(S$, P [, N])` | `N` (byte; all if omitted) characters from position `P` (byte, counting from 1); `P` of 0 is `ILLEGAL QUANTITY`; past the end, the empty string. |
+| `LEFT$(S$, N)` | The first `N` (position) characters, or all of `S$` if it is shorter. |
+| `RIGHT$(S$, N)` | The last `N` (position) characters, or all of `S$`. |
+| `MID$(S$, P [, N])` | `N` (position; all if omitted) characters from position `P` (position, counting from 1); `P` of 0 is `ILLEGAL QUANTITY`; past the end, the empty string. |
 | `CHR$(N)` | The character with code `N` (byte): the Unicode character `N`, which for 32 to 126 is the same as the C64's. |
 | `ASC(S$)` | The code of the first character (its Unicode code point); `ILLEGAL QUANTITY` for the empty string (`$B78B`). |
 | `STR$(X)` | `X` formatted as `PRINT` formats it, without the space after: `STR$(5)` is `" 5"`. |
@@ -532,9 +536,9 @@ String functions evaluate their arguments in order; each must have its type (a s
 |---|---|
 | `ENVIRON$(S$)` | The value of the variable named `S$`, or the empty string if it is not set. |
 | `ENVIRON$(N)` | The `N`th (byte, from 1) variable as `NAME=VALUE`, counting in order of name, or the empty string past the last; `N` of 0 is `ILLEGAL QUANTITY`. A loop up to the first empty string lists them all. |
-| `ENVIRON S$ [; S$ …]` | Joins the strings into one text and splits it at its first `=` into a name and a value: sets the variable, or removes it if the value is empty. A number among them is `TYPE MISMATCH`; no `=`, or nothing before it, is `ILLEGAL QUANTITY`, as is a name or value the environment refuses. |
+| `ENVIRON S$` | Splits `S$` at its first `=` into a name and a value: sets the variable, or removes it if the value is empty. A number is `TYPE MISMATCH`; no `=`, or nothing before it, is `ILLEGAL QUANTITY`, as is a name or value the environment refuses. |
 
-Environment values are often longer than a BASIC string's 255 characters (`PATH` is). `ENVIRON$` returns the whole value, so `PRINT ENVIRON$("PATH")` shows it, and the string functions read it; storing it in a variable, or joining it with `+`, is `STRING TOO LONG` as for any other string, so a value is never silently cut short. `ENVIRON`'s parts are joined without that limit, so `ENVIRON "PATH=";ENVIRON$("PATH");":/opt/bin"` extends a long `PATH`.
+Environment values are often longer than a C64 string's 255 characters (`PATH` is). Strings are unlimited by default (see *String length*), so `ENVIRON "PATH="+ENVIRON$("PATH")+":/opt/bin"` extends any `PATH`. With a string limit set, `ENVIRON$` still returns the whole value, so `PRINT ENVIRON$("PATH")` shows it, and the string functions read it; storing it in a variable, or joining it with `+`, is `STRING TOO LONG` as for any other string, so a value is never silently cut short.
 
 ## The clock
 
@@ -635,7 +639,9 @@ Every numeric result is limited to the C64's range: `OVERFLOW` if its size excee
 
 ### String length
 
-On a C64, a string produced at run time can hold at most 255 characters. If joining strings with `+` would produce a longer string, evaluation fails with a `STRING TOO LONG` error; the `PRINT` containing it writes only the output of items before the failing one (see *PRINT*). Length is counted in characters (Unicode code points), not bytes; each byte that is not valid UTF-8 counts as one character. A string literal printed without being joined is not limited, as on a C64, where literals are printed directly from the program text.
+On a C64, a string produced at run time can hold at most 255 characters, because its length is kept in one byte. In c64sh the **string limit** is set with `SetStringLimit`: unlimited (-1) by default, or 255 for the C64's limit, or any other whole number from 0. While a limit is set, if joining strings with `+` would produce a longer string, evaluation fails with a `STRING TOO LONG` error, and so does storing a longer string in a variable; the `PRINT` containing it writes only the output of items before the failing one (see *PRINT*). Length is counted in characters (Unicode code points), not bytes; each byte that is not valid UTF-8 counts as one character. A string literal printed without being joined is not limited, as on a C64, where literals are printed directly from the program text.
+
+Unlimited is the default because it cannot change how any working C64 program behaves: BASIC V2 has no `ON ERROR`, so `STRING TOO LONG` can only ever stop a program, and lifting the limit only lets lines that would have failed succeed. A limit of 255 brings back the C64's check, for programs meant to run on one.
 
 ## Errors
 
@@ -643,7 +649,7 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 
 | Kind | Cause |
 |---|---|
-| `STRING TOO LONG` | Joining strings with `+` produces more than 255 characters, or a string longer than 255 characters is assigned to a variable. |
+| `STRING TOO LONG` | While a string limit is set, joining strings with `+` produces a string longer than the limit, or a string longer than the limit is assigned to a variable. |
 | `TYPE MISMATCH` | Comparing a string with a number; a string operand of `AND`, `OR`, or `NOT`; assigning a string to a number variable or a number to a string variable; `+` with a string on one side and a number on the other; `-`, `*`, `/`, `^`, or negation with any string operand. |
 | `OVERFLOW` | A number literal or arithmetic result larger in size than `maxNumber`. |
 | `DIVISION BY ZERO` | `/` with a right operand of 0. |
@@ -681,8 +687,8 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
 | Environment access | Through an `Environment`, the process's own from the shell | Read and set the process environment directly | Tests and snapshots stay deterministic and never change the test process's environment. |
-| Values over 255 characters | `ENVIRON$` returns all of it; storing or `+` is `STRING TOO LONG` | Truncate to 255; `STRING TOO LONG` from `ENVIRON$` itself | Truncating would silently corrupt a value written back (a cut-short `PATH`); an error from `ENVIRON$` would make long values impossible even to print. |
-| Building long values | `ENVIRON` joins `;`-separated parts, without the string limit | GW-BASIC's single string only; raise the string limit | Keeps GW-BASIC's form working unchanged while making `PATH` editable; the 255-character limit stays a C64 rule everywhere else. |
+| Values longer than the string limit | `ENVIRON$` returns all of it; storing or `+` is `STRING TOO LONG` | Truncate to the limit; `STRING TOO LONG` from `ENVIRON$` itself | Truncating would silently corrupt a value written back (a cut-short `PATH`); an error from `ENVIRON$` would make long values impossible even to print. |
+| `ENVIRON`'s form | GW-BASIC's single string | Also join `;`-separated parts, without the string limit | With strings unlimited by default, `+` builds any value, so a second form would only add surface. |
 | `ENVIRON$(N)` order | By name | The process's order, as GW-BASIC lists its table | The process's order is arbitrary; by name, a listing is stable and easy to read. |
 | Number type | `float64` with C64 range checks and C64 output format | Emulating the C64's 5-byte float | See HLD *Number representation*. The range constants make overflow and underflow match the C64's limits, and formatting reproduces its output. |
 | Integer variable conversion | Round down (toward minus infinity) | Truncate toward zero; round to nearest | The C64 ROM converts by shifting the two's-complement mantissa, which rounds down, so `-3.7` becomes -4. |
@@ -692,7 +698,8 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Screen codes | Translated in the interpreter's single writer, which also keeps the column | Translate in the shell's output stream | The column must follow the codes' meaning (clear and home return it to 0, colors take no column), and only the interpreter keeps the column. |
 | Cursor column owner | The interpreter, which writes all program output | The shell's output wrapper, queried by the interpreter; separate counts in both, kept in step by the shell | One owner means one count that cannot drift, and the interpreter is where a C64 program's cursor lives. `FreshLine` lets the shell start errors and `READY.` on a new line without tracking output itself. The C64's `POS()` function will read the same column. |
 | Trailing `;` or `,` | Suppresses the newline | Always end with a newline | C64 BASIC V2 behavior. Scripts rely on it to build one line of output from several statements. |
-| 255-character limit | Enforced on concatenation results | No limit | Tenet *C64 language, Unix I/O*: string semantics are language behavior. Enforcing it now avoids a behavior change when string functions arrive. |
+| String limit | A setting, unlimited (-1) by default; 255 restores the C64's | Always 255, as on a C64; unlimited with no way back | No program can catch `STRING TOO LONG` (BASIC V2 has no `ON ERROR`), so unlimited never changes a working C64 program, while environment values, program output, and network data are routinely longer than 255. The setting keeps the C64's check for programs meant to run on one. -1 for unlimited is the common convention. |
+| Positions past 255 | Allowed when the limit allows longer strings; bytes otherwise | Bytes always | A long string that cannot be sliced past 255 is of little use; with a limit of 255 or less, behavior is exactly the C64's. |
 | Output writes | One write per `PRINT`; on failure, one write of the items before the failing one | One write per item; write nothing on failure | Keeps output of a single statement together and reduces system calls when output is unbuffered, while still showing exactly what a C64 would have printed before the error. |
 | State | `Interp` value created once per session | Stateless function | Variables and the stored program need a home that persists across lines. |
 | Execution model | A position (line, statement index) and a control stack of entries holding positions | Run line by line, with loops handled by re-running whole lines; a tree-walking loop construct built by the parser | A C64 resumes a loop just after its `FOR`, which can be mid-line or in the direct-mode line, and lets `NEXT` and `FOR` be anywhere, unmatched in the text. Only positions reproduce that; a parsed loop construct would reject valid programs such as one `FOR` with two `NEXT`s. |

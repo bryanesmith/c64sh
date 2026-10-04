@@ -38,14 +38,13 @@ const banner = "    **** C64SH BASIC V2 ****\n\nREADY."
 
 // Config selects how Run behaves.
 type Config struct {
-	Interactive bool               // banner, READY., continue after errors
-	File        string             // input file; empty means stdin
-	HistoryFile string             // line-editor history file; empty: none
-	Clock       func() time.Time   // the interpreter's clock; nil: the system clock
-	Terminal    bool               // stdout is a terminal: screen codes become escape codes
-	NoColor     bool               // NO_COLOR is set: no colors
-	Styled      bool               // stderr is a terminal and colors are on: the shell styles its own text
-	Env         interp.Environment // ENVIRON's environment; nil: the interpreter's own, empty
+	Interactive    bool               // run-commands file, banner, READY., continue after errors
+	File           string             // input file; empty means stdin
+	Clock          func() time.Time   // the interpreter's clock; nil: the system clock
+	Terminal       bool               // stdout is a terminal: screen codes become escape codes
+	StderrTerminal bool               // stderr is a terminal: the shell may style its own text
+	Env            interp.Environment // ENVIRON's environment and the shell's settings; nil: empty
+	Home           string             // home directory, for ~/.c64shrc and ~/.c64sh_history; empty: unknown
 }
 
 // Main runs c64sh with the given command-line arguments and streams and
@@ -71,11 +70,10 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	var cfg Config
-	cfg.HistoryFile = defaultHistoryFile(os.LookupEnv, os.UserHomeDir)
 	cfg.Terminal = isTerminal(stdout)
-	cfg.NoColor = noColor(os.LookupEnv)
-	cfg.Styled = styled(stderr, cfg.NoColor)
+	cfg.StderrTerminal = isTerminal(stderr)
 	cfg.Env = osEnvironment{}
+	cfg.Home, _ = os.UserHomeDir() // "" if unknown
 	if len(files) == 1 {
 		cfg.File = files[0]
 	} else {
@@ -95,20 +93,12 @@ func isTerminal(r any) bool {
 	return ok && term.IsTerminal(int(f.Fd()))
 }
 
-// noColor reports whether the environment asks for no colors: NO_COLOR
-// set to a non-empty value.
-//
-// @spec SHELL-SCREEN-001
-func noColor(lookup func(string) (string, bool)) bool {
-	v, ok := lookup("NO_COLOR")
-	return ok && v != ""
-}
-
 // Run is Main with the mode chosen by the caller instead of detected.
 // Interactive selects the behavior; File, or stdin when File is empty,
 // selects the input.
 //
-// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004, SHELL-CLOCK-001, SHELL-SCREEN-001, SHELL-SCREEN-002, SHELL-ENV-001
+// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004, SHELL-CLOCK-001, SHELL-SCREEN-002, SHELL-ENV-001
+// @spec SHELL-SET-001, SHELL-SET-004, SHELL-RC-005
 func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	input, name := stdin, "stdin"
 	if cfg.File != "" {
@@ -125,16 +115,12 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 		stderr:      stderr,
 		interp:      interp.New(stdout),
 	}
-	if cfg.Styled {
-		s.style = newStyle(s.interp)
-	}
 	plain := bufio.NewReader(input)
 	var lines lineReader = &plainReader{r: plain}
 	s.setConsole(cfg, stdin, plain)
 	if cfg.Clock != nil {
 		s.interp.SetClock(cfg.Clock)
 	}
-	s.interp.SetScreen(cfg.Terminal, !cfg.NoColor)
 	if cfg.Env != nil {
 		s.interp.SetEnvironment(cfg.Env)
 	}
@@ -142,13 +128,31 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	if cfg.Interactive {
 		s.interp.SetMessages(stderr)
 	}
-	if editorWanted(cfg, stdin, stderr) {
-		tty := stdin.(*os.File)
-		editor := newEditorReader(tty, stderr, terminalRawMode(tty), terminalSize(tty), cfg.HistoryFile, stderr)
-		editor.setStyle(s.style)
-		lines = editor
+
+	// The settings are read again after the run-commands file, which can
+	// set them; that reading decides them.
+	set := readSettings(cfg.Env, cfg.Home)
+	s.apply(cfg, set)
+	status, stop := 0, false
+	if cfg.Interactive {
+		if rc := runCommandsFile(cfg.Env, cfg.Home); rc != "" {
+			status, stop = s.runCommands(rc)
+		}
+		set = readSettings(cfg.Env, cfg.Home)
+		s.apply(cfg, set)
 	}
-	status := s.run(lines, name)
+	for _, msg := range set.invalid {
+		io.WriteString(stderr, msg+"\n")
+	}
+	if !stop {
+		if editorWanted(cfg, stdin, stderr) {
+			tty := stdin.(*os.File)
+			editor := newEditorReader(tty, stderr, terminalRawMode(tty), terminalSize(tty), set.historyFile, set.historySize, stderr)
+			editor.setStyle(s.style)
+			lines = editor
+		}
+		status = s.run(lines, name)
+	}
 	if cfg.Terminal {
 		// A program's color stays set, as on a C64; the user's own shell
 		// should not inherit it.
@@ -164,6 +168,62 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	return status
 }
 
+// apply puts the shell's settings into effect: colors in program output,
+// unless NO_COLOR, the string limit, and the shell's styles, when stderr
+// is a terminal.
+//
+// @spec SHELL-SCREEN-001, SHELL-STYLE-001
+func (s *session) apply(cfg Config, set settings) {
+	s.interp.SetScreen(cfg.Terminal, !set.noColor)
+	s.interp.SetStringLimit(set.stringLimit)
+	s.style = style{}
+	if cfg.StderrTerminal && !set.noColor {
+		s.style = newStyle(s.interp, set)
+	}
+}
+
+// runCommands runs the lines of the run-commands file as if typed, with
+// no READY. after them, and stops at the first error, which it reports
+// with the file and line in front. It returns the exit status and whether
+// the session must stop, as execLine does.
+//
+// @spec SHELL-RC-002, SHELL-RC-003, SHELL-RC-004
+func (s *session) runCommands(path string) (int, bool) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, false
+	}
+	if err != nil {
+		io.WriteString(s.stderr, s.style.paint(s.style.fail, fmt.Sprintf("c64sh: %s: %s", path, reason(err)))+"\n")
+		return 0, false
+	}
+	defer func() { s.where = "" }()
+	for i, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		if isBlank(line) {
+			continue
+		}
+		s.where = fmt.Sprintf("c64sh: %s:%d: ", path, i+1)
+		_, err := s.enter(line)
+		if status, stop := s.handle(err); stop {
+			return status, true
+		}
+		if err != nil {
+			break
+		}
+	}
+	return 0, false
+}
+
+// reason returns why an operation on a file failed, without the operation
+// and path a *fs.PathError adds.
+func reason(err error) string {
+	if pathErr, ok := errors.AsType[*fs.PathError](err); ok {
+		return pathErr.Err.Error()
+	}
+	return err.Error()
+}
+
 // inputError reports that the named input could not be read.
 func inputError(stderr io.Writer, name string, err error) int {
 	if pathErr, ok := errors.AsType[*fs.PathError](err); ok {
@@ -177,7 +237,8 @@ func inputError(stderr io.Writer, name string, err error) int {
 type session struct {
 	interactive bool
 	stderr      io.Writer
-	style       style // how the shell's own text is styled
+	style       style  // how the shell's own text is styled
+	where       string // while the run-commands file runs, "c64sh: FILE:N: " for messages
 	interp      *interp.Interp
 	programMode func() (restore func(), err error) // for INPUT and GET at a terminal; nil otherwise
 }
@@ -191,7 +252,7 @@ func (s *session) setConsole(cfg Config, stdin io.Reader, lines *bufio.Reader) {
 	switch {
 	case isTerminal(stdin):
 		tty := stdin.(*os.File)
-		s.interp.SetConsole(&ttyConsole{in: tty, echo: s.stderr, style: s.style})
+		s.interp.SetConsole(&ttyConsole{in: tty, echo: s.stderr, style: &s.style})
 		s.programMode = terminalProgramMode(tty)
 	case cfg.File == "":
 		s.interp.SetConsole(&lineConsole{r: lines})
@@ -246,32 +307,54 @@ func isBlank(line string) bool {
 }
 
 // execLine stores a numbered line in the program, or runs any other line
-// in direct mode. It returns the exit status and whether the session must
-// stop.
+// in direct mode, and reports any error. It returns the exit status and
+// whether the session must stop.
 //
-// @spec SHELL-LINE-005, SHELL-LINE-006, SHELL-LINE-007, SHELL-MODE-004
-// @spec SHELL-INT-002, SHELL-INT-005, SHELL-SCRIPT-005, SHELL-PROG-001, SHELL-PROG-002, SHELL-KEY-006
+// @spec SHELL-INT-002, SHELL-INT-005, SHELL-SCRIPT-005, SHELL-KEY-006
 func (s *session) execLine(line string) (int, bool) {
+	stored, err := s.enter(line)
+	if stored {
+		return 0, false // a C64 prints no READY. after storing a line
+	}
+	if status, stop := s.handle(err); stop {
+		return status, true
+	}
+	if s.interactive {
+		s.ready()
+	}
+	return 0, false
+}
+
+// enter stores a numbered line in the program, reporting stored, or runs
+// any other line in direct mode, returning its error.
+//
+// @spec SHELL-LINE-005, SHELL-LINE-006, SHELL-LINE-007, SHELL-MODE-004, SHELL-PROG-001, SHELL-PROG-002
+func (s *session) enter(line string) (stored bool, err error) {
 	n, rest, numbered, err := lexer.LineNumber(line)
 	switch {
 	case numbered && err == nil:
 		s.interp.Store(n, rest)
-		return 0, false // a C64 prints no READY. after storing a line
+		return true, nil
 	case !numbered:
 		// A syntax error is part of the tree, where parsing failed, so it
 		// is reported only if execution reaches it: statements before it
 		// run first, and one skipped by a false IF is never reported, as
 		// on a C64.
 		tree, _ := parser.Parse(lexer.Lex(line))
-		err = s.exec(tree)
+		return false, s.exec(tree)
 	}
+	return false, err
+}
 
+// handle reports an error from a line, if any, and returns the exit status
+// and whether the session must stop.
+func (s *session) handle(err error) (int, bool) {
 	basicErr, isBasic := errors.AsType[*basicerr.Error](err)
 	var storageErr *interp.StorageError
 	switch {
 	case errors.Is(err, interp.ErrEndOfInput):
 		s.freshLine()
-		io.WriteString(s.stderr, s.style.paint(s.style.fail, "c64sh: stdin: end of input")+"\n")
+		io.WriteString(s.stderr, s.style.paint(s.style.fail, s.label("c64sh: ")+"stdin: end of input")+"\n")
 		return 1, true
 	case errors.As(err, &storageErr):
 		s.reportStorage(storageErr)
@@ -290,11 +373,16 @@ func (s *session) execLine(line string) (int, bool) {
 	default:
 		return 1, true // program output could not be written
 	}
-
-	if s.interactive {
-		s.ready()
-	}
 	return 0, false
+}
+
+// label returns what a message starts with: the run-commands file's place
+// while it runs, otherwise def.
+func (s *session) label(def string) string {
+	if s.where != "" {
+		return s.where
+	}
+	return def
 }
 
 // notifyInterrupt and stopInterrupt start and stop delivering SIGINT to
@@ -337,14 +425,11 @@ func (s *session) exec(tree *ast.Line) error {
 // @spec SHELL-FILE-003
 func (s *session) reportStorage(err *interp.StorageError) {
 	s.freshLine()
-	reason := err.Err.Error()
-	if pathErr, ok := errors.AsType[*fs.PathError](err.Err); ok {
-		reason = pathErr.Err.Error()
-	}
+	why := reason(err.Err)
 	if errors.Is(err.Err, fs.ErrExist) {
-		reason = fmt.Sprintf("file exists (use %s to replace it)", err.Replace)
+		why = fmt.Sprintf("file exists (use %s to replace it)", err.Replace)
 	}
-	io.WriteString(s.stderr, s.style.paint(s.style.fail, fmt.Sprintf("c64sh: %s: %s", err.File, reason))+"\n")
+	io.WriteString(s.stderr, s.style.paint(s.style.fail, fmt.Sprintf("%s%s: %s", s.label("c64sh: "), err.File, why))+"\n")
 }
 
 // report writes a BASIC error the way a C64 prints it, on a fresh line,
@@ -361,7 +446,7 @@ func (s *session) report(err *basicerr.Error) {
 	if err.HasLine {
 		msg += fmt.Sprintf(" IN %d", err.Line)
 	}
-	io.WriteString(s.stderr, s.style.paint(s.style.fail, msg)+"\n")
+	io.WriteString(s.stderr, s.style.paint(s.style.fail, s.label("")+msg)+"\n")
 }
 
 // ready writes the READY. prompt on a fresh line.

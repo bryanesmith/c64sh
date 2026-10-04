@@ -286,9 +286,9 @@ type ReadStmt struct{ Vars []*VarRef }
 // RestoreStmt is RESTORE.
 type RestoreStmt struct{}
 
-// EnvironStmt is ENVIRON Expression { ; Expression }, a c64sh extension:
-// set or remove an environment variable.
-type EnvironStmt struct{ Parts []Expr }
+// EnvironStmt is ENVIRON Expression, a c64sh extension: set or remove an
+// environment variable.
+type EnvironStmt struct{ Value Expr }
 
 func (*EnvironStmt) stmt() {}
 

@@ -44,6 +44,20 @@ func (m MapEnvironment) List() []string {
 	return vars
 }
 
+// SetStringLimit sets the most characters a string may hold: -1 for no
+// limit (the default), or a whole number from 0, such as the C64's 255.
+//
+// @spec INTERP-156
+func (in *Interp) SetStringLimit(n int) {
+	in.stringLimit = n
+}
+
+// tooLong reports whether a string of n characters is longer than the
+// string limit allows.
+func (in *Interp) tooLong(n int) bool {
+	return in.stringLimit >= 0 && n > in.stringLimit
+}
+
 // SetEnvironment sets the environment ENVIRON$ and ENVIRON use. Without
 // one, they use an empty MapEnvironment.
 //
@@ -84,24 +98,19 @@ func (in *Interp) environ(arg ast.Expr) (value, error) {
 	return stringValue(vars[n-1]), nil
 }
 
-// execEnviron joins ENVIRON's parts, with no length limit, and sets the
-// variable the text names, or removes it if the value is empty.
+// execEnviron sets the variable that ENVIRON's NAME=VALUE text names, or
+// removes it if the value is empty.
 //
 // @spec INTERP-153, INTERP-154
 func (in *Interp) execEnviron(s *ast.EnvironStmt) error {
-	var b strings.Builder
-	for _, part := range s.Parts {
-		str, err := in.evalString(part)
-		if err != nil {
-			return err
-		}
-		b.WriteString(str)
+	text, err := in.evalString(s.Value)
+	if err != nil {
+		return err
 	}
-	name, val, ok := strings.Cut(b.String(), "=")
+	name, val, ok := strings.Cut(text, "=")
 	if !ok || name == "" {
 		return &basicerr.Error{Kind: basicerr.IllegalQuantity}
 	}
-	var err error
 	if val == "" {
 		err = in.env.Unset(name)
 	} else {

@@ -109,9 +109,9 @@ type ReadStmt struct{ Vars []*VarRef }
 // RestoreStmt is RESTORE.
 type RestoreStmt struct{}
 
-// EnvironStmt is ENVIRON Expression { ; Expression }, a c64sh extension:
-// set or remove an environment variable.
-type EnvironStmt struct{ Parts []Expr }
+// EnvironStmt is ENVIRON Expression, a c64sh extension: set or remove an
+// environment variable.
+type EnvironStmt struct{ Value Expr }
 
 // IfStmt is IF Cond THEN. It guards the rest of its line: the statements
 // after it run only when Cond is true.
@@ -310,7 +310,7 @@ A `Data` token is a `DataStmt` holding its text; the items in it are read by `RE
 
 ### ENVIRON
 
-*c64sh extension.* `ENVIRON` is followed by one or more expressions separated by `;`, which `EnvironStmt` keeps in order; the interpreter joins them into one `NAME=VALUE` text. `ENVIRON$` is an ordinary function, taking one argument. GW-BASIC's `ENVIRON` takes a single string; the `;`-separated form is c64sh's, so that a value longer than a BASIC string, such as a long `PATH`, can be built from parts. A missing expression, or anything after the last one other than `:` or the end of the line, is a SYNTAX error in place of the statement.
+*c64sh extension.* `ENVIRON` is followed by one expression, as in GW-BASIC, which the interpreter reads as `NAME=VALUE`. `ENVIRON$` is an ordinary function, taking one argument. A missing expression, or anything after the last one other than `:` or the end of the line, is a SYNTAX error in place of the statement.
 
 ### Reserved keywords
 
@@ -405,7 +405,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `DataStatement = data .` | `parseStatement` | `*ast.DataStmt` |
 | `ReadStatement = read Variable { "," Variable } .` | `parseStatement` | `*ast.ReadStmt` |
 | `RestoreStatement = restore .` | `parseCommand` | `*ast.RestoreStmt` |
-| `EnvironStatement = environ Expression { ";" Expression } .` | `parseEnvironStatement` | `*ast.EnvironStmt` |
+| `EnvironStatement = environ Expression .` | `parseEnvironStatement` | `*ast.EnvironStmt` |
 | `DimStatement = dim Variable { "," Variable } .` | `parseDimStatement` | `*ast.DimStmt` |
 | `Operand = string \| number \| pi \| Variable \| "(" Expression ")" \| not Comparison \| fn FunctionName "(" Expression ")" \| Call .` | `parseOperand` | `ast.Expr` |
 

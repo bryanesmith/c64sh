@@ -134,7 +134,8 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `028-data-statements.bas` | `READ` and `DATA`, a table ended by a marker value, filling an array from `DATA`, quoted items and keywords as text, `RESTORE`, and `?OUT OF DATA  ERROR IN 10` |
 | `029-clock.bas` | `TI` and `TI$` (with the fixed clock), setting `TI$`, a timer, seeding `RND(-TI)` after a key press (its key comes from `029-clock.input`), and `TI=0` as a `?SYNTAX  ERROR` |
 | `030-screen-codes.bas` | Clearing the screen, colors, reverse video, cursor right, Return, and codes in variables, as plain output (the snapshot is not a terminal) |
-| `031-environment.bas` | `ENVIRON` and `ENVIRON$` (a c64sh extension): setting, reading, unset variables, values with `=`, names from expressions, joining parts with `;`, listing by number, removing, and an error |
+| `031-environment.bas` | `ENVIRON` and `ENVIRON$` (a c64sh extension): setting, reading, unset variables, values with `=`, names from expressions, extending `PATH` with `+`, listing by number, removing, and an error |
+| `032-string-length.bas` | Strings longer than 255 characters (the default, unlimited string limit), positions past 255 in `LEFT$`, `RIGHT$`, and `MID$`, and a negative position as `?ILLEGAL QUANTITY  ERROR` |
 | `005-syntax-errors.bas` | Common mistakes explained in comments, ending in `?SYNTAX  ERROR` |
 
 ## Decisions & Alternatives

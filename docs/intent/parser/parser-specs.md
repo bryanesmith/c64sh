@@ -126,5 +126,5 @@ Design: `parser-design.md`
 
 ## Environment
 
-- [x] **PARSER-078**: When a statement is `ENVIRON` followed by one or more expressions separated by `;`, the parser shall produce an `*ast.EnvironStmt` holding the expressions in order, and when a call is `ENVIRON$` with one argument, an `*ast.CallExpr` (both c64sh extensions).
-- [x] **PARSER-079**: If `ENVIRON` lacks an expression, or its last expression is followed by anything other than `:` or `EOL`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement; an `ENVIRON$` call with other than one argument shall be a SYNTAX error as for any other call.
+- [x] **PARSER-078**: When a statement is `ENVIRON` followed by an expression, the parser shall produce an `*ast.EnvironStmt` holding it, and when a call is `ENVIRON$` with one argument, an `*ast.CallExpr` (both c64sh extensions).
+- [x] **PARSER-079**: If `ENVIRON` lacks an expression, or its expression is followed by anything other than `:` or `EOL`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement; an `ENVIRON$` call with other than one argument shall be a SYNTAX error as for any other call.

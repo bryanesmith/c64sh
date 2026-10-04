@@ -88,11 +88,13 @@ func terminalSize(f *os.File) sizeFunc {
 // editorReader reads lines with the golang.org/x/term line editor, which
 // provides history (up and down arrows) and basic editing keys.
 type editorReader struct {
-	term *term.Terminal
-	in   *cancelFilter
-	raw  rawModeFunc
-	size sizeFunc
-	hist *history
+	term  *term.Terminal
+	in    *cancelFilter
+	raw   rawModeFunc
+	size  sizeFunc
+	hist  *history
+	echo  io.Writer
+	style style
 }
 
 // newEditorReader returns a line editor reading keystrokes from in and
@@ -111,7 +113,17 @@ func newEditorReader(in io.Reader, echo io.Writer, raw rawModeFunc, size sizeFun
 	}
 	h.load()
 	t.History = h
-	return &editorReader{term: t, in: filter, raw: raw, size: size, hist: h}
+	return &editorReader{term: t, in: filter, raw: raw, size: size, hist: h, echo: echo}
+}
+
+// setStyle colors typed lines with the style's input color. The prompt is
+// that escape code alone, which term.Terminal counts as zero columns wide,
+// so every redraw of the line is colored; the span ends after each line.
+//
+// @spec SHELL-STYLE-003
+func (e *editorReader) setStyle(st style) {
+	e.style = st
+	e.term.SetPrompt(st.input)
 }
 
 // defaultHistoryFile returns the history file Main uses: $C64SH_HISTORY if
@@ -160,6 +172,9 @@ func (e *editorReader) readOnce() (string, error) {
 		e.term.SetSize(w, h)
 	}
 	line, err := e.term.ReadLine()
+	if e.style.input != "" {
+		io.WriteString(e.echo, e.style.end())
+	}
 	if errors.Is(err, term.ErrPasteIndicator) {
 		err = nil // a pasted line runs like a typed one
 	}

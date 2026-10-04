@@ -77,6 +77,12 @@ func (in *Interp) SetClock(now func() time.Time)
 // shown there. Without it, output is not a terminal.
 func (in *Interp) SetScreen(terminal, color bool)
 
+// ScreenState returns the escape codes that set the color and reverse
+// video program output has left on in the terminal, or "" if none, so
+// that a caller writing its own styled text to the terminal can put
+// them back after it.
+func (in *Interp) ScreenState() string
+
 // SetConsole sets where INPUT and GET read. Without one, they find the
 // end of input.
 func (in *Interp) SetConsole(c Console)
@@ -183,7 +189,7 @@ On a C64, printing certain characters controls the screen instead of showing a c
 
 Every other character is written as it is. The colors are the C64's own (the measured "Pepto" palette): black, white, red, cyan, purple, green, blue, yellow, orange, brown, light red, dark gray, gray, light green, light blue, light gray, in the order of the codes above. When colors are off, the color codes are left out even on a terminal; the other codes are still translated. As on a C64, a color stays in effect until another is printed; the interpreter does not reset it (see the shell design).
 
-The interpreter remembers whether reverse video is on (after `18`, until `146` or a Return), so that it writes `ESC[27m` at a Return only when it changes something; ordinary lines carry no escape codes.
+The interpreter remembers whether reverse video is on (after `18`, until `146` or a Return), so that it writes `ESC[27m` at a Return only when it changes something; ordinary lines carry no escape codes. It also remembers the last color it wrote to the terminal; `ScreenState` returns that color's code, followed by `ESC[7m` if reverse is on, for the shell to restore after its own styled text.
 
 The cursor-right code becomes a space everywhere, as a comma's move to a print zone does: in a terminal, output only appears after the cursor, so a space looks the same.
 

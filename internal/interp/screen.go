@@ -34,6 +34,19 @@ func (in *Interp) SetScreen(terminal, color bool) {
 	in.terminal, in.color = terminal, color
 }
 
+// ScreenState returns the escape codes that set the color and reverse
+// video program output has left on in the terminal, or "" if none, so
+// that a caller writing its own styled text to the terminal can put them
+// back after it.
+//
+// @spec INTERP-150
+func (in *Interp) ScreenState() string {
+	if in.reverse {
+		return in.ink + "\x1b[7m"
+	}
+	return in.ink
+}
+
 // translate returns s as it should be written, with the C64's screen
 // control codes translated, and the cursor column after writing it,
 // starting from col.
@@ -59,7 +72,8 @@ func (in *Interp) translate(s string, col int) (string, int) {
 			if n, ok := colorCodes[r]; ok {
 				if in.terminal && in.color {
 					c := pepto[n]
-					b = fmt.Appendf(b, "\x1b[38;2;%d;%d;%dm", c[0], c[1], c[2])
+					in.ink = fmt.Sprintf("\x1b[38;2;%d;%d;%dm", c[0], c[1], c[2])
+					b = append(b, in.ink...)
 				}
 				continue
 			}

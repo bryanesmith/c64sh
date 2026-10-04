@@ -43,6 +43,7 @@ type Interp struct {
 	terminal    bool                    // program output is a terminal: screen codes become escape codes
 	color       bool                    // the terminal shows colors
 	reverse     bool                    // reverse video is on in the terminal
+	ink         string                  // escape code of the last color written to the terminal
 	arrays      map[string]*array       // arrays, by identity
 	data        dataPos                 // the data pointer: the next DATA item
 	printing    bool                    // a PRINT to the screen is evaluating an item

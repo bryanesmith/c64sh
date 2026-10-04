@@ -11,6 +11,7 @@ To learn the language by building a game, start with the [tutorial](tutorial/ind
 - [Scripts](#scripts)
 - [PRINT](#print)
 - [Numbers](#numbers)
+- [Colors and the screen](#colors-and-the-screen)
 - [Arithmetic](#arithmetic)
 - [Number functions](#number-functions)
 - [String functions](#string-functions)
@@ -209,6 +210,34 @@ prints `HELLO, WORLD`.
 A string made by joining with `+` may hold at most 255 characters; longer results cause `?STRING TOO LONG  ERROR`.
 
 **Keywords are uppercase.** `PRINT` must be typed in capitals; `print` is a syntax error. Text inside quotes can use any case.
+
+## Colors and the screen
+
+As on a C64, printing certain characters controls the screen instead of showing a character:
+
+```
+PRINT CHR$(147);CHR$(28);"RED ALERT";CHR$(154)
+```
+
+clears the screen, then prints `RED ALERT` in red, and sets the color back to the C64's light blue.
+
+| Code | Effect | Code | Effect |
+|---|---|---|---|
+| `CHR$(147)` | clear the screen | `CHR$(19)` | cursor to the top left |
+| `CHR$(17)` / `CHR$(145)` | cursor down / up | `CHR$(29)` / `CHR$(157)` | cursor right / left |
+| `CHR$(18)` / `CHR$(146)` | reverse video on / off | `CHR$(13)` | new line |
+| `CHR$(144)` black | `CHR$(5)` white | `CHR$(28)` red | `CHR$(159)` cyan |
+| `CHR$(156)` purple | `CHR$(30)` green | `CHR$(31)` blue | `CHR$(158)` yellow |
+| `CHR$(129)` orange | `CHR$(149)` brown | `CHR$(150)` light red | `CHR$(151)` dark gray |
+| `CHR$(152)` gray | `CHR$(153)` light green | `CHR$(154)` light blue | `CHR$(155)` light gray |
+
+- **The colors are the C64's own**, shown exactly in any terminal that supports 24-bit color (most do).
+- **A color stays until another is printed**, as on a C64, so set it back when you are done. c64sh resets the terminal's color when it exits.
+- **In a file or a pipe**, these codes are left out (cursor right still becomes a space, and Return a new line), so redirected output is plain text.
+- **`NO_COLOR=1`** in the environment turns colors off; the other codes still work.
+- **Idiom**: keep codes in variables, such as `RE$=CHR$(28)`, so `PRINT RE$;"DANGER"` reads well.
+
+See [`examples/030-screen-codes.bas`](../examples/030-screen-codes.bas) for every form.
 
 ## Numbers
 
@@ -801,7 +830,7 @@ For example, `c64sh build.bas && echo done` prints `done` only if the script ran
 
 - **`,` fills print zones with spaces.** A C64 moves its cursor right on screen instead, leaving whatever was there; in a terminal, output only ever appears after the cursor, so spaces look the same.
 - **Errors go to stderr** and set a non-zero exit status in scripts.
-- **No screen emulation**: no 40-column wrapping, colors, or graphics characters. So a print zone past column 40 stays on the same line: `PRINT 2,3,4,5,6` prints ` 6 ` at column 40, where a C64 would start a new screen line.
+- **No screen emulation**: no 40-column wrapping or graphics characters; the screen's control codes, such as colors and clearing the screen, are translated to the terminal's own (see [Colors and the screen](#colors-and-the-screen)), and PETSCII graphics characters are not. So a print zone past column 40 stays on the same line: `PRINT 2,3,4,5,6` prints ` 6 ` at column 40, where a C64 would start a new screen line.
 - **Arithmetic uses standard 64-bit floating point**, rounded to the C64's 9 digits when printed. Results match a C64 in nearly every case; a C64's own rounding occasionally differs in the last digit. Rarely, a loop with a fractional `STEP`, such as `FOR I=0 TO 1 STEP .1`, runs a different number of times than on a C64.
 - **The banner** reads `C64SH BASIC V2`.
 - **Ctrl-C stops a program waiting in `INPUT`.** On a C64, the STOP key does nothing until Return is pressed.

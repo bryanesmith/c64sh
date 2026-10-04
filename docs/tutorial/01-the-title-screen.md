@@ -16,11 +16,12 @@ The title screen is a subroutine at line 8000:
 
 ```basic
 8000 REM TITLE SCREEN
-8010 PRINT TAB(12);"THE LOST AMULET"
+8005 PRINT CHR$(147):REM CLEAR THE SCREEN
+8010 PRINT TAB(12);CHR$(158);"THE LOST AMULET";CHR$(154)
 8020 PRINT TAB(12);"---------------"
 ```
 
-`PRINT` writes text, and `TAB(12)` moves to column 12 first, centering the title on a 40-column C64 screen. The `;` joins the items without spaces.
+`PRINT CHR$(147)` clears the screen: on a C64, printing character 147 does that, and nearly every program starts with it. `PRINT` writes text, and `TAB(12)` moves to column 12 first, centering the title on a 40-column C64 screen. The `;` joins the items without spaces. `CHR$(158)` switches the text to yellow, and `CHR$(154)` back to the C64's usual light blue: colors are characters too. (In a terminal you see the colors; when output goes to a file, these codes are left out.)
 
 ## Waiting for a key
 
@@ -55,7 +56,8 @@ If you are typing at the `c64sh` prompt, two commands help: `LIST` shows the pro
 30 GOSUB 8000:REM TITLE SCREEN
 50 END
 8000 REM TITLE SCREEN
-8010 PRINT TAB(12);"THE LOST AMULET"
+8005 PRINT CHR$(147):REM CLEAR THE SCREEN
+8010 PRINT TAB(12);CHR$(158);"THE LOST AMULET";CHR$(154)
 8020 PRINT TAB(12);"---------------"
 8030 PRINT "THE AMULET OF DAWN LIES SOMEWHERE IN THE"
 8040 PRINT "RUINED CASTLE. FIND IT AND CARRY IT BACK"

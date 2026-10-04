@@ -213,6 +213,7 @@ const (
     FileData                  // FILE DATA
     BadSubscript              // BAD SUBSCRIPT
     RedimdArray               // REDIM'D ARRAY
+    OutOfData                 // OUT OF DATA
     Break                     // BREAK: execution stopped by Ctrl-C
 )
 

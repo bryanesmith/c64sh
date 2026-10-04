@@ -118,6 +118,9 @@ func (in *Interp) atCur(err error) error {
 	if nl, ok := err.(*noLine); ok {
 		return nl.err
 	}
+	if al, ok := err.(*atLineErr); ok {
+		return atLine(al.err, al.line)
+	}
 	if in.cur.line == directLine {
 		return err
 	}
@@ -138,5 +141,6 @@ func (in *Interp) clr() {
 	clear(in.vars)
 	clear(in.fns)
 	clear(in.arrays)
+	in.restore()
 	in.stack = nil
 }

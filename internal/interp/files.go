@@ -240,6 +240,7 @@ func (in *Interp) execLoad(s *ast.LoadStmt) error {
 		return errEnd
 	}
 	in.stack = nil
+	in.restore()
 	return &jump{}
 }
 

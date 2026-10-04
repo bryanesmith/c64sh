@@ -1,0 +1,11 @@
+exit status: 1
+--- stdout ---
+ALICE IS 12 
+APPLE      .5 
+BREAD      2.25 
+CHEESE     4 
+THAT'S ALL
+PRINT|  LEFT|B,C|A:|
+ 1  2  1 
+--- stderr ---
+?OUT OF DATA  ERROR IN 10

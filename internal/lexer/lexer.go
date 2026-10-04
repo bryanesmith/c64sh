@@ -78,11 +78,11 @@ var keywords = []struct {
 	{"TAB(", token.Tab},
 	{"SPC(", token.Spc},
 	{"DIM", token.Dim},
+	{"DATA", token.Data},
+	{"READ", token.Read},
+	{"RESTORE", token.Restore},
 	// Keywords that c64sh does not support, reserved as on a C64, so a
 	// name containing one breaks and the parser rejects them.
-	{"DATA", token.Reserved},
-	{"READ", token.Reserved},
-	{"RESTORE", token.Reserved},
 	{"STOP", token.Reserved},
 	{"CONT", token.Reserved},
 	{"CLR", token.Reserved},
@@ -124,7 +124,7 @@ const upArrow = "\u2191"
 // @spec LEXER-001, LEXER-002, LEXER-003, LEXER-004, LEXER-005, LEXER-006, LEXER-007
 // @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013, LEXER-014
 // @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018, LEXER-019, LEXER-020, LEXER-021
-// @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025, LEXER-026, LEXER-030, LEXER-031, LEXER-032, LEXER-033, LEXER-034, LEXER-035, LEXER-036, LEXER-037, LEXER-038, LEXER-039, LEXER-040, LEXER-041, LEXER-042
+// @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025, LEXER-026, LEXER-030, LEXER-031, LEXER-032, LEXER-033, LEXER-034, LEXER-035, LEXER-036, LEXER-037, LEXER-038, LEXER-039, LEXER-040, LEXER-041, LEXER-042, LEXER-043, LEXER-044
 func Lex(line string) []token.Token {
 	var toks []token.Token
 	emit := func(k token.Kind, value string, pos int) {
@@ -202,6 +202,18 @@ func Lex(line string) []token.Token {
 				// A comment runs to the end of the line, untokenized.
 				emit(kind, line[i+len(text):], i)
 				i = len(line)
+				continue
+			}
+			if kind == token.Data {
+				// data = "DATA" { character | `"` { character } `"` } .  /* up to ":" outside quotes */
+				// DATA items run to ":" outside quotes, untokenized.
+				end := dataEnd(line, i+len(text))
+				body := line[i+len(text) : end]
+				if end == len(line) {
+					body = strings.TrimRight(body, " ")
+				}
+				emit(kind, body, i)
+				i = end
 				continue
 			}
 			emit(kind, text, i)
@@ -355,6 +367,23 @@ func matchKeyword(s string) (string, token.Kind, bool) {
 		return "", 0, false
 	}
 	return keywords[best].text, keywords[best].kind, true
+}
+
+// dataEnd returns the index of the ":" that ends DATA text starting at
+// i, outside double quotes, or the end of the line.
+func dataEnd(line string, i int) int {
+	quoted := false
+	for ; i < len(line); i++ {
+		switch line[i] {
+		case '"':
+			quoted = !quoted
+		case ':':
+			if !quoted {
+				return i
+			}
+		}
+	}
+	return i
 }
 
 // LineNumber reads the line number at the start of s, after any spaces

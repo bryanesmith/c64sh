@@ -172,6 +172,12 @@ func dumpStmt(s ast.Stmt) string {
 		return "SAVE" + dumpFileArgs(s.FileArgs)
 	case *ast.VerifyStmt:
 		return "VERIFY" + dumpFileArgs(s.FileArgs)
+	case *ast.DataStmt:
+		return "DATA" + strconv.Quote(s.Text)
+	case *ast.ReadStmt:
+		return "READ " + dumpVars(s.Vars)
+	case *ast.RestoreStmt:
+		return "RESTORE"
 	case *ast.DimStmt:
 		return "DIM " + dumpVars(s.Arrays)
 	case *ast.ListStmt:
@@ -1135,5 +1141,28 @@ func TestReservedKeywords(t *testing.T) {
 		{"statement", toks(res("POKE"), number("1"), comma, number("2")), `BADSTMT`, true},
 		{"operand", toks(pr, res("PEEK"), lp, number("1"), rp), `PRINT[BAD(SYNTAX)]`, true},
 		{"assignment", toks(name("A"), eq, res("FRE"), lp, number("0"), rp), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-075
+func TestDataReadRestore(t *testing.T) {
+	read := token.Token{Kind: token.Read, Value: "READ"}
+	restore := token.Token{Kind: token.Restore, Value: "RESTORE"}
+	runParseCases(t, []parseCase{
+		{"DATA", toks(token.Token{Kind: token.Data, Value: " 1,A"}), `DATA" 1,A"`, false},
+		{"READ", toks(read, name("A"), comma, name("B$")), `READ $A[A],$B$[B$]`, false},
+		{"READ element", toks(read, name("A"), lp, name("I"), rp), `READ $A[A]($I[I])`, false},
+		{"RESTORE", toks(restore), `RESTORE`, false},
+	})
+}
+
+// @spec PARSER-076
+func TestDataSyntaxErrors(t *testing.T) {
+	read := token.Token{Kind: token.Read, Value: "READ"}
+	restore := token.Token{Kind: token.Restore, Value: "RESTORE"}
+	runParseCases(t, []parseCase{
+		{"READ alone", toks(read), `BADSTMT`, true},
+		{"READ number", toks(read, number("1")), `BADSTMT`, true},
+		{"RESTORE line", toks(restore, number("100")), `BADSTMT`, true},
 	})
 }

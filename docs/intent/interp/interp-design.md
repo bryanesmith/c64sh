@@ -149,7 +149,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
         *ast.ForStmt, *ast.NextStmt, *ast.GosubStmt, *ast.ReturnStmt,
         *ast.InputStmt, *ast.GetStmt, *ast.DefStmt,
         *ast.LoadStmt, *ast.SaveStmt, *ast.VerifyStmt,
-        *ast.OpenStmt, *ast.CloseStmt, *ast.CmdStmt, *ast.OnStmt, *ast.DimStmt:
+        *ast.OpenStmt, *ast.CloseStmt, *ast.CmdStmt, *ast.OnStmt, *ast.DimStmt,
+        *ast.DataStmt, *ast.ReadStmt, *ast.RestoreStmt:
         … // see Program mode
     default:
         panic(fmt.Sprintf("interp: unhandled statement %T", s))
@@ -490,6 +491,17 @@ Arrays are kept apart from plain variables, by identity: `A`, `A(…)`, `A%(…)
 - **Memory.** An array takes, as on a C64, 5 bytes plus 2 per dimension, plus 5 bytes per element for numbers, 3 for strings, and 2 for integers. Creating an array (with `DIM` or by use) that would make all arrays together take more than 38911 bytes, the memory free on a C64 when it starts, fails with `OUT OF MEMORY`. The program, the variables, and the strings themselves are not counted, so a C64 runs out of memory sooner.
 - Arrays are cleared with the variables (`RUN`, `NEW`, storing a line).
 
+## DATA and READ
+
+The interpreter keeps a **data pointer**: a place among the items of the program's `DATA` statements, in program order (line by line, statement by statement). It starts at the first item, and `RESTORE`, clearing the variables (`RUN`, `NEW`, storing a line), and a `LOAD` that chains move it back there (`$A81D`, `$A677`). Executing a `DATA` statement does nothing; `DATA` in the line typed in direct mode is never read.
+
+`READ` assigns each of its variables the next item, as the ROM does (`$AC06`):
+
+- Items are separated by commas. Each is read as `INPUT` reads a value: for a string variable, a quoted string, or the text up to the next comma, with spaces before it skipped and spaces inside or after it kept; for a number variable, a number written as in a program, or 0 for an empty item. After the item, any spaces, the next character must be a comma or the end of the `DATA` text; a comma at the end of the text leaves one more, empty, item.
+- When a `DATA` statement's items are used up, reading continues with the next `DATA` statement, on the same line or a later one. If there is none, `READ` fails with `OUT OF DATA`.
+- An item that cannot be read (a number variable given text that is not a number, or anything after a quoted string other than a comma) is `SYNTAX`, reported with the number of the **`DATA` line**, as the ROM reports it (`$AB57`); a number too large is `OVERFLOW`.
+- `READ` works in direct mode too, reading the program's `DATA`.
+
 ## Values
 
 Every expression evaluates to a value that is either a **string** or a **number**. Numbers are Go `float64`s kept within the C64's range:
@@ -587,6 +599,7 @@ The interpreter returns BASIC errors as the error type defined in the shell desi
 | `UNDEF'D FUNCTION` | `FN` calling a function that has not been defined. |
 | `BAD SUBSCRIPT` | An element with the wrong number of subscripts, or a subscript past the top. |
 | `REDIM'D ARRAY` | `DIM` of an array that exists, including one created by use. |
+| `OUT OF DATA` | `READ` with no `DATA` items left. |
 | `RETURN WITHOUT GOSUB` | `RETURN` with no `GOSUB` entry on the control stack, other than `FOR` entries above it. |
 | `UNDEF'D STATEMENT` | `RUN n` or `GOTO n` where the program has no line `n`. |
 | `BREAK` | `Interrupt` was called (see *BREAK*). |

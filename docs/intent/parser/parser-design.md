@@ -100,6 +100,15 @@ type VarRef struct {
 // DimStmt is DIM Array {, Array}: each VarRef holds the top subscripts.
 type DimStmt struct{ Arrays []*VarRef }
 
+// DataStmt is DATA and its text, exactly as the lexer kept it.
+type DataStmt struct{ Text string }
+
+// ReadStmt is READ Var {, Var}.
+type ReadStmt struct{ Vars []*VarRef }
+
+// RestoreStmt is RESTORE.
+type RestoreStmt struct{}
+
 // IfStmt is IF Cond THEN. It guards the rest of its line: the statements
 // after it run only when Cond is true.
 type IfStmt struct{ Cond Expr }
@@ -291,6 +300,10 @@ These are SYNTAX errors, following the tenet *Authentic errors over helpful ones
 
 `TAB(` and `SPC(` are print items, not functions: each is followed by an expression and `)`, becoming a `TabItem` or `SpcItem`, and they can appear only among the items of `PRINT`, `PRINT#`, and `CMD` (anywhere else, such as `A=TAB(5)`, they are SYNTAX errors, as on a C64). A missing `)` is a SYNTAX error.
 
+### DATA, READ, RESTORE
+
+A `Data` token is a `DataStmt` holding its text; the items in it are read by `READ` when it runs. `READ` is followed by one or more variables, separated by commas, as for `INPUT`. `RESTORE` takes no arguments; anything after it other than `:` or the end of the line is a SYNTAX error in place of the statement.
+
 ### Reserved keywords
 
 A `Reserved` token (a BASIC V2 keyword c64sh does not support, see the lexer design) is a SYNTAX error wherever it appears: at the start of a statement, where an operand is expected, or anywhere else.
@@ -340,7 +353,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OnStatement \| DimStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OnStatement \| DimStatement \| DataStatement \| ReadStatement \| RestoreStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," \| tab Expression ")" \| spc Expression ")" .` | `parsePrintItem` | `ast.PrintItem` |
@@ -381,10 +394,13 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `EndStatement = end .` | `parseCommand` | `*ast.EndStmt` (`parseCommand` parses any command without arguments) |
 | `Call = function "(" Expression { "," Expression } ")" .` | `parseCall` | `*ast.CallExpr` (argument count checked) |
 | `Variable = name [ "(" Expression { "," Expression } ")" ] .` | `parseVariable` | `*ast.VarRef` (with `Subs` for an array element) |
+| `DataStatement = data .` | `parseStatement` | `*ast.DataStmt` |
+| `ReadStatement = read Variable { "," Variable } .` | `parseStatement` | `*ast.ReadStmt` |
+| `RestoreStatement = restore .` | `parseCommand` | `*ast.RestoreStmt` |
 | `DimStatement = dim Variable { "," Variable } .` | `parseDimStatement` | `*ast.DimStmt` |
 | `Operand = string \| number \| pi \| Variable \| "(" Expression ")" \| not Comparison \| fn FunctionName "(" Expression ")" \| Call .` | `parseOperand` | `ast.Expr` |
 
-Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `printfile`, `inputfile`, `open`, `close`, `cmd`, `on`, `function`, `pi`, `tab`, `spc`, `dim`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
+Lowercase names in these rules (`print`, `rem`, `let`, `and`, `or`, `not`, `if`, `then`, `run`, `goto`, `go`, `to`, `for`, `next`, `step`, `gosub`, `return`, `input`, `get`, `def`, `fn`, `load`, `save`, `verify`, `printfile`, `inputfile`, `open`, `close`, `cmd`, `on`, `function`, `pi`, `tab`, `spc`, `dim`, `data`, `read`, `restore`, `list`, `new`, `end`, `name`, `string`, `number`) are token rules, defined and documented in the lexer.
 
 `parsePrintStatement` reads items until the next token is `:` or `EOL`. A statement ends only at `:` or end of line.
 

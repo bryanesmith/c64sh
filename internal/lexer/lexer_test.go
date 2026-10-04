@@ -544,8 +544,30 @@ func TestDimKeyword(t *testing.T) {
 
 // @spec LEXER-042
 func TestReservedKeywords(t *testing.T) {
-	for _, k := range []string{"DATA", "READ", "RESTORE", "STOP", "CONT", "CLR", "FRE", "PEEK", "POKE", "SYS", "WAIT", "USR"} {
+	for _, k := range []string{"STOP", "CONT", "CLR", "FRE", "PEEK", "POKE", "SYS", "WAIT", "USR"} {
 		runLexCases(t, []lexCase{{k, k, []token.Token{tok(token.Reserved, k, 0), eol(len(k))}}})
 	}
-	runLexCases(t, []lexCase{{"in a name", "READY", []token.Token{tok(token.Reserved, "READ", 0), name("Y", 4), eol(5)}}})
+	runLexCases(t, []lexCase{{"in a name", "FREE", []token.Token{tok(token.Reserved, "FRE", 0), name("E", 3), eol(4)}}})
+}
+
+// @spec LEXER-043
+func TestDataText(t *testing.T) {
+	data := func(v string, pos int) token.Token { return tok(token.Data, v, pos) }
+	runLexCases(t, []lexCase{
+		{"items", "DATA 1,2,ABC", []token.Token{data(" 1,2,ABC", 0), eol(12)}},
+		{"keywords are text", "DATA PRINT,TO", []token.Token{data(" PRINT,TO", 0), eol(13)}},
+		{"colon ends it", `DATA 1,2:PRINT"X"`, []token.Token{data(" 1,2", 0), tok(token.Colon, ":", 8), tok(token.Print, "PRINT", 9), tok(token.String, "X", 14), eol(17)}},
+		{"colon in quotes", `DATA "A:B",C`, []token.Token{data(` "A:B",C`, 0), eol(12)}},
+		{"trailing spaces removed", "DATA A, B   ", []token.Token{data(" A, B", 0), eol(12)}},
+		{"no space", "DATA1", []token.Token{data("1", 0), eol(5)}},
+	})
+}
+
+// @spec LEXER-044
+func TestReadRestoreKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"READ", "READ A", []token.Token{tok(token.Read, "READ", 0), name("A", 5), eol(6)}},
+		{"RESTORE", "RESTORE", []token.Token{tok(token.Restore, "RESTORE", 0), eol(7)}},
+		{"READ in a name", "READY", []token.Token{tok(token.Read, "READ", 0), name("Y", 4), eol(5)}},
+	})
 }

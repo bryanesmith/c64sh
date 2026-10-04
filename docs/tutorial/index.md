@@ -16,7 +16,7 @@ EXITS: N S E W
 WHAT NOW? GO WEST
 ```
 
-Each chapter adds to the program and ends with the complete program so far, which you can run. The [user guide](../user-guide.md) is the reference for every statement; this tutorial shows how they fit together.
+Each chapter adds to the program and ends with the complete program so far, which you can run. The [user guide](../user-guide.md) is the reference for every statement; this tutorial shows how they fit together, and the guide to [idiomatic BASIC](../idioms.md) collects the patterns it uses, and more, in one place.
 
 ## Before you start
 

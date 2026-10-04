@@ -21,9 +21,13 @@ The tutorial lives in `docs/tutorial/`:
 
 Each chapter's program is the previous chapter's with lines added, replaced, or deleted (the chapter says which to delete), so a reader can type the changes, or copy the complete listing.
 
+## The idioms guide
+
+`docs/idioms.md` is a companion to the tutorial: the patterns experienced BASIC programmers used, grouped by topic (program structure, keyboard input, random numbers, numbers, strings, layout, loops, data, files, time), each with a short example in a `basic` block and a brief explanation of why the pattern exists. It describes only what c64sh supports: a test parses every line of every `basic` block in it and fails on any syntax error, including one in a `DEF FN` body. Patterns that depend on a feature c64sh lacks are left out until the feature exists.
+
 ## Keeping the tutorial current
 
-When a language feature is added or changed, the tutorial is updated in the same change where the feature belongs in the game or a project, as the user guide is: a chapter that uses the feature shows it, and a feature that the game can use naturally is worked into it (a new chapter, or an existing chapter's program) rather than left to the reference alone. A change in behavior that alters a listing's output appears in the tutorial tests, like any snapshot.
+When a language feature is added or changed, the tutorial and the idioms guide are updated in the same change where the feature belongs, as the user guide is; the idioms guide gains any pattern the feature makes standard. For the tutorial: a chapter that uses the feature shows it, and a feature that the game can use naturally is worked into it (a new chapter, or an existing chapter's program) rather than left to the reference alone. A change in behavior that alters a listing's output appears in the tutorial tests, like any snapshot.
 
 ## Tests
 

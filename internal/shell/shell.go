@@ -41,6 +41,8 @@ type Config struct {
 	File        string           // input file; empty means stdin
 	HistoryFile string           // line-editor history file; empty: none
 	Clock       func() time.Time // the interpreter's clock; nil: the system clock
+	Terminal    bool             // stdout is a terminal: screen codes become escape codes
+	NoColor     bool             // NO_COLOR is set: no colors
 }
 
 // Main runs c64sh with the given command-line arguments and streams and
@@ -67,6 +69,8 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	var cfg Config
 	cfg.HistoryFile = defaultHistoryFile(os.LookupEnv, os.UserHomeDir)
+	cfg.Terminal = isTerminal(stdout)
+	cfg.NoColor = noColor(os.LookupEnv)
 	if len(files) == 1 {
 		cfg.File = files[0]
 	} else {
@@ -80,17 +84,26 @@ func usageError(stderr io.Writer, msg string) int {
 	return 2
 }
 
-// isTerminal reports whether r is a terminal.
-func isTerminal(r io.Reader) bool {
+// isTerminal reports whether r, a reader or writer, is a terminal.
+func isTerminal(r any) bool {
 	f, ok := r.(*os.File)
 	return ok && term.IsTerminal(int(f.Fd()))
+}
+
+// noColor reports whether the environment asks for no colors: NO_COLOR
+// set to a non-empty value.
+//
+// @spec SHELL-SCREEN-001
+func noColor(lookup func(string) (string, bool)) bool {
+	v, ok := lookup("NO_COLOR")
+	return ok && v != ""
 }
 
 // Run is Main with the mode chosen by the caller instead of detected.
 // Interactive selects the behavior; File, or stdin when File is empty,
 // selects the input.
 //
-// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004, SHELL-CLOCK-001
+// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004, SHELL-CLOCK-001, SHELL-SCREEN-001, SHELL-SCREEN-002
 func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	input, name := stdin, "stdin"
 	if cfg.File != "" {
@@ -113,6 +126,7 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	if cfg.Clock != nil {
 		s.interp.SetClock(cfg.Clock)
 	}
+	s.interp.SetScreen(cfg.Terminal, !cfg.NoColor)
 	s.interp.SetStorage(dirStorage{})
 	if cfg.Interactive {
 		s.interp.SetMessages(stderr)
@@ -122,6 +136,11 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 		lines = newEditorReader(tty, stderr, terminalRawMode(tty), terminalSize(tty), cfg.HistoryFile, stderr)
 	}
 	status := s.run(lines, name)
+	if cfg.Terminal {
+		// A program's color stays set, as on a C64; the user's own shell
+		// should not inherit it.
+		io.WriteString(stdout, "\x1b[0m")
+	}
 	// Data files a program left open are written now.
 	if se, ok := errors.AsType[*interp.StorageError](s.interp.CloseFiles()); ok {
 		s.reportStorage(se)

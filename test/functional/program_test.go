@@ -165,7 +165,7 @@ func TestKeyboardInput(t *testing.T) {
 	}{
 		{"piped script answers itself", "10 INPUT \"NAME\";N$\n20 PRINT \"HI \";N$\nRUN\nALICE\nPRINT \"DONE\"\n", result{"NAME? ALICE\nHI ALICE\nDONE\n", "", 0}},
 		{"redo from start", "10 INPUT A:PRINT A*2\nRUN\nX\n21\n", result{"? X\n?REDO FROM START\n? 21\n 42 \n", "", 0}},
-		{"GET reads characters", "10 GET A$,B$:PRINT \"[\";A$;B$;\"]\"\nRUN\nX\n", result{"[X\r]\n", "", 0}},
+		{"GET reads characters", "10 GET A$,B$:PRINT \"[\";A$;B$;\"]\"\nRUN\nX\n", result{"[X\n]\n", "", 0}},
 		{"end of input", "10 INPUT A\n", result{"? \n", "c64sh: stdin: end of input\n", 1}},
 		{"direct", "INPUT \"HI\";A\n", result{"HI\n", "?ILLEGAL DIRECT  ERROR\n", 1}},
 	}
@@ -267,5 +267,26 @@ func TestFixedClock(t *testing.T) {
 	}
 	if a, b := run(), run(); a != b {
 		t.Errorf("RND(0) with the same fixed clock: %q, then %q", a, b)
+	}
+}
+
+// TestScreenCodes checks that the shell sets the interpreter's screen and
+// resets colors at the end of a terminal session.
+//
+// @spec SHELL-SCREEN-001, SHELL-SCREEN-002
+func TestScreenCodes(t *testing.T) {
+	run := func(cfg shell.Config) string {
+		var out strings.Builder
+		shell.Run(cfg, strings.NewReader("PRINT CHR$(28);\"X\"\n"), &out, io.Discard)
+		return out.String()
+	}
+	if got := run(shell.Config{Terminal: true}); got != "\x1b[38;2;104;55;43mX\n\x1b[0m" {
+		t.Errorf("terminal: %q", got)
+	}
+	if got := run(shell.Config{Terminal: true, NoColor: true}); got != "X\n\x1b[0m" {
+		t.Errorf("NO_COLOR: %q", got)
+	}
+	if got := run(shell.Config{}); got != "X\n" {
+		t.Errorf("not a terminal: %q", got)
 	}
 }

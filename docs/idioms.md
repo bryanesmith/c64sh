@@ -10,6 +10,7 @@ Everything here works in c64sh. The [user guide](user-guide.md) describes each s
 - [Numbers](#numbers)
 - [Strings](#strings)
 - [Output and layout](#output-and-layout)
+- [Colors and the screen](#colors-and-the-screen)
 - [Loops](#loops)
 - [Data and arrays](#data-and-arrays)
 - [Files](#files)
@@ -340,6 +341,41 @@ Everything here works in c64sh. The [user guide](user-guide.md) describes each s
 ```
 
 **Why:** `SPC(N)` moves right `N` columns, so a computed amount draws simple bar charts and indents without building strings.
+
+## Colors and the screen
+
+### Clear the screen first
+
+```basic
+10 PRINT CHR$(147)
+```
+
+**Why:** the C64 has no `CLS` statement; printing character 147 clears the screen and puts the cursor at the top left. Nearly every C64 program starts this way.
+
+### Keep control codes in variables
+
+```basic
+10 RE$=CHR$(28):YE$=CHR$(158):LB$=CHR$(154)
+20 PRINT YE$;"WARNING: ";RE$;"LOW FUEL";LB$
+```
+
+**Why:** colors are set by printing characters, and `CHR$(28)` says nothing about red. Named variables make the `PRINT` statements readable, and set up once, at the start, they cost nothing later.
+
+### Set the color back
+
+```basic
+10 PRINT CHR$(28);"GAME OVER";CHR$(154)
+```
+
+**Why:** a color stays in effect until another is printed, so a program that changes it sets it back to the usual light blue (`CHR$(154)`) afterwards, or every later line is red too.
+
+### Reverse video for headings and menus
+
+```basic
+10 PRINT CHR$(18);" MAIN MENU ";CHR$(146)
+```
+
+**Why:** reverse video (`CHR$(18)` on, `CHR$(146)` off) makes a bar that stands out without needing any graphics characters.
 
 ## Loops
 

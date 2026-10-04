@@ -40,6 +40,9 @@ type Interp struct {
 	files       map[int]*ioFile         // open logical files, by number
 	cmd         int                     // the file CMD sends output to; 0 for the screen
 	status      int                     // ST: the status of the last file operation
+	terminal    bool                    // program output is a terminal: screen codes become escape codes
+	color       bool                    // the terminal shows colors
+	reverse     bool                    // reverse video is on in the terminal
 	arrays      map[string]*array       // arrays, by identity
 	data        dataPos                 // the data pointer: the next DATA item
 	printing    bool                    // a PRINT to the screen is evaluating an item
@@ -329,11 +332,13 @@ func (in *Interp) write(s string) error {
 	if s == "" {
 		return nil
 	}
-	n, err := io.WriteString(in.out, s)
-	written := s[:n]
-	// RuneCountInString counts each invalid UTF-8 byte as one character.
-	if i := strings.LastIndexByte(written, '\n'); i >= 0 {
-		in.column = utf8.RuneCountInString(written[i+1:])
+	out, col := in.translate(s, in.column)
+	n, err := io.WriteString(in.out, out)
+	if n == len(out) {
+		in.column = col
+	} else if written := out[:n]; strings.LastIndexByte(written, '\n') >= 0 {
+		// A failed write: count only what reached the output.
+		in.column = utf8.RuneCountInString(written[strings.LastIndexByte(written, '\n')+1:])
 	} else {
 		in.column += utf8.RuneCountInString(written)
 	}

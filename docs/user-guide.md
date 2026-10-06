@@ -986,6 +986,9 @@ These features are c64sh's own: they are not part of Commodore 64 BASIC V2 and d
 - **No screen emulation**: no 40-column wrapping or graphics characters; the screen's control codes, such as colors and clearing the screen, are translated to the terminal's own (see [Colors and the screen](#colors-and-the-screen)), and PETSCII graphics characters are not. So a print zone past column 40 stays on the same line: `PRINT 2,3,4,5,6` prints ` 6 ` at column 40, where a C64 would start a new screen line.
 - **Arithmetic uses standard 64-bit floating point**, rounded to the C64's 9 digits when printed. Results match a C64 in nearly every case; a C64's own rounding occasionally differs in the last digit. Rarely, a loop with a fractional `STEP`, such as `FOR I=0 TO 1 STEP .1`, runs a different number of times than on a C64.
 - **The banner** reads `C64SH BASIC V2`.
+- **Lines can be longer than 80 characters**, typed or in a file. A C64's screen editor stops at two screen lines, 80 characters.
+- **No `?FORMULA TOO COMPLEX  ERROR`.** A C64 gives it when an expression needs more than three temporary strings at once, such as `A$+(B$+(C$+D$))`; c64sh evaluates such expressions.
+- **Memory limits apply to arrays only**: as on a C64, all arrays together must fit in 38911 bytes, but strings and programs are not limited (see [Free memory](#free-memory)).
 - **Strings have no length limit** by default, where a C64's hold 255 characters. No C64 program can catch `?STRING TOO LONG`, so this never changes how a working program behaves; set `C64SH_STRING_LIMIT=255` to get the C64's limit back.
 - **The shell colors its own text** in a terminal (see [Shell colors](#shell-colors)); a C64 shows everything in the current color.
 - **Ctrl-C stops a program waiting in `INPUT`.** On a C64, the STOP key does nothing until Return is pressed.

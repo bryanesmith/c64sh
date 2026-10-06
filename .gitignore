@@ -1,3 +1,6 @@
 # @spec BUILD-009
 bin/
 .DS_Store
+
+# Custom data files (e.g., Lost Amulet)
+*.SAV

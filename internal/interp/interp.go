@@ -47,6 +47,7 @@ type Interp struct {
 	env         Environment             // ENVIRON's environment variables
 	cont        *pos                    // where CONT continues the program; nil: CAN'T CONTINUE
 	drives      map[int]string          // each disk drive's status, once set
+	system      System                  // runs SYS's programs
 	stringLimit int                     // the most characters a string may hold; -1: no limit
 	arrays      map[string]*array       // arrays, by identity
 	data        dataPos                 // the data pointer: the next DATA item
@@ -229,6 +230,8 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 			in.cont = &pos{in.cur.line, in.cur.stmt + 1}
 		}
 		return errEnd
+	case *ast.SysStmt:
+		return in.execSys(s)
 	case *ast.StopStmt:
 		return in.execStop()
 	case *ast.ContStmt:

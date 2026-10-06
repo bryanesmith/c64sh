@@ -600,3 +600,13 @@ ENVIRON "PATH="+ENVIRON$("PATH")+":/opt/bin"
 ```
 
 **Why:** `ENVIRON$(N)` gives the `N`th variable as `NAME=VALUE`, in order of name, and the empty string past the last, so counting up until it comes back empty visits them all.
+
+### Run a program and check it worked
+
+```basic
+10 SYS "git","pull"
+20 IF ST<>0 THEN PRINT "GIT FAILED WITH";ST:END
+30 PRINT "UP TO DATE"
+```
+
+**Why:** `SYS` sets `ST` to the program's exit status, and Unix programs exit with 0 for success and anything else for failure, so testing `ST` straight after `SYS` is how a BASIC script stops when a step fails. *c64sh extension.*

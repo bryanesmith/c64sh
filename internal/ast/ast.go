@@ -155,6 +155,12 @@ type GotoStmt struct{ Line int }
 // is From = To = n.
 type ListStmt struct{ From, To int }
 
+// SysStmt is SYS Expression { , Expression }, with a string first: run a
+// program with arguments (a c64sh extension).
+type SysStmt struct{ Args []Expr }
+
+func (*SysStmt) stmt() {}
+
 // StopStmt is STOP: stop the program with BREAK, so that CONT can
 // continue it.
 type StopStmt struct{}

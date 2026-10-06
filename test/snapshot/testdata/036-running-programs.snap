@@ -1,0 +1,12 @@
+exit status: 1
+--- stdout ---
+HELLO FROM ECHO
+[TWO WORDS]
+[*]
+[$HOME]
+HELLO, WORLD 3
+ 0 
+ 1 
+2
+--- stderr ---
+?FILE NOT FOUND  ERROR

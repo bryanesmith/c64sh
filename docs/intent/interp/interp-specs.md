@@ -251,3 +251,10 @@ Design: `interp-design.md`
 - [x] **INTERP-172**: When matching a command's or directory pattern's name to files, the interpreter shall consider only the non-hidden files in storage, match `?` to any one character and `*` to the rest of the name, and, for a name without an extension or wildcard that matches no file, use the name with `.bas` added (and add `.bas` to a rename's new name without an extension).
 - [x] **INTERP-173**: When `LOAD` on a disk drive names `$` or `$0`, optionally followed by `:` and a pattern, the interpreter shall replace the program with the directory listing: line 0 holding `CHR$(18)` and `"C64SH" 00 2A` with the name padded to 16 characters; a line per matching file, in order of name, numbered with its size in 254-byte blocks (at least 1), holding the aligned, quoted, padded name and `PRG` for a `.bas` file or `SEQ` otherwise; and line 664 holding `BLOCKS FREE.`; then continue as `LOAD` does.
 - [x] **INTERP-174**: When `LOAD`, `SAVE`, or `VERIFY` runs on a disk drive, the interpreter shall set the drive's status to `62,FILE NOT FOUND,00,00` when no file is found, `63,FILE EXISTS,00,00` when `SAVE` may not replace a file, and `00, OK,00,00` otherwise.
+
+## Running programs
+
+- [x] **INTERP-175**: When executing an `ast.SysStmt`, the interpreter shall evaluate its expressions in order and run, through its `System`, the program the first names, with the rest as its arguments: strings as they are, numbers as `STR$` writes them without the leading space (a c64sh extension).
+- [x] **INTERP-176**: If the first expression of an `ast.SysStmt` is a number, then the interpreter shall fail with a SYNTAX error and run nothing.
+- [x] **INTERP-177**: When a program run by `SYS` ends, the interpreter shall set `ST` to its exit status, take the cursor column to be 0, and discard any interrupt received while it ran; before running it, the interpreter shall end a line that program output left unfinished.
+- [x] **INTERP-178**: If the `System` cannot start the program, then the interpreter shall fail with FILE NOT FOUND; if no `System` is set, with DEVICE NOT PRESENT.

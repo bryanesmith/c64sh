@@ -113,6 +113,10 @@ type RestoreStmt struct{}
 // Without numbers, From is 0 and To is 65535; LIST n is From = To = n.
 type ListStmt struct{ From, To int }
 
+// SysStmt is SYS Expression { , Expression }, with a string first: run a
+// program (a c64sh extension).
+type SysStmt struct{ Args []Expr }
+
 // StopStmt, ContStmt, and ClrStmt are STOP, CONT, and CLR.
 type StopStmt struct{}
 type ContStmt struct{}
@@ -321,6 +325,10 @@ A `Data` token is a `DataStmt` holding its text; the items in it are read by `RE
 
 *c64sh extension.* `ENVIRON` is followed by one expression, as in GW-BASIC, which the interpreter reads as `NAME=VALUE`. `ENVIRON$` is an ordinary function, taking one argument. A missing expression, or anything after the last one other than `:` or the end of the line, is a SYNTAX error in place of the statement.
 
+### SYS
+
+*c64sh extension, with a string.* `SYS` is followed by one or more expressions separated by commas: the program, then its arguments. A number literal first is a SYNTAX error in place of the statement, as `SYS` with an address is unsupported; a numeric expression that is not a literal is caught when it runs. A missing expression, or anything after the last one other than `:` or the end of the line, is a SYNTAX error.
+
 ### LIST ranges
 
 `LIST` may be followed by a line number, a `-` and a line number, or both, as on a C64: `LIST 100` lists line 100 only, `LIST 100-200` lines 100 to 200, `LIST -200` up to 200, `LIST 100-` from 100, and `LIST -` all of them. Line numbers are read as for `GOTO` (above 63999 is a SYNTAX error). Anything else after `LIST` is a SYNTAX error in place of the statement.
@@ -374,7 +382,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | Grammar rule | Function | Returns |
 |---|---|---|
 | `Line = Statement { ":" Statement } .` | `parseLine` | `*ast.Line` |
-| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OnStatement \| DimStatement \| DataStatement \| ReadStatement \| RestoreStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| EnvironStatement \| StopStatement \| ContStatement \| ClrStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
+| `Statement = [ PrintStatement \| RemStatement \| LetStatement \| IfStatement \| RunStatement \| GotoStatement \| ForStatement \| NextStatement \| GosubStatement \| ReturnStatement \| InputStatement \| GetStatement \| DefStatement \| LoadStatement \| SaveStatement \| VerifyStatement \| OnStatement \| DimStatement \| DataStatement \| ReadStatement \| RestoreStatement \| OpenStatement \| CloseStatement \| PrintFileStatement \| CmdStatement \| InputFileStatement \| EnvironStatement \| SysStatement \| StopStatement \| ContStatement \| ClrStatement \| ListStatement \| NewStatement \| EndStatement ] .` | `parseStatement` | `ast.Stmt`, or nil for an empty statement |
 | `RemStatement = rem .` | `parseRemStatement` | `*ast.RemStmt` |
 | `PrintStatement = print { PrintItem } .` | `parsePrintStatement` | `*ast.PrintStmt` |
 | `PrintItem = Expression \| ";" \| "," \| tab Expression ")" \| spc Expression ")" .` | `parsePrintItem` | `ast.PrintItem` |
@@ -411,6 +419,7 @@ Empty statements (from `::` or a line of only `:`) produce no node, so `Line.Sta
 | `GotoStatement = ( goto \| go to ) LineNumber .` | `parseGotoStatement` | `*ast.GotoStmt` |
 | `LineNumber = [ number ] .` | `parseLineNumber` | `int`: the line number, 0 if there is none (see *Program commands*) |
 | `ListStatement = list [ LineNumber ] [ "-" [ LineNumber ] ] .` | `parseListStatement` | `*ast.ListStmt` |
+| `SysStatement = sys Expression { "," Expression } .` | `parseSysStatement` | `*ast.SysStmt` |
 | `StopStatement = stop .`, `ContStatement = cont .`, `ClrStatement = clr .` | `parseCommand` | `*ast.StopStmt`, `*ast.ContStmt`, `*ast.ClrStmt` |
 | `NewStatement = new .` | `parseCommand` | `*ast.NewStmt` |
 | `EndStatement = end .` | `parseCommand` | `*ast.EndStmt` (`parseCommand` parses any command without arguments) |

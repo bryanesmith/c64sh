@@ -139,3 +139,8 @@ Design: `shell-design.md`
 - [x] **SHELL-RC-003**: If a line of the run-commands file reports a BASIC error or a storage failure, then the shell shall write `c64sh: `, the file's path, `:`, the line's number in the file, `: `, and the message it would otherwise write (for a storage failure, without its `c64sh: `) to stderr, run no more of the file, and start the session.
 - [x] **SHELL-RC-004**: If the run-commands file does not exist, then the shell shall start the session without writing anything; if it exists but cannot be read, then the shell shall write `c64sh: `, its path, `: `, and the reason to stderr and start the session.
 - [x] **SHELL-RC-005**: In script mode, the shell shall not run the run-commands file.
+
+## Running programs
+
+- [x] **SHELL-SYS-001**: The shell shall set a `System` on the interpreter that runs a program, found on the `PATH` unless its name holds a `/`, with its arguments passed unchanged, as a child process sharing the shell's stdin, stdout, and stderr, and returns its exit status, or 128 plus the signal number for a child ended by a signal.
+- [x] **SHELL-SYS-002**: While a program run by `SYS` runs at a terminal, the shell shall restore the terminal mode it had before the line ran, and switch back to program mode when the program ends.

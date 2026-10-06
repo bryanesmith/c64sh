@@ -88,11 +88,11 @@ var keywords = []struct {
 	{"STOP", token.Stop},
 	{"CONT", token.Cont},
 	{"CLR", token.Clr},
+	{"SYS", token.Sys},
 	// Keywords that c64sh does not support, reserved as on a C64, so a
 	// name containing one breaks and the parser rejects them.
 	{"PEEK", token.Reserved},
 	{"POKE", token.Reserved},
-	{"SYS", token.Reserved},
 	{"WAIT", token.Reserved},
 	{"USR", token.Reserved},
 }
@@ -127,7 +127,7 @@ const upArrow = "\u2191"
 // @spec LEXER-001, LEXER-002, LEXER-003, LEXER-004, LEXER-005, LEXER-006, LEXER-007
 // @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013, LEXER-014
 // @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018, LEXER-046, LEXER-019, LEXER-020, LEXER-021
-// @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025, LEXER-026, LEXER-030, LEXER-031, LEXER-032, LEXER-033, LEXER-034, LEXER-035, LEXER-036, LEXER-037, LEXER-038, LEXER-039, LEXER-040, LEXER-041, LEXER-042, LEXER-043, LEXER-044, LEXER-045, LEXER-047
+// @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025, LEXER-026, LEXER-030, LEXER-031, LEXER-032, LEXER-033, LEXER-034, LEXER-035, LEXER-036, LEXER-037, LEXER-038, LEXER-039, LEXER-040, LEXER-041, LEXER-042, LEXER-043, LEXER-044, LEXER-045, LEXER-047, LEXER-048
 func Lex(line string) []token.Token {
 	var toks []token.Token
 	emit := func(k token.Kind, value string, pos int) {

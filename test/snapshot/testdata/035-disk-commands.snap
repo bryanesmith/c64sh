@@ -1,0 +1,19 @@
+exit status: 0
+--- stdout ---
+ 73 CBM DOS V2.6 1541 0  0 
+ 0 OK 0  0 
+ 63 FILE EXISTS 0  0 
+ 0 OK 0  0 
+ 1 FILES SCRATCHED 2  0 
+ 26 WRITE PROTECT ON 0  0 
+ 31 SYNTAX ERROR 0  0 
+
+0 "C64SH           " 00 2A
+1    "LETTERS"          SEQ
+1    "PROG.bas"         PRG
+664 BLOCKS FREE.
+
+0 "C64SH           " 00 2A
+1    "LETTERS"          SEQ
+664 BLOCKS FREE.
+--- stderr ---

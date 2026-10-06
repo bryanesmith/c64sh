@@ -98,7 +98,7 @@ Design: `shell-design.md`
 
 ## Program files
 
-- [x] **SHELL-FILE-001**: The shell shall set storage on the interpreter that reads and writes files by relative name in the current directory, creating files with permissions `0644`, and, when replacing is not allowed, creating the file only if it does not exist.
+- [x] **SHELL-FILE-001**: The shell shall set storage on the interpreter that reads and writes files by relative name in the current directory, creating files with permissions `0644`, and, when replacing is not allowed, creating the file only if it does not exist; listing the directory's regular files that are not hidden, in order of name, with their sizes; removing files; and renaming a file only if the new name does not exist.
 - [x] **SHELL-FILE-002**: In interactive mode the shell shall set stderr as the interpreter's messages writer; in script mode it shall set none.
 - [x] **SHELL-FILE-003**: If executing a line returns an `*interp.StorageError`, then the shell shall write to stderr `c64sh: `, the file, `: `, and, for `fs.ErrExist`, `file exists (use REPLACE to replace it)` with the error's `Replace`, or else the error, then a newline; and then continue as for a BASIC error (SHELL-INT-005, SHELL-SCRIPT-005).
 - [x] **SHELL-FILE-004**: When the session ends, the shell shall call the interpreter's `CloseFiles` and report a `*interp.StorageError` it returns as SHELL-FILE-003 specifies, setting exit status 1 if it was 0.

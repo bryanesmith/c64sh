@@ -1,4 +1,4 @@
-exit status: 1
+exit status: 0
 --- stdout ---
 ALICE 12 
 BOB 7 
@@ -8,5 +8,6 @@ LOG STARTS
 QUIETLY
 END
 MORE
+[] 66 
+ 62 FILE NOT FOUND 0  0 
 --- stderr ---
-?FILE NOT FOUND  ERROR

@@ -508,6 +508,19 @@ PRINT FRE(0)-65536*(FRE(0)<0)
 
 **Why:** `ST` is the status of the last read, and becomes 64 when reading reaches the end of the file; checking it after each read stops the loop at the right time. (A C64 does not stop a program reading past the end; the values it gets are meaningless.)
 
+### Check the disk drive's status
+
+```basic
+10 OPEN 15,8,15
+20 OPEN 2,8,2,"SCORES"
+30 INPUT#15,E,E$,T,S
+40 IF E>=20 THEN PRINT "DISK ERROR";E;E$:CLOSE 2:CLOSE 15:END
+50 INPUT#2,N$:PRINT N$
+60 CLOSE 2:CLOSE 15
+```
+
+**Why:** a disk drive doesn't stop the program when something goes wrong, as a 1541 doesn't: it sets its status, which the program reads from the command channel, secondary address 15. Opening the channel first and checking it after each `OPEN` is how careful C64 programs found a missing file (`62 FILE NOT FOUND`) before reading nothing from it. Error numbers below 20 are not errors (`1 FILES SCRATCHED`).
+
 ### Add to the end of a file
 
 ```basic

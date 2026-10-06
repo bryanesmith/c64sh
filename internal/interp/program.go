@@ -53,13 +53,19 @@ func storeLine(prog []progLine, n int, text string) []progLine {
 	case text == "":
 		return prog
 	}
-	tree, _ := parser.Parse(lexer.Lex(text)) // errors are in the tree
-	l := progLine{number: n, text: text, tree: tree}
+	l := newProgLine(n, text)
 	if found {
 		prog[i] = l
 		return prog
 	}
 	return slices.Insert(prog, i, l)
+}
+
+// newProgLine returns a program line, its text parsed; syntax errors are
+// in the tree.
+func newProgLine(n int, text string) progLine {
+	tree, _ := parser.Parse(lexer.Lex(text))
+	return progLine{number: n, text: text, tree: tree}
 }
 
 // NeverRun reports whether the stored program holds lines and no RUN or

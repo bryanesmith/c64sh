@@ -46,6 +46,7 @@ type Interp struct {
 	ink         string                  // escape code of the last color written to the terminal
 	env         Environment             // ENVIRON's environment variables
 	cont        *pos                    // where CONT continues the program; nil: CAN'T CONTINUE
+	drives      map[int]string          // each disk drive's status, once set
 	stringLimit int                     // the most characters a string may hold; -1: no limit
 	arrays      map[string]*array       // arrays, by identity
 	data        dataPos                 // the data pointer: the next DATA item
@@ -63,7 +64,7 @@ type Interp struct {
 //
 // @spec INTERP-002
 func New(out io.Writer) *Interp {
-	return &Interp{out: out, vars: map[string]value{}, arrays: map[string]*array{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed, tiStart: time.Now(), env: MapEnvironment{}, stringLimit: -1}
+	return &Interp{out: out, vars: map[string]value{}, arrays: map[string]*array{}, fns: map[string]*ast.DefStmt{}, files: map[int]*ioFile{}, seed: initialSeed, tiStart: time.Now(), env: MapEnvironment{}, stringLimit: -1, drives: map[int]string{}}
 }
 
 // Interrupt asks the interpreter to stop, as the C64's STOP key does: the

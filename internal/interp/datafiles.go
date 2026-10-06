@@ -24,6 +24,10 @@ type ioFile struct {
 	data          string          // input: the file's contents, read at OPEN
 	pos           int             // input: where reading continues in data
 	out           strings.Builder // output: written to storage at CLOSE
+	failed        bool            // a disk file that failed to open: reads give nothing
+	discard       bool            // a disk file that may not be written: output is dropped
+	command       bool            // a disk drive's command channel
+	device        int             // the command channel's drive
 }
 
 // execOpen opens a logical file, following the Kernal ($F34A).
@@ -82,10 +86,19 @@ func (in *Interp) execOpen(s *ast.OpenStmt) error {
 
 // openStorage opens a tape or disk file: read whole now, or collecting
 // output to write at CLOSE.
+//
+// @spec INTERP-164, INTERP-165, INTERP-166
 func (in *Interp) openStorage(device, secondary int, name string) (*ioFile, error) {
 	disk := device >= 8
-	if in.storage == nil || (disk && secondary == 15) {
+	if in.storage == nil {
 		return nil, &basicerr.Error{Kind: basicerr.DeviceNotPresent}
+	}
+	if disk && secondary == 15 {
+		f := &ioFile{input: true, output: true, command: true, device: device}
+		if name == "" {
+			return f, nil
+		}
+		return f, in.runCommand(device, name)
 	}
 	if name == "" {
 		return nil, &basicerr.Error{Kind: basicerr.MissingFileName}
@@ -114,17 +127,28 @@ func (in *Interp) openStorage(device, secondary int, name string) (*ioFile, erro
 		mode = "W"
 	}
 	f := &ioFile{file: base}
+	status := statusOK
+	defer func() {
+		if disk {
+			in.setStatus(device, status)
+		}
+	}()
 	if mode == "W" {
 		f.output = true
 		if !replace {
 			if _, err := in.storage.ReadFile(base); err == nil {
-				return nil, &StorageError{File: base, Err: &fs.PathError{Op: "open", Path: base, Err: fs.ErrExist}, Replace: `"@0:` + base + `,S,W"`}
+				// A 1541 refuses with its status alone; writes go nowhere.
+				status, f.discard = fileExists, true
 			}
 		}
 		return f, nil
 	}
 	data, err := in.storage.ReadFile(base)
 	switch {
+	case errors.Is(err, fs.ErrNotExist) && disk:
+		// A 1541 reports a missing file with its status alone.
+		status, f.failed, f.discard = notFound, true, true
+		f.input, f.output = mode != "A", mode == "A"
 	case errors.Is(err, fs.ErrNotExist):
 		return nil, &basicerr.Error{Kind: basicerr.FileNotFound}
 	case err != nil:
@@ -159,7 +183,7 @@ func (in *Interp) close(lfn int) error {
 	if in.cmd == lfn {
 		in.cmd = 0
 	}
-	if f.output && f.file != "" {
+	if f.output && f.file != "" && !f.discard {
 		if err := in.storage.WriteFile(f.file, []byte(f.out.String()), true); err != nil {
 			return &StorageError{File: f.file, Err: err}
 		}
@@ -223,6 +247,8 @@ func (in *Interp) inputFile(e ast.Expr) (*ioFile, error) {
 		return nil, &basicerr.Error{Kind: basicerr.FileNotOpen}
 	case !f.input:
 		return nil, &basicerr.Error{Kind: basicerr.NotInputFile}
+	case f.command && f.pos >= len(f.data):
+		f.data, f.pos = in.takeStatus(f.device)+"\n", 0
 	}
 	return f, nil
 }
@@ -260,7 +286,29 @@ func (in *Interp) emit(f *ioFile, text string) error {
 		return in.write(text)
 	}
 	f.out.WriteString(text)
+	if f.command {
+		return in.runCommands(f)
+	}
 	return nil
+}
+
+// runCommands runs each complete line written to a command channel as a
+// disk command.
+//
+// @spec INTERP-168
+func (in *Interp) runCommands(f *ioFile) error {
+	for {
+		pending := f.out.String()
+		cmd, rest, found := strings.Cut(pending, "\n")
+		if !found {
+			return nil
+		}
+		f.out.Reset()
+		f.out.WriteString(rest)
+		if err := in.runCommand(f.device, strings.TrimSuffix(cmd, "\r")); err != nil {
+			return err
+		}
+	}
 }
 
 // readLine returns the next line of an input file, ending at "\n",
@@ -310,7 +358,10 @@ func (f *ioFile) atEnd() bool {
 // setReadStatus sets ST after reading f: 64 at the end of a file.
 func (in *Interp) setReadStatus(f *ioFile) {
 	in.status = 0
-	if f.atEnd() {
+	switch {
+	case f.failed:
+		in.status = 66 // end of file, and the drive's time-out
+	case f.atEnd():
 		in.status = 64
 	}
 }

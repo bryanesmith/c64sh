@@ -233,10 +233,14 @@ func TestDataFiles(t *testing.T) {
 	if data, _ := os.ReadFile("OPEN"); string(data) != "KEPT\n" {
 		t.Errorf("OPEN = %q", data)
 	}
-	check(t, "disk refuses to replace", runMain(t, "OPEN 2,8,2,\"SCORES,S,W\"\n"),
-		result{"", "c64sh: SCORES: file exists (use \"@0:SCORES,S,W\" to replace it)\n", 1})
+	check(t, "disk refuses to replace, through its status", runMain(t, "10 OPEN 2,8,2,\"SCORES,S,W\":PRINT#2,\"X\":CLOSE 2\n20 OPEN 15,8,15:INPUT#15,E,E$:PRINT E;E$\n"),
+		result{" 63 FILE EXISTS\n", "", 0})
+	if data, _ := os.ReadFile("SCORES"); string(data) != "ALICE, 12 \n" {
+		t.Errorf("SCORES = %q after a refused write", data)
+	}
 	check(t, "CMD to the printer", runMain(t, "10 REM HI\nOPEN 4,4:CMD 4:LIST\n"), result{"\n\n10 REM HI\n", "", 0})
-	check(t, "missing file", runMain(t, "OPEN 2,8,2,\"NONE\"\n"), result{"", "?FILE NOT FOUND  ERROR\n", 1})
+	check(t, "missing file, through the drive's status", runMain(t, "10 OPEN 2,8,2,\"NONE\":OPEN 15,8,15:INPUT#15,E,E$:PRINT E;E$\n"), result{" 62 FILE NOT FOUND\n", "", 0})
+	check(t, "scratch", runMain(t, "OPEN 15,8,15,\"S0:SCORES\"\n10 OPEN 2,8,2,\"SCORES\":INPUT#2,A$:PRINT ST\n"), result{" 66 \n", "", 0})
 }
 
 // TestComputedJumps checks ON … GOTO and ON … GOSUB end to end.

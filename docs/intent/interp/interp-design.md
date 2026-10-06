@@ -87,7 +87,8 @@ func (in *Interp) ScreenState() string
 // end of input.
 func (in *Interp) SetConsole(c Console)
 
-// Storage holds the files that LOAD, SAVE, and VERIFY use, by name.
+// Storage holds the files that LOAD, SAVE, VERIFY, data files, and the
+// drive commands use, by name.
 type Storage interface {
     // ReadFile returns a file's contents, or an error satisfying
     // errors.Is(err, fs.ErrNotExist) if there is no such file.
@@ -96,6 +97,20 @@ type Storage interface {
     // it writes nothing and returns an error satisfying
     // errors.Is(err, fs.ErrExist).
     WriteFile(name string, data []byte, replace bool) error
+    // Files returns the files, without directories or hidden files
+    // (names beginning with "."), in order of name.
+    Files() ([]StoredFile, error)
+    // Remove deletes a file.
+    Remove(name string) error
+    // Rename renames a file. If newName exists, it changes nothing and
+    // returns an error satisfying errors.Is(err, fs.ErrExist).
+    Rename(oldName, newName string) error
+}
+
+// StoredFile is a file's name and size in bytes.
+type StoredFile struct {
+    Name string
+    Size int64
 }
 
 // SetStorage sets where LOAD, SAVE, and VERIFY find files. Without one,
@@ -448,10 +463,10 @@ When the file is not found, the messages stop after `SEARCHING FOR NAME`. A tape
 | 0, the keyboard | Input only, read from the console as `INPUT` and `GET` read it. |
 | 3, the screen; 4 and 5, printers | Output only, written to the program output (stdout), as `PRINT` writes. |
 | 1, tape | A file in storage: read when the secondary address is 0, written (replacing any file) when it is 1 or 2. |
-| 8 to 11, disk drives | A file in storage, by the secondary address: 0 reads, 1 writes; 2 to 14 take the mode from the name, `NAME,S,W` (write) or `NAME,P,W`, `NAME,S,A` (append), or `NAME,S,R` and plain `NAME` (read); 15, the drive's command channel, is `DEVICE NOT PRESENT` (not supported yet). |
+| 8 to 11, disk drives | A file in storage, by the secondary address: 0 reads, 1 writes; 2 to 14 take the mode from the name, `NAME,S,W` (write) or `NAME,P,W`, `NAME,S,A` (append), or `NAME,S,R` and plain `NAME` (read); 15, the drive's command channel (see *The drive's command channel*). |
 | any other | `DEVICE NOT PRESENT`, as is any storage device when no storage is set. |
 
-For a storage file, the name is required (`MISSING FILE NAME`), and for a disk drive a leading `@0:`, `@:`, or `0:` means what it means for `SAVE`. The file in storage is the name before the first comma, as given: data files get no `.bas`. A file opened to read, or to append, must exist (`FILE NOT FOUND`; a C64's tape reports this, and c64sh reports it for disk files too, rather than through the drive's error channel). A disk file opened to write that exists, without `@0:`, is a `StorageError` with `fs.ErrExist` and `Replace` set to `"@0:NAME,S,W"`. A file opened to read is read whole when opened; one opened to write or append collects its output, which is written to storage when the file is closed.
+For a storage file, the name is required (`MISSING FILE NAME`), and for a disk drive a leading `@0:`, `@:`, or `0:` means what it means for `SAVE`. The file in storage is the name before the first comma, as given: data files get no `.bas`. A tape file opened to read must exist (`FILE NOT FOUND`, as a C64's tape reports). A disk drive reports its problems only through its command channel, as a 1541 does, so `OPEN` on a disk drive never fails with a BASIC error for them: a disk file opened to read or append that does not exist sets the drive's status to `62,FILE NOT FOUND,00,00`, and reading it gives nothing (see *ST*); a disk file opened to write that exists, without `@0:`, sets `63,FILE EXISTS,00,00`, and what is written to it is discarded at `CLOSE`; any other disk file opened sets `00, OK,00,00`. A file opened to read is read whole when opened; one opened to write or append collects its output, which is written to storage when the file is closed.
 
 ### CLOSE
 
@@ -475,7 +490,42 @@ For both, the file must be open (`FILE NOT OPEN`) and not output-only (`NOT INPU
 
 ### ST
 
-`ST` is the status of the last `OPEN`, `PRINT#`, `CMD`, `INPUT#`, or `GET#`: 64 after a read that reached the end of a file (its last character was read, or there was nothing left to read), and 0 otherwise. It starts at 0.
+`ST` is the status of the last `OPEN`, `PRINT#`, `CMD`, `INPUT#`, or `GET#`: 64 after a read that reached the end of a file (its last character was read, or there was nothing left to read), 66 after a read of a disk file that failed to open (end of file, and the time-out a C64 gets from a drive with nothing to send), and 0 otherwise. It starts at 0.
+
+### The drive's command channel
+
+Opening secondary address 15 on a disk drive (`OPEN 15,8,15`) opens its **command channel**, as on a 1541. Each drive keeps a **status**, a line `NN,MESSAGE,TT,SS` (an error number, a message, and a track and sector, here a count or 00):
+
+- **Reading** the channel with `INPUT#` or `GET#` gives the status followed by a line end, so `INPUT#15,E,E$,T,S` reads its four parts; once the whole line has been read, the status becomes `00, OK,00,00`, as a 1541 clears it once read. A drive's status starts as `73,CBM DOS V2.6 1541,00,00`, the message a 1541 gives after it is switched on.
+- **Writing** to it sends commands: each line written (with `PRINT#`) is one command, run when its line end is written, and a name given to `OPEN` is a command run at once (`OPEN 15,8,15,"I0"`). Each command sets the status.
+
+| Command | Effect | Status |
+|---|---|---|
+| `S0:NAME` (or `S:NAME`), several names separated by commas | **Scratch**: delete the files matching each name | `01, FILES SCRATCHED,NN,00`, `NN` the number deleted |
+| `R0:NEW=OLD` (or `R:NEW=OLD`) | **Rename** `OLD` to `NEW` | `00, OK,00,00`; `62,FILE NOT FOUND,00,00` without `OLD`; `63,FILE EXISTS,00,00` if `NEW` exists |
+| `N0:NAME,ID` (or `N…`) | **Format**: a 1541 erases the whole disk. c64sh refuses, since its disk is a directory of other files | `26,WRITE PROTECT ON,00,00`, as a 1541 refuses a protected disk |
+| `I0`, `V0` (or `I`, `V`) | **Initialize**, **validate**: nothing to do | `00, OK,00,00` |
+| `UJ`, `UI` | **Reset** the drive | `73,CBM DOS V2.6 1541,00,00` |
+| a scratch or rename without a name, or a rename without `=` | | `34,SYNTAX ERROR,00,00` |
+| a rename name with `*` or `?` | | `33,SYNTAX ERROR,00,00` |
+| anything else | | `31,SYNTAX ERROR,00,00` |
+
+**Names.** A name is the name of a file in storage, as `OPEN` names data files, except that a name without an extension that does not exist names the program of that name (`NAME.bas`), as `LOAD` finds it; a rename then adds `.bas` to the new name too, if it has no extension. In scratch names, `?` matches any one character and `*` matches the rest of the name, as on a 1541. Only files are matched, never directories, and hidden files (names beginning with `.`) never are.
+
+Loading, saving, and verifying on a disk drive set its status too: `00, OK,00,00`, or `62,FILE NOT FOUND,00,00` when `LOAD` or `VERIFY` finds no file, or `63,FILE EXISTS,00,00` when `SAVE` may not replace one (still reported as a `StorageError`, below).
+
+### The disk directory
+
+`LOAD "$",8` (on any disk drive, also `"$0"`) replaces the program with a listing of the drive's files, as on a C64, where the directory comes from the drive as a program to `LIST`; with `:PATTERN` (`"$:A*"`, `"$0:A*"`), only the files matching the pattern, as scratch names match. Like any `LOAD`, it clears the variables in direct mode and runs the new "program" in a running one. The listing's lines are:
+
+| Line number | Text |
+|---|---|
+| 0 | `CHR$(18)` (reverse on), then `"C64SH"` padded with spaces to 16 characters inside the quotes, ` 00 2A` |
+| each file's size in 254-byte blocks (at least 1) | spaces so the names line up (3 for 1 digit, 2 for 2, 1 for 3), the name in quotes, spaces to 16 characters, a space, and `PRG` for a program (`.bas`), `SEQ` for any other file |
+| 664 | `BLOCKS FREE.` |
+
+Files are listed in order of name, with their extensions; directories and hidden files are not listed. The header names no real directory and the free count is an empty 1541 disk's, so a listing shows only the files.
+
 
 ## Keyboard input
 
@@ -725,6 +775,10 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Values longer than the string limit | `ENVIRON$` returns all of it; storing or `+` is `STRING TOO LONG` | Truncate to the limit; `STRING TOO LONG` from `ENVIRON$` itself | Truncating would silently corrupt a value written back (a cut-short `PATH`); an error from `ENVIRON$` would make long values impossible even to print. |
 | `ENVIRON`'s form | GW-BASIC's single string | Also join `;`-separated parts, without the string limit | With strings unlimited by default, `+` builds any value, so a second form would only add surface. |
 | `ENVIRON$(N)` order | By name | The process's order, as GW-BASIC lists its table | The process's order is arbitrary; by name, a listing is stable and easy to read. |
+| Disk errors on `OPEN` | Reported only through the command channel, as on a 1541 | `FILE NOT FOUND` and a c64sh message, as before the command channel existed | A program written for a C64 checks the channel, and one that opens a file that may not exist expects to go on. Authenticity wins unless the alternative is very compelling. |
+| `SAVE` over an existing disk file | Still a `StorageError` with a message, besides the drive's status | Silent, as a 1541 is (its drive light flashes) | Losing a save without a word is the one case where the C64's silence costs work. |
+| Formatting | Refused with `26,WRITE PROTECT ON` | Delete every file; ignore it | A disk is a directory that holds other files; `WRITE PROTECT ON` is the 1541's own refusal, and programs already handle it. |
+| Program files | Text (`NAME.bas`) only; tokenized `.prg` files are not read or written | `.prg` as well, chosen by extension | See HLD *Program file format*: c64sh's lowercase letters, Unicode, and extensions cannot be stored in a C64's tokenized format. |
 | `CONT` in a running program | Continues at itself, looping until interrupted, as the ROM does | `CAN'T CONTINUE`; `ILLEGAL DIRECT`-style refusal | The ROM keeps the start of each statement as it runs it, so this is what a C64 does; a program has no reason to `CONT`, and Ctrl-C ends the loop. |
 | Continuing an interrupted `INPUT` | At the same statement, asking again | After it | On a C64 the STOP key does nothing while `INPUT` waits, so there is no C64 rule; asking again is the only choice that does not lose the answer the program expected. |
 | Number type | `float64` with C64 range checks and C64 output format | Emulating the C64's 5-byte float | See HLD *Number representation*. The range constants make overflow and underflow match the C64's limits, and formatting reproduces its output. |

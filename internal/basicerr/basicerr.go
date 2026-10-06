@@ -13,7 +13,7 @@ const (
 	DivisionByZero                  // DIVISION BY ZERO
 	IllegalQuantity                 // ILLEGAL QUANTITY
 	UndefdStatement                 // UNDEF'D STATEMENT
-	Break                           // BREAK: execution stopped by Ctrl-C
+	Break                           // BREAK: execution stopped by Ctrl-C or STOP
 	NextWithoutFor                  // NEXT WITHOUT FOR
 	OutOfMemory                     // OUT OF MEMORY
 	ReturnWithoutGosub              // RETURN WITHOUT GOSUB
@@ -34,6 +34,7 @@ const (
 	BadSubscript                    // BAD SUBSCRIPT
 	RedimdArray                     // REDIM'D ARRAY
 	OutOfData                       // OUT OF DATA
+	CantContinue                    // CAN'T CONTINUE
 )
 
 // names holds each kind's name as the C64 prints it.
@@ -66,6 +67,7 @@ var names = [...]string{
 	BadSubscript:        "BAD SUBSCRIPT",
 	RedimdArray:         "REDIM'D ARRAY",
 	OutOfData:           "OUT OF DATA",
+	CantContinue:        "CAN'T CONTINUE",
 }
 
 // Error is a BASIC error.
@@ -73,6 +75,7 @@ type Error struct {
 	Kind    Kind
 	Line    int  // the program line where the error occurred, if HasLine
 	HasLine bool // false for an error in direct mode
+	Stopped bool // a BREAK from the STOP statement, rather than Ctrl-C
 }
 
 // Error returns the error's C64 name, such as "SYNTAX".

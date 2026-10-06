@@ -30,7 +30,7 @@ import (
 // @spec PARSER-042, PARSER-043, PARSER-044, PARSER-045, PARSER-046, PARSER-047
 // @spec PARSER-048, PARSER-049, PARSER-050, PARSER-051, PARSER-052, PARSER-053, PARSER-054
 // @spec PARSER-055, PARSER-056
-// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065, PARSER-066, PARSER-067, PARSER-068, PARSER-069, PARSER-070, PARSER-071, PARSER-072, PARSER-073, PARSER-074, PARSER-075, PARSER-076, PARSER-077, PARSER-080
+// @spec PARSER-057, PARSER-058, PARSER-059, PARSER-060, PARSER-061, PARSER-062, PARSER-063, PARSER-064, PARSER-065, PARSER-066, PARSER-067, PARSER-068, PARSER-069, PARSER-070, PARSER-071, PARSER-072, PARSER-073, PARSER-074, PARSER-075, PARSER-076, PARSER-077, PARSER-080, PARSER-081
 func Parse(tokens []token.Token) (*ast.Line, error) {
 	if n := len(tokens); n == 0 || tokens[n-1].Kind != token.EOL {
 		tokens = append(tokens[:n:n], token.Token{Kind: token.EOL})
@@ -117,7 +117,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OnStatement | DimStatement | DataStatement | ReadStatement | RestoreStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | EnvironStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OnStatement | DimStatement | DataStatement | ReadStatement | RestoreStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | EnvironStatement | StopStatement | ContStatement | ClrStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -210,7 +210,13 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		}
 		return stmt, nil
 	case token.List:
-		return p.parseCommand(&ast.ListStmt{})
+		return p.parseListStatement()
+	case token.Stop:
+		return p.parseCommand(&ast.StopStmt{})
+	case token.Cont:
+		return p.parseCommand(&ast.ContStmt{})
+	case token.Clr:
+		return p.parseCommand(&ast.ClrStmt{})
 	case token.New:
 		return p.parseCommand(&ast.NewStmt{})
 	case token.End:
@@ -492,6 +498,43 @@ func (p *parser) parseGotoStatement() (*ast.GotoStmt, error) {
 	return &ast.GotoStmt{Line: n}, nil
 }
 
+// ListStatement = list [ number ] [ "-" [ number ] ] .
+//
+// LIST lists the lines numbered from the first number to the second, as
+// on a C64 ($A6C9): LIST 100 is line 100 alone, LIST -200 up to 200,
+// LIST 100- from 100, and a plain LIST or LIST - everything.
+//
+// @spec PARSER-082, PARSER-083
+func (p *parser) parseListStatement() (ast.Stmt, error) {
+	p.next()
+	stmt := &ast.ListStmt{From: 0, To: 65535}
+	number := func() (int, error) {
+		n, _, _, err := lexer.LineNumber(p.next().Value)
+		return n, err
+	}
+	if p.peek() == token.Number {
+		n, err := number()
+		if err != nil {
+			return nil, err
+		}
+		stmt.From, stmt.To = n, n
+	}
+	if p.accept(token.Minus) {
+		stmt.To = 65535
+		if p.peek() == token.Number {
+			n, err := number()
+			if err != nil {
+				return nil, err
+			}
+			stmt.To = n
+		}
+	}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return stmt, nil
+}
+
 // LineNumber = [ number ] .
 //
 // A line number is read from the number's text as the ROM reads one
@@ -509,7 +552,9 @@ func (p *parser) parseLineNumber() (int, error) {
 func isDigit(c byte) bool { return '0' <= c && c <= '9' }
 
 // ReturnStatement = return .
-// ListStatement   = list .
+// StopStatement   = stop .
+// ContStatement   = cont .
+// ClrStatement    = clr .
 // NewStatement    = new .
 // EndStatement    = end .
 //

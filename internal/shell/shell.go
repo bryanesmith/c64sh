@@ -364,7 +364,7 @@ func (s *session) handle(err error) (int, bool) {
 	case err == nil:
 	case isBasic:
 		s.report(basicErr)
-		if !s.interactive && basicErr.Kind == basicerr.Break {
+		if !s.interactive && basicErr.Kind == basicerr.Break && !basicErr.Stopped {
 			return 130, true // 128 + SIGINT, as Unix shells report Ctrl-C
 		}
 		if !s.interactive {

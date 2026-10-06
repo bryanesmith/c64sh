@@ -183,7 +183,16 @@ func dumpStmt(s ast.Stmt) string {
 	case *ast.DimStmt:
 		return "DIM " + dumpVars(s.Arrays)
 	case *ast.ListStmt:
-		return "LIST"
+		if s.From == 0 && s.To == 65535 {
+			return "LIST"
+		}
+		return fmt.Sprintf("LIST %d-%d", s.From, s.To)
+	case *ast.StopStmt:
+		return "STOP"
+	case *ast.ContStmt:
+		return "CONT"
+	case *ast.ClrStmt:
+		return "CLR"
 	case *ast.NewStmt:
 		return "NEW"
 	case *ast.EndStmt:
@@ -718,8 +727,6 @@ func TestListNewEnd(t *testing.T) {
 // @spec PARSER-037
 func TestProgramCommandSyntaxErrors(t *testing.T) {
 	runParseCases(t, []parseCase{
-		{"LIST n", toks(list, number("10")), `BADSTMT`, true},
-		{"LIST range", toks(list, number("10"), minus, number("20")), `BADSTMT`, true},
 		{"NEW junk", toks(nw, name("X")), `BADSTMT`, true},
 		{"END n", toks(end, number("1")), `BADSTMT`, true},
 		{"after a statement", toks(pr, str("A"), colon, end, str("X")), `PRINT["A"] : BADSTMT`, true},
@@ -1209,5 +1216,45 @@ func TestReadOnlySystemVariables(t *testing.T) {
 		{"INPUT TI", toks(input, name("TI")), `BADSTMT`, true},
 		{"READ ST", toks(read, name("ST")), `BADSTMT`, true},
 		{"TI% is ordinary", toks(name("TI%"), eq, number("1")), `LET $TI%[TI%]=#1`, false},
+	})
+}
+
+// @spec PARSER-081
+func TestStopContClr(t *testing.T) {
+	stop := token.Token{Kind: token.Stop, Value: "STOP"}
+	cont := token.Token{Kind: token.Cont, Value: "CONT"}
+	clr := token.Token{Kind: token.Clr, Value: "CLR"}
+	runParseCases(t, []parseCase{
+		{"STOP", toks(stop), `STOP`, false},
+		{"CONT", toks(cont), `CONT`, false},
+		{"CLR then a statement", toks(clr, colon, pr), `CLR : PRINT[]`, false},
+		{"STOP with a number", toks(stop, number("1")), `BADSTMT`, true},
+		{"CONT with a number", toks(cont, number("10")), `BADSTMT`, true},
+		{"CLR with a name", toks(clr, name("A")), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-082
+func TestListRanges(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"all", toks(list), `LIST`, false},
+		{"one line", toks(list, number("100")), `LIST 100-100`, false},
+		{"a range", toks(list, number("100"), minus, number("200")), `LIST 100-200`, false},
+		{"up to", toks(list, minus, number("200")), `LIST 0-200`, false},
+		{"from", toks(list, number("100"), minus), `LIST 100-65535`, false},
+		{"dash alone", toks(list, minus), `LIST`, false},
+		{"then a statement", toks(list, number("10"), colon, pr), `LIST 10-10 : PRINT[]`, false},
+	})
+}
+
+// @spec PARSER-083
+func TestListRangeErrors(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"a name", toks(list, name("A")), `BADSTMT`, true},
+		{"two dashes", toks(list, minus, minus), `BADSTMT`, true},
+		{"a comma", toks(list, number("10"), comma, number("20")), `BADSTMT`, true},
+		{"above 63999", toks(list, number("64000")), `BADSTMT`, true},
+		{"end above 63999", toks(list, minus, number("70000")), `BADSTMT`, true},
+		{"a string", toks(list, str("A")), `BADSTMT`, true},
 	})
 }

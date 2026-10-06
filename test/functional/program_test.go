@@ -90,7 +90,7 @@ func TestProgramErrorsNameTheLine(t *testing.T) {
 		{"undefined line, direct", "10 PRINT \"A\"\nRUN 20\n", result{"", "?UNDEF'D STATEMENT  ERROR\n", 1}},
 		{"undefined line, in program", "10 RUN 20\n", result{"", "?UNDEF'D STATEMENT  ERROR IN 10\n", 1}},
 		{"skipped by IF", "10 IF 0 THEN @\n20 PRINT \"OK\"\n", result{"OK\n", "", 0}},
-		{"LIST junk", "10 PRINT \"A\"\nLIST 10\n", result{"", "?SYNTAX  ERROR\n", 1}},
+		{"LIST junk", "10 PRINT \"A\"\nLIST A\n", result{"", "?SYNTAX  ERROR\n", 1}},
 	}
 	for _, c := range cases {
 		check(t, c.name, runMain(t, c.input), c.want)

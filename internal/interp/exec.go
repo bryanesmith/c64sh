@@ -34,8 +34,12 @@ func (in *Interp) Exec(line *ast.Line) error {
 	if err != nil {
 		in.cmd = 0 // an error returns output to the screen ($A447)
 	}
-	if be, ok := errors.AsType[*basicerr.Error](err); ok && be.Kind != basicerr.Break {
+	be, isBasic := errors.AsType[*basicerr.Error](err)
+	if isBasic && be.Kind != basicerr.Break {
 		in.stack = nil // an error flushes the stack, as on a C64 ($A462)
+	}
+	if err != nil && (!isBasic || be.Kind != basicerr.Break) {
+		in.cont = nil // and leaves nothing to continue ($A462)
 	}
 	// Entries that would resume in this line are gone with it.
 	for i, f := range in.stack {
@@ -56,12 +60,16 @@ func (in *Interp) Exec(line *ast.Line) error {
 // its STOP key between statements ($A7AE, $A82C).
 //
 // @spec INTERP-052, INTERP-053, INTERP-054, INTERP-055, INTERP-056, INTERP-058, INTERP-061
-// @spec INTERP-065, INTERP-074
+// @spec INTERP-065, INTERP-074, INTERP-160
 func (in *Interp) execute(p pos) error {
 	for {
 		stmts := in.statements(p.line)
 		if p.stmt >= len(stmts) {
-			if p.line == directLine || p.line+1 >= len(in.program) {
+			if p.line == directLine {
+				return nil
+			}
+			if p.line+1 >= len(in.program) {
+				in.cont = &pos{len(in.program), 0} // CONT has nothing more to run
 				return nil
 			}
 			p = pos{p.line + 1, 0}
@@ -76,6 +84,9 @@ func (in *Interp) execute(p pos) error {
 		isJump := errors.As(err, &j)
 		isResume := errors.As(err, &r)
 		if (err == nil || err == errSkipLine || isJump || isResume) && in.interrupted.Swap(false) {
+			if p.line != directLine {
+				in.cont = in.continueAt(next, stmts, err, j, r)
+			}
 			return in.atCur(&basicerr.Error{Kind: basicerr.Break})
 		}
 		switch {
@@ -98,10 +109,35 @@ func (in *Interp) execute(p pos) error {
 			}
 			next = pos{i, 0}
 		default:
+			if be, ok := errors.AsType[*basicerr.Error](err); ok && be.Kind == basicerr.Break && !be.Stopped && p.line != directLine {
+				in.cont = &pos{p.line, p.stmt} // INPUT or GET interrupted: ask again
+			}
 			return in.atCur(err)
 		}
 		p = next
 	}
+}
+
+// continueAt returns where CONT continues after an interrupt that came
+// as a statement finished with err, next being the statement after it:
+// next, the next line after a false IF, or where a jump or resume was
+// going. A jump to a line that does not exist leaves nothing to continue.
+func (in *Interp) continueAt(next pos, stmts []ast.Stmt, err error, j *jump, r *resume) *pos {
+	switch {
+	case err == errSkipLine:
+		return &pos{next.line, len(stmts)}
+	case r != nil:
+		return &r.at
+	case j != nil && !j.hasLine:
+		return &pos{0, 0}
+	case j != nil:
+		i, found := in.find(j.line)
+		if !found {
+			return nil
+		}
+		return &pos{i, 0}
+	}
+	return &next
 }
 
 // statements returns the statements of a position's line.
@@ -135,7 +171,7 @@ func (in *Interp) after() pos {
 // clr clears the variables, function definitions, and the control stack,
 // as the C64's CLR does.
 //
-// @spec INTERP-095, INTERP-138
+// @spec INTERP-095, INTERP-138, INTERP-161
 func (in *Interp) clr() {
 	in.closeAll()
 	clear(in.vars)
@@ -143,4 +179,5 @@ func (in *Interp) clr() {
 	clear(in.arrays)
 	in.restore()
 	in.stack = nil
+	in.cont = nil // nothing to continue, as the ROM's stkini ($A68E)
 }

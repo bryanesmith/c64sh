@@ -81,7 +81,7 @@ Design: `interp-design.md`
 - [x] **INTERP-056**: If a statement fails while the program is running, then the interpreter shall stop the program and return the error with `Line` set to the number of the line containing the statement and `HasLine` true (for a failing `RUN n`, the line holding the `RUN`); an error in direct mode shall have `HasLine` false.
 - [x] **INTERP-057**: When executing an `ast.RunStmt`, `ast.GotoStmt`, `ast.ListStmt`, `ast.NewStmt`, or `ast.EndStmt`, the interpreter shall execute no further statements on the line holding it, in direct mode or in a program.
 - [x] **INTERP-058**: When executing an `ast.EndStmt` in a running program, or an `ast.ListStmt` or `ast.NewStmt`, the interpreter shall end the program, if one is running, and return no error.
-- [x] **INTERP-059**: When executing an `ast.ListStmt`, the interpreter shall write, for each program line in ascending order, a newline, the line number without a leading space, one space, and the line's text with each `?` that the lexer reads as a `Print` token written as `PRINT` (so `10 ?"HI"` lists as `10 PRINT"HI"`), followed by a newline after the last line; for an empty program it shall write nothing.
+- [x] **INTERP-059**: When executing an `ast.ListStmt`, the interpreter shall write, for each program line numbered from its `From` to its `To`, in ascending order, a newline, the line number without a leading space, one space, and the line's text with each `?` that the lexer reads as a `Print` token written as `PRINT` (so `10 ?"HI"` lists as `10 PRINT"HI"`), followed by a newline after the last line; when no line is in that range, it shall write nothing.
 - [x] **INTERP-060**: When executing an `ast.NewStmt`, the interpreter shall delete every program line and clear all variables.
 - [x] **INTERP-061**: When executing an `ast.RunStmt` in a running program, the interpreter shall start the program again as INTERP-052 and INTERP-053 specify.
 - [x] **INTERP-062**: `NeverRun` shall return true when the program holds at least one line and no `ast.RunStmt`, `ast.GotoStmt`, or `ast.GosubStmt` has been executed since the interpreter was created, and false otherwise.
@@ -228,3 +228,12 @@ Design: `interp-design.md`
 ## String limit
 
 - [x] **INTERP-156**: The interpreter shall apply the string limit given to `SetStringLimit` (INTERP-011, INTERP-035, INTERP-126), with -1 meaning no limit, and no limit when none has been given.
+
+## Program control
+
+- [x] **INTERP-158**: When executing an `ast.ClrStmt`, the interpreter shall clear the variables, arrays, function definitions, and control stack, close the data files, and move the data pointer to the first `DATA` item, as storing a line does, and continue with the next statement.
+- [x] **INTERP-159**: When executing an `ast.StopStmt`, the interpreter shall stop and return a BREAK error with `Stopped` set, with `Line` the line holding the `STOP` in a running program, and no line in direct mode.
+- [x] **INTERP-160**: When a running program stops by `STOP`, `END`, finishing its last line, or `Interrupt` after a statement, the interpreter shall set the continue position to the statement after the one that stopped it (the program's end, after the last line); when it stops by `Interrupt` while `INPUT` or `GET` waits, to that statement.
+- [x] **INTERP-161**: When an error other than BREAK stops execution, or the variables are cleared (`CLR`, `RUN`, `NEW`, storing or deleting a line, `LOAD` in direct mode), the interpreter shall clear the continue position.
+- [x] **INTERP-162**: When executing an `ast.ContStmt` in direct mode, the interpreter shall continue the program at the continue position, keeping the variables and control stack, or fail with CAN'T CONTINUE (`basicerr.CantContinue`) if there is none.
+- [x] **INTERP-163**: When executing an `ast.ContStmt` in a running program, the interpreter shall continue at that same statement.

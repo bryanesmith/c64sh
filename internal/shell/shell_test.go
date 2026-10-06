@@ -57,3 +57,11 @@ func TestTerminalIsTerminal(t *testing.T) {
 		t.Errorf("isTerminal(/dev/tty) = false, want true")
 	}
 }
+
+// @spec SHELL-SCRIPT-005
+func TestStopExitStatus(t *testing.T) {
+	var stdout, stderr strings.Builder
+	if status := Run(Config{}, strings.NewReader("10 PRINT \"A\":STOP\n"), &stdout, &stderr); status != 1 || stderr.String() != "BREAK IN 10\n" {
+		t.Errorf("status %d, stderr %q; want 1 and BREAK IN 10 (STOP is not Ctrl-C's 130)", status, stderr.String())
+	}
+}

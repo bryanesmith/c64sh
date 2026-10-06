@@ -314,7 +314,7 @@ Running the program executes each line's statements, in line-number order, until
 - **A statement fails**: the program stops, and the error is returned with the number of the line it occurred in (`Line` and `HasLine` on the `basicerr.Error`), so the shell prints `?SYNTAX  ERROR IN 20`.
 - **`RUN` runs**: the program starts again, with the variables cleared.
 - **`GOTO n` runs**: the program continues at line `n`, or stops with `UNDEF'D STATEMENT` if there is no line `n`.
-- **The interpreter is interrupted** (see *BREAK*): the program stops with a `BREAK` error.
+- **The interpreter is interrupted** (see *BREAK*), or **`STOP` runs**: the program stops with a `BREAK` error, and `CONT` can continue it (see *STOP and CONT*).
 
 A false `IF` ends only its own line; the program continues with the next line. `RUN` and `NEW` also empty the control stack. Program output and the cursor column carry on across lines exactly as in direct mode.
 
@@ -334,13 +334,33 @@ A false `IF` ends only its own line; the program continues with the next line. `
 
 ### LIST
 
-`LIST` writes the whole program, in line-number order, as the C64 ROM does (`$A6C9`). Before each line it writes a newline, then the line number with no leading space, one space, and the line's text: `10 PRINT "HI"`. In the text, a `?` that the lexer reads as `PRINT` (outside strings and comments) is written as `PRINT`, because a C64 stores both as the same keyword: `10 ?"HI"` lists as `10 PRINT"HI"`. Everything else is written as it was typed, including spaces. An empty program writes nothing.
+`LIST` writes the program's lines numbered from its `From` to its `To` (the whole program for a plain `LIST`; see the parser design for the forms), in line-number order, as the C64 ROM does (`$A6C9`). Before each line it writes a newline, then the line number with no leading space, one space, and the line's text: `10 PRINT "HI"`. In the text, a `?` that the lexer reads as `PRINT` (outside strings and comments) is written as `PRINT`, because a C64 stores both as the same keyword: `10 ?"HI"` lists as `10 PRINT"HI"`. Everything else is written as it was typed, including spaces. An empty program writes nothing.
 
 Because each line starts with a newline, the listing begins with one: a blank line after the `LIST` command in a terminal, as on a C64. After the last line `LIST` writes a newline too, because on a C64 a listing is always followed by `READY.`, whose message begins with one (`$A714`, `$A376`); so whatever follows starts on a fresh line, in a script as well. Then `LIST` stops, like `END`: in a program, the program ends; in direct mode, the rest of the line does not run (`$A714` returns to `READY.`).
 
 ### NEW, END
 
 `NEW` erases the program and clears the variables, then stops like `END`. `END` stops: it ends a running program, and in direct mode it ends the line. Neither writes anything.
+
+### CLR
+
+`CLR` clears the variables, the arrays, the function definitions, and the control stack, closes the data files, and moves the data pointer to the first `DATA` item, exactly as storing a line does, without changing the program (`$A65E`). In a running program, execution goes on with the next statement, so a later `NEXT` or `RETURN` finds no entry.
+
+### STOP and CONT
+
+A program that stops can be continued with `CONT`, as on a C64, where the ROM keeps the place to continue from (`OLDTXT` and `OLDLIN`, `$A82C`, `$A857`). The interpreter keeps the same: a **continue position**, or none.
+
+| When | In a running program | In direct mode |
+|---|---|---|
+| `STOP` runs | Continue after `STOP`; stop with `BREAK IN n` (a `basicerr.Error` of kind `Break` with `Stopped` set) | `BREAK`; the continue position is unchanged |
+| `END` runs | Continue after `END`; end | End the line; unchanged |
+| The program's last line finishes | Continue at the program's end (so `CONT` does nothing more) | — |
+| Interrupted after a statement (see *BREAK*) | Continue at the next statement | Unchanged |
+| Interrupted while `INPUT` or `GET` waits (a c64sh behavior: on a C64 the STOP key does nothing then) | Continue at the same statement, which asks again | Unchanged |
+| An error other than `BREAK` stops execution | None (`$A462`) | None |
+| The variables are cleared (`CLR`, `RUN`, `NEW`, storing or deleting a line, a `LOAD` in direct mode) | None | None |
+
+`CONT` in direct mode continues the program at the continue position, with the variables and control stack as they were, or fails with `CAN'T CONTINUE` if there is none. In a running program, `CONT` continues at itself, as the ROM does, since it keeps the position of every statement as it starts (`$A7AE`): the program loops on the `CONT` until it is interrupted.
 
 ### NeverRun
 
@@ -705,6 +725,8 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Values longer than the string limit | `ENVIRON$` returns all of it; storing or `+` is `STRING TOO LONG` | Truncate to the limit; `STRING TOO LONG` from `ENVIRON$` itself | Truncating would silently corrupt a value written back (a cut-short `PATH`); an error from `ENVIRON$` would make long values impossible even to print. |
 | `ENVIRON`'s form | GW-BASIC's single string | Also join `;`-separated parts, without the string limit | With strings unlimited by default, `+` builds any value, so a second form would only add surface. |
 | `ENVIRON$(N)` order | By name | The process's order, as GW-BASIC lists its table | The process's order is arbitrary; by name, a listing is stable and easy to read. |
+| `CONT` in a running program | Continues at itself, looping until interrupted, as the ROM does | `CAN'T CONTINUE`; `ILLEGAL DIRECT`-style refusal | The ROM keeps the start of each statement as it runs it, so this is what a C64 does; a program has no reason to `CONT`, and Ctrl-C ends the loop. |
+| Continuing an interrupted `INPUT` | At the same statement, asking again | After it | On a C64 the STOP key does nothing while `INPUT` waits, so there is no C64 rule; asking again is the only choice that does not lose the answer the program expected. |
 | Number type | `float64` with C64 range checks and C64 output format | Emulating the C64's 5-byte float | See HLD *Number representation*. The range constants make overflow and underflow match the C64's limits, and formatting reproduces its output. |
 | Integer variable conversion | Round down (toward minus infinity) | Truncate toward zero; round to nearest | The C64 ROM converts by shifting the two's-complement mantissa, which rounds down, so `-3.7` becomes -4. |
 | Rounding for output | Round to 9 significant digits in decimal, then choose notation | Scale by 10 in binary as the ROM does | Decimal rounding gives the same 9 digits for all but rare boundary cases, and is simple and exact with `strconv`. |

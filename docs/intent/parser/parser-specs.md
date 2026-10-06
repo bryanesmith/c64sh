@@ -34,7 +34,7 @@ Design: `parser-design.md`
 - [x] **PARSER-033**: When a statement is `RUN` followed by `:` or `EOL`, the parser shall produce an `*ast.RunStmt` with `HasLine` false.
 - [x] **PARSER-034**: When `RUN` is followed by a `Number` token, the parser shall produce an `*ast.RunStmt` with `HasLine` true and `Line` the line number read as PARSER-039 specifies (`RUN 20` is line 20, `RUN 20.5` line 20, and `RUN .5` line 0).
 - [x] **PARSER-035**: When `RUN` is followed by a token other than `:`, `EOL`, or `Number`, the parser shall produce an `*ast.RunStmt` with `HasLine` true and `Line` 0, without consuming that token (`RUN A` is `RUN 0`, as on a C64).
-- [x] **PARSER-036**: When a statement is `LIST`, `NEW`, or `END` followed by `:` or `EOL`, the parser shall produce an `*ast.ListStmt`, `*ast.NewStmt`, or `*ast.EndStmt` respectively.
+- [x] **PARSER-036**: When a statement is `NEW` or `END` followed by `:` or `EOL`, the parser shall produce an `*ast.NewStmt` or `*ast.EndStmt` respectively (for `LIST`, see PARSER-082).
 - [x] **PARSER-038**: When a statement is `GOTO`, or `GO` followed by `TO`, the parser shall produce an `*ast.GotoStmt` whose `Line` is the line number read as PARSER-039 specifies (`GOTO 20`, `GO TO 20`, and `GOTO 20.5` are line 20; `GOTO` alone and `GOTO A` are line 0).
 - [x] **PARSER-039**: When reading the line number after `RUN`, `GOTO`, `GO TO`, or `THEN`, the parser shall consume the next token if it is a `Number` and take the value `lexer.LineNumber` reads from its text, or 0 if that text does not begin with a digit; if the next token is not a `Number`, the line number shall be 0 and the token shall not be consumed.
 - [x] **PARSER-040**: When `THEN` is followed by a `Number` token whose text begins with a digit, the parser shall produce, after the `*ast.IfStmt`, an `*ast.GotoStmt` whose line number is read as PARSER-039 specifies (`IF A THEN 20` is `IfStmt(A)`, `GotoStmt(20)`).
@@ -47,7 +47,7 @@ Design: `parser-design.md`
 - [x] **PARSER-009**: When the parser returns a SYNTAX error, it shall also return a non-nil `*ast.Line` holding the statements completed before the statement in which the error occurred, followed by the error itself at that point (PARSER-010 or PARSER-011), and it shall not parse any tokens after the error.
 - [x] **PARSER-010**: If a SYNTAX error occurs within a `PRINT` statement's items, then the parser shall include that statement in the returned `*ast.Line` as its last statement, with `Items` holding the items completed before the error followed by an `*ast.BadItem` carrying the SYNTAX error (so `PRINT "A";"B"+@` has items `ExprItem("A")`, `Semicolon`, `BadItem`).
 - [x] **PARSER-011**: If a SYNTAX error occurs other than within a `PRINT` statement's items (for example at the first token of a statement, in an assignment, or in an `IF`), then the parser shall put an `*ast.BadStmt` holding the error in place of the failing statement, as the line's last statement.
-- [x] **PARSER-037**: If `LIST`, `NEW`, or `END` is followed by a token other than `:` or `EOL`, `GO` is not followed by `TO`, or a line number read as PARSER-039 specifies is above 63999, then the parser shall return a SYNTAX error, with an `*ast.BadStmt` in place of the statement (so `LIST 10`, `END 1`, and `GO 10` do nothing but report the error).
+- [x] **PARSER-037**: If `NEW` or `END` is followed by a token other than `:` or `EOL`, `GO` is not followed by `TO`, or a line number read as PARSER-039 specifies is above 63999, then the parser shall return a SYNTAX error, with an `*ast.BadStmt` in place of the statement (so `LIST 10`, `END 1`, and `GO 10` do nothing but report the error).
 
 ## Loops
 
@@ -129,3 +129,9 @@ Design: `parser-design.md`
 
 - [x] **PARSER-078**: When a statement is `ENVIRON` followed by an expression, the parser shall produce an `*ast.EnvironStmt` holding it, and when a call is `ENVIRON$` with one argument, an `*ast.CallExpr` (both c64sh extensions).
 - [x] **PARSER-079**: If `ENVIRON` lacks an expression, or its expression is followed by anything other than `:` or `EOL`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement; an `ENVIRON$` call with other than one argument shall be a SYNTAX error as for any other call.
+
+## Program control
+
+- [x] **PARSER-081**: When a statement is `STOP`, `CONT`, or `CLR` followed by `:` or `EOL`, the parser shall produce an `*ast.StopStmt`, `*ast.ContStmt`, or `*ast.ClrStmt` respectively; followed by anything else, a SYNTAX error with an `*ast.BadStmt` in place of the statement.
+- [x] **PARSER-082**: When a statement is `LIST` followed by an optional line number, then optionally `-` and an optional line number, then `:` or `EOL`, the parser shall produce an `*ast.ListStmt` with `From` the first number (0 if absent) and `To` the second (65535 if absent after a `-`; the first number when there is no `-`; 65535 when there are neither).
+- [x] **PARSER-083**: If `LIST` is followed by anything other than PARSER-082's forms, or one of its line numbers is above 63999, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.

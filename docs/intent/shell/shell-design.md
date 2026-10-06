@@ -265,13 +265,15 @@ const (
     BadSubscript              // BAD SUBSCRIPT
     RedimdArray               // REDIM'D ARRAY
     OutOfData                 // OUT OF DATA
-    Break                     // BREAK: execution stopped by Ctrl-C
+    CantContinue              // CAN'T CONTINUE
+    Break                     // BREAK: execution stopped by Ctrl-C or STOP
 )
 
 type Error struct {
     Kind    Kind
     Line    int  // the program line where the error occurred, if HasLine
     HasLine bool // false for an error in direct mode
+    Stopped bool // a BREAK from the STOP statement, rather than Ctrl-C
 }
 
 func (e *Error) Error() string // the C64 name, e.g. "SYNTAX"

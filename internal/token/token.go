@@ -70,6 +70,9 @@ const (
 	Read                  // READ
 	Restore               // RESTORE
 	Environ               // ENVIRON (a c64sh extension)
+	Stop                  // STOP
+	Cont                  // CONT
+	Clr                   // CLR
 )
 
 var kindNames = [...]string{
@@ -135,6 +138,9 @@ var kindNames = [...]string{
 	Read:      "Read",
 	Restore:   "Restore",
 	Environ:   "Environ",
+	Stop:      "Stop",
+	Cont:      "Cont",
+	Clr:       "Clr",
 }
 
 func (k Kind) String() string {

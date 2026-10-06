@@ -34,6 +34,9 @@ func (in *Interp) now() time.Time {
 //
 // @spec INTERP-122, INTERP-123
 func (in *Interp) call(e *ast.CallExpr) (value, error) {
+	if e.Name == "FRE" {
+		return in.fre(e.Args[0])
+	}
 	if e.Name == "POS" {
 		// The argument is evaluated and ignored, whatever its type ($B39E).
 		// @spec INTERP-132

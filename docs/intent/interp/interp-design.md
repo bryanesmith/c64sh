@@ -563,6 +563,21 @@ Arrays are kept apart from plain variables, by identity: `A`, `A(…)`, `A%(…)
 - **Memory.** An array takes, as on a C64, 5 bytes plus 2 per dimension, plus 5 bytes per element for numbers, 3 for strings, and 2 for integers. Creating an array (with `DIM` or by use) that would make all arrays together take more than 38911 bytes, the memory free on a C64 when it starts, fails with `OUT OF MEMORY`. The program, the variables, and the strings themselves are not counted, so a C64 runs out of memory sooner.
 - Arrays are cleared with the variables (`RUN`, `NEW`, storing a line).
 
+## Free memory
+
+`FRE(X)` evaluates `X`, of either type, and ignores it, as the ROM does, and returns the memory left for BASIC, counted as a C64 counts it: 38909 bytes (the 38911 a C64 reports at start-up, less the two bytes ending an empty program), less what is used:
+
+| What | Bytes, as on a C64 |
+|---|---|
+| Each program line | 5 (link, line number, end), plus its text with each keyword as one byte |
+| Each variable and function definition | 7 |
+| Each array | as for *Arrays* above |
+| Each string held by a variable or array element | its length |
+
+The result is shown as the C64 shows it: a signed 16-bit number, so free memory above 32767 comes out negative (38909 free is -26627), and programs add 65536 to a negative result to read the real figure. With more in use than a C64 holds (possible in c64sh, where strings are unlimited by default), it is 0.
+
+The count is close to a C64's but not exact: a C64 does not store a string assigned from a literal (`A$="HI"`), pointing into the program instead, and c64sh counts its length; and keywords that are c64sh extensions count as one byte, like the C64's own. `FRE` only reports memory; running out of it is `OUT OF MEMORY` only for arrays (see *Arrays*).
+
 ## DATA and READ
 
 The interpreter keeps a **data pointer**: a place among the items of the program's `DATA` statements, in program order (line by line, statement by statement). It starts at the first item, and `RESTORE`, clearing the variables (`RUN`, `NEW`, storing a line), and a `LOAD` that chains move it back there (`$A81D`, `$A677`). Executing a `DATA` statement does nothing; `DATA` in the line typed in direct mode is never read.

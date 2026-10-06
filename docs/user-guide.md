@@ -24,6 +24,7 @@ To learn the language by building a game, start with the [tutorial](tutorial/ind
 - [Variables](#variables)
 - [Arrays](#arrays)
 - [DATA statements](#data-statements)
+- [Free memory](#free-memory)
 - [Programs](#programs)
 - [Loops](#loops)
 - [Subroutines](#subroutines)
@@ -545,6 +546,28 @@ prints ` 9 `.
 
 See [`examples/features/027-arrays.bas`](../examples/features/027-arrays.bas) for every form.
 
+## Free memory
+
+`FRE(0)` gives the memory left for BASIC, counted as a C64 counts it: the program (each line 5 bytes, plus its text with each keyword as one byte), each variable (7 bytes, plus a string's length), and each array.
+
+```
+PRINT FRE(0)
+```
+
+prints `-26627` with nothing in use. As on a C64, the result is a signed 16-bit number, so free memory above 32767 shows as negative; add 65536 to get the real figure:
+
+```
+PRINT FRE(0)-65536*(FRE(0)<0)
+```
+
+prints ` 38909 `.
+
+- **The argument is ignored**, whatever it is: `FRE(0)` and `FRE("X")` are the same.
+- **The count is close to a C64's, not exact**: a C64 doesn't store a string assigned straight from the program's text (`A$="HI"`), and c64sh counts it.
+- **`FRE` only reports.** As c64sh's strings are unlimited by default, a program can use more than a C64 holds; `FRE` then gives 0. Only arrays can run out of memory (see [Arrays](#arrays)).
+
+See [`examples/features/033-free-memory.bas`](../examples/features/033-free-memory.bas) for every form.
+
 ## DATA statements
 
 `DATA` lines keep values inside a program, and `READ` takes them, in order:
@@ -968,7 +991,6 @@ These features are c64sh's own: they are not part of Commodore 64 BASIC V2 and d
 
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
-- `FRE`
 - `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 

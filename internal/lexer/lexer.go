@@ -75,6 +75,7 @@ var keywords = []struct {
 	{"STR$", token.Function},
 	{"VAL", token.Function},
 	{"POS", token.Function},
+	{"FRE", token.Function},
 	{"TAB(", token.Tab},
 	{"SPC(", token.Spc},
 	{"DIM", token.Dim},
@@ -89,7 +90,6 @@ var keywords = []struct {
 	{"STOP", token.Reserved},
 	{"CONT", token.Reserved},
 	{"CLR", token.Reserved},
-	{"FRE", token.Reserved},
 	{"PEEK", token.Reserved},
 	{"POKE", token.Reserved},
 	{"SYS", token.Reserved},
@@ -126,7 +126,7 @@ const upArrow = "\u2191"
 //
 // @spec LEXER-001, LEXER-002, LEXER-003, LEXER-004, LEXER-005, LEXER-006, LEXER-007
 // @spec LEXER-008, LEXER-009, LEXER-010, LEXER-011, LEXER-012, LEXER-013, LEXER-014
-// @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018, LEXER-019, LEXER-020, LEXER-021
+// @spec LEXER-015, LEXER-016, LEXER-017, LEXER-018, LEXER-046, LEXER-019, LEXER-020, LEXER-021
 // @spec LEXER-022, LEXER-023, LEXER-024, LEXER-025, LEXER-026, LEXER-030, LEXER-031, LEXER-032, LEXER-033, LEXER-034, LEXER-035, LEXER-036, LEXER-037, LEXER-038, LEXER-039, LEXER-040, LEXER-041, LEXER-042, LEXER-043, LEXER-044
 func Lex(line string) []token.Token {
 	var toks []token.Token

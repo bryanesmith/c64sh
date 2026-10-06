@@ -31,11 +31,12 @@ Design: `lexer-design.md`
 - [x] **LEXER-039**: When the lexer encounters `LEN`, `LEFT$`, `RIGHT$`, `MID$`, `CHR$`, `ASC`, `STR$`, or `VAL` in uppercase outside a string literal, it shall produce a `Function` token whose value is the name.
 - [x] **LEXER-040**: When the lexer encounters `TAB(` or `SPC(` in uppercase outside a string literal, it shall produce a `Tab` or `Spc` token, and for `POS`, a `Function` token with value `POS`.
 - [x] **LEXER-041**: When the lexer encounters `DIM` in uppercase outside a string literal, it shall produce a `Dim` token.
-- [x] **LEXER-042**: When the lexer encounters `STOP`, `CONT`, `CLR`, `FRE`, `PEEK`, `POKE`, `SYS`, `WAIT`, or `USR` in uppercase outside a string literal, it shall produce a `Reserved` token whose value is the keyword.
+- [x] **LEXER-042**: When the lexer encounters `STOP`, `CONT`, `CLR`, `PEEK`, `POKE`, `SYS`, `WAIT`, or `USR` in uppercase outside a string literal, it shall produce a `Reserved` token whose value is the keyword.
 - [x] **LEXER-043**: When the lexer encounters `DATA` in uppercase outside a string literal, it shall produce a `Data` token whose value is the text after it up to the next `:` outside double quotes, or else to the end of the line with trailing spaces removed, without recognizing keywords in it, and continue scanning at the `:`.
 - [x] **LEXER-044**: When the lexer encounters `READ` or `RESTORE` in uppercase outside a string literal, it shall produce a `Read` or `Restore` token respectively.
 
 - [x] **LEXER-045**: When the lexer encounters `ENVIRON$` in uppercase outside a string literal, it shall produce a `Function` token with value `ENVIRON$`, and for `ENVIRON` not followed by `$`, an `Environ` token (both c64sh extensions; the longest match decides).
+- [x] **LEXER-046**: When the lexer encounters `FRE` in uppercase outside a string literal, it shall produce a `Function` token with value `FRE`.
 
 ## Punctuation and illegal input
 
@@ -52,7 +53,7 @@ Design: `lexer-design.md`
 - [x] **LEXER-015**: When the lexer encounters a digit or `.` outside a string literal, it shall produce a `Number` token for the number literal starting there (digits with at most one `.`, optionally followed by `E`, an optional `+` or `-`, and digits), positioned at its first character, whose value is the literal's characters with spaces and tabs removed (so `.` alone, `1E`, and `1E+` are complete literals).
 - [x] **LEXER-016**: While scanning a number literal, the lexer shall skip spaces and tabs between its characters (`1 2` produces one `Number` token with value `12`, and `1 . 5 E 3` one with value `1.5E3`), and shall not include whitespace after the literal's last character in the token.
 - [x] **LEXER-017**: When a `.` follows a number literal that already contains a `.`, the lexer shall end the literal before it, so that `.` starts the next token (`1.2.3` produces `Number(1.2)` and `Number(.3)`).
-- [D] **LEXER-018**: When a keyword begins at an `E` that would otherwise continue a number literal, the lexer shall end the literal before the `E`, so that the keyword is recognized (the C64 reads keywords before numbers).
+- [x] **LEXER-018**: When a keyword begins at an `E` that would otherwise continue a number literal, the lexer shall end the literal before the `E`, so that the keyword is recognized (the C64 reads keywords before numbers).
 - [x] **LEXER-019**: When the lexer encounters `^` or `↑` (U+2191) outside a string literal, it shall produce a `Caret` token whose value is that character.
 - [x] **LEXER-020**: When the lexer encounters, outside a string literal, an uppercase letter at a position where no keyword begins, it shall produce a `Name` token positioned at that letter, whose value is the letter followed by any uppercase letters and digits after it, skipping spaces and tabs between them, followed by a `$` or `%` if one comes next (possibly after spaces or tabs), all without the spaces and tabs (`HEIGHT` is `Name(HEIGHT)`, `A B` is `Name(AB)`, `N $` is `Name(N$)`, and `C%` is `Name(C%)`).
 - [x] **LEXER-021**: While reading a name, when a keyword begins at the next character, the lexer shall end the name before it (`OUTLET` is `Name(OUT)` followed by `Let`, `PREMIUM` is `Name(P)` followed by a `Rem` token, and `SCORE` is `Name(SC)`, `Or`, `Name(E)`).

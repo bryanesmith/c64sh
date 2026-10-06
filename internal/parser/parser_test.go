@@ -1106,6 +1106,14 @@ func TestPos(t *testing.T) {
 	})
 }
 
+// @spec PARSER-080
+func TestFre(t *testing.T) {
+	runParseCases(t, []parseCase{
+		{"FRE", toks(pr, fun("FRE"), lp, number("0"), rp), `PRINT[FRE(#0)]`, false},
+		{"no argument", toks(pr, fun("FRE"), lp, rp), `PRINT[BAD(SYNTAX)]`, true},
+	})
+}
+
 // @spec PARSER-071
 func TestArrayElements(t *testing.T) {
 	runParseCases(t, []parseCase{

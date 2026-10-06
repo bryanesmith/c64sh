@@ -1,6 +1,7 @@
 package interp
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -109,5 +110,59 @@ func TestRndInitialSeed(t *testing.T) {
 	rec := &recorder{}
 	if err := enter(New(rec), `PRINT RND(0)>=0`); err != nil || rec.String() != "-1 \n" {
 		t.Errorf("RND(0) with the system clock: %q, %v", rec.String(), err)
+	}
+}
+
+// @spec INTERP-157
+func TestFre(t *testing.T) {
+	fre := func(lines ...string) string {
+		t.Helper()
+		rec := &recorder{}
+		in := New(rec)
+		for _, l := range lines {
+			if err := enter(in, l); err != nil {
+				t.Fatalf("%s: %v", l, err)
+			}
+		}
+		rec.writes = nil
+		if err := enter(in, `PRINT FRE(0)-65536*(FRE(0)<0);FRE("X")-65536*(FRE("X")<0)`); err != nil {
+			t.Fatal(err)
+		}
+		return rec.String()
+	}
+	cases := []struct {
+		name  string
+		lines []string
+		free  int
+	}{
+		{"nothing in use", nil, 38909},
+		{"a number variable", []string{"A=1"}, 38909 - 7},
+		{"a string variable", []string{`A$="HELLO"`}, 38909 - 7 - 5},
+		// DEF and FN are one byte each: 5 + len(`D FA(X)=X`), then 7 for the function.
+		{"a function", []string{"10 DEF FNA(X)=X", "RUN"}, 38909 - 14 - 7},
+		{"an array", []string{"DIM B(9)"}, 38909 - (5 + 2 + 5*10)},
+		{"a string array element", []string{`B$(1)="AB"`}, 38909 - (5 + 2 + 3*11) - 2},
+		// PRINT is one byte: 5 + len(`P"HI"`) = 5 + 5.
+		{"a program line", []string{`10 PRINT"HI"`}, 38909 - 10},
+		// Spaces are kept; REM is one byte: 5 + len(`R HELLO`).
+		{"a comment line", []string{`20 REM HELLO`}, 38909 - 12},
+	}
+	for _, c := range cases {
+		want := fmt.Sprintf(" %d  %d \n", c.free, c.free)
+		if got := fre(c.lines...); got != want {
+			t.Errorf("%s: %q, want %q", c.name, got, want)
+		}
+	}
+
+	rec := &recorder{}
+	in := New(rec)
+	if err := enter(in, "PRINT FRE(0)"); err != nil || rec.String() != "-26627 \n" {
+		t.Errorf("signed result: %q, %v; want -26627 as a C64 shows 38909", rec.String(), err)
+	}
+	rec = &recorder{}
+	in = New(rec)
+	enter(in, `A$="X":FOR I=1 TO 16:A$=A$+A$:NEXT`) // 65536 characters
+	if err := enter(in, "PRINT FRE(0)"); err != nil || rec.String() != " 0 \n" {
+		t.Errorf("more in use than a C64 holds: %q, %v; want 0", rec.String(), err)
 	}
 }

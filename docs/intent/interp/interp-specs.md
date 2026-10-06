@@ -185,6 +185,7 @@ Design: `interp-design.md`
 - [x] **INTERP-130**: When executing a `TabItem`, the interpreter shall write `X - C` spaces if the cursor column `C` (the screen's, for a storage file) is less than `X`, and nothing otherwise; for an `SpcItem`, `X` spaces; `X` being rounded down and required to be from 0 to 255 (ILLEGAL QUANTITY otherwise, TYPE MISMATCH for a string).
 - [x] **INTERP-131**: When the last item of a `PRINT` is a `TabItem` or `SpcItem`, the interpreter shall not write the final newline.
 - [x] **INTERP-132**: When evaluating `POS(X)`, the interpreter shall evaluate `X`, of either type, and return the cursor column.
+- [x] **INTERP-157**: When evaluating `FRE(X)`, the interpreter shall evaluate `X`, of either type, and return 38909 less the bytes used by the program (5 per line plus its text with each keyword counted as one byte), the variables and function definitions (7 each), the arrays (as for INTERP-137), and the strings held by variables and array elements (their lengths), or 0 if that is negative, minus 65536 if the result is above 32767.
 
 ## Arrays
 

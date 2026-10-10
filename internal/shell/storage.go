@@ -1,8 +1,12 @@
 package shell
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/bryanesmith/c64sh/internal/interp"
 )
 
 // dirStorage holds LOAD, SAVE, and VERIFY files in a directory: the
@@ -31,4 +35,43 @@ func (s dirStorage) WriteFile(name string, data []byte, replace bool) error {
 		err = cerr
 	}
 	return err
+}
+
+// Files returns the directory's regular files that are not hidden, in
+// order of name, with their sizes.
+func (s dirStorage) Files() ([]interp.StoredFile, error) {
+	dir := s.dir
+	if dir == "" {
+		dir = "."
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var files []interp.StoredFile
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".") || !e.Type().IsRegular() {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue // removed since it was listed
+		}
+		files = append(files, interp.StoredFile{Name: e.Name(), Size: info.Size()})
+	}
+	return files, nil
+}
+
+// Remove deletes a file.
+func (s dirStorage) Remove(name string) error {
+	return os.Remove(filepath.Join(s.dir, name))
+}
+
+// Rename renames a file, refusing to replace one.
+func (s dirStorage) Rename(oldName, newName string) error {
+	newPath := filepath.Join(s.dir, newName)
+	if _, err := os.Lstat(newPath); err == nil {
+		return &os.PathError{Op: "rename", Path: newName, Err: fs.ErrExist}
+	}
+	return os.Rename(filepath.Join(s.dir, oldName), newPath)
 }

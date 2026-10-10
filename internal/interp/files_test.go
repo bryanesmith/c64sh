@@ -3,6 +3,7 @@ package interp
 import (
 	"errors"
 	"io/fs"
+	"slices"
 	"strings"
 	"testing"
 
@@ -39,6 +40,38 @@ func (m *memStorage) WriteFile(name string, data []byte, replace bool) error {
 		return &fs.PathError{Op: "open", Path: name, Err: fs.ErrExist}
 	}
 	m.files[name] = string(data)
+	return nil
+}
+
+func (m *memStorage) Files() ([]StoredFile, error) {
+	var files []StoredFile
+	for name, data := range m.files {
+		if !strings.HasPrefix(name, ".") {
+			files = append(files, StoredFile{Name: name, Size: int64(len(data))})
+		}
+	}
+	slices.SortFunc(files, func(a, b StoredFile) int { return strings.Compare(a.Name, b.Name) })
+	return files, nil
+}
+
+func (m *memStorage) Remove(name string) error {
+	if _, ok := m.files[name]; !ok {
+		return &fs.PathError{Op: "remove", Path: name, Err: fs.ErrNotExist}
+	}
+	delete(m.files, name)
+	return nil
+}
+
+func (m *memStorage) Rename(oldName, newName string) error {
+	data, ok := m.files[oldName]
+	if !ok {
+		return &fs.PathError{Op: "rename", Path: oldName, Err: fs.ErrNotExist}
+	}
+	if _, ok := m.files[newName]; ok {
+		return &fs.PathError{Op: "rename", Path: newName, Err: fs.ErrExist}
+	}
+	delete(m.files, oldName)
+	m.files[newName] = data
 	return nil
 }
 

@@ -36,6 +36,10 @@ OPEN 3,8,3,"LOG,S,A":PRINT#3,"MORE":CLOSE 3
 20 INPUT#3,L$:PRINT L$:IF ST=0 THEN 20:REM LOG STARTS, QUIETLY, END, MORE
 30 CLOSE 3
 RUN
-REM Opening a file that does not exist, to read it, is an error, so the
-REM next line prints ?FILE NOT FOUND  ERROR, and the script stops
-OPEN 5,8,5,"NO SUCH FILE"
+REM A disk drive reports problems only through its command channel, as a
+REM 1541 does: opening a file that does not exist is not a BASIC error,
+REM reading it gets nothing (ST is 66), and channel 15 says what went wrong
+40 OPEN 5,8,5,"NO SUCH FILE":INPUT#5,A$:PRINT "[";A$;"]";ST:CLOSE 5:REM [] 66
+50 OPEN 15,8,15:INPUT#15,E,E$,T,S:PRINT E;E$;T;S:CLOSE 15:REM " 62 FILE NOT FOUND 0  0 "
+GOTO 40
+REM See 035-disk-commands.bas for the command channel in full

@@ -139,7 +139,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `019-keyboard-input.bas` | `INPUT` with and without a prompt, several values, `?? `, `?REDO FROM START`, `?EXTRA IGNORED`, quoted strings, a `GET` wait loop, and `?ILLEGAL DIRECT  ERROR`; its answers come from `019-keyboard-input.input` |
 | `020-user-functions.bas` | `DEF FN` and `FN`, the protected parameter, bodies using other variables and functions, two-character names separate from variables, and a body mistake reported at the call (`?SYNTAX  ERROR IN 120`) |
 | `021-saving-programs.bas` | `SAVE`, `LOAD`, and `VERIFY` on tape and disk, `LOAD` chaining a running program with its variables, names with and without an extension, replacing on tape and with `@0:` on disk, and the disk's refusal to replace a file |
-| `022-data-files.bas` | `OPEN`, `PRINT#`, and `CLOSE` writing a disk file, an `INPUT#` loop ended by `ST`, `GET#`, `CMD`, the printer, appending with `,S,A`, and `?FILE NOT FOUND  ERROR` opening a missing file |
+| `022-data-files.bas` | `OPEN`, `PRINT#`, and `CLOSE` writing a disk file, an `INPUT#` loop ended by `ST`, `GET#`, `CMD`, the printer, appending with `,S,A`, and a missing file read as nothing with `ST` 66 and its error in the drive's status |
 | `023-computed-jumps.bas` | `ON … GOTO` in a loop, `ON … GOSUB` returning after the statement, indexes rounded down, 0 and past the list falling through, `ON` typed directly, and `?ILLEGAL QUANTITY  ERROR` |
 | `024-number-functions.bas` | `ABS`, `SGN`, `INT` (and rounding with it), `SQR`, `EXP`, `LOG`, the trigonometric functions and `π`, a function in `DEF FN`, `RND` with a negative seed and dice rolls, and `?ILLEGAL QUANTITY  ERROR` |
 | `025-string-functions.bas` | `LEN`, `LEFT$`, `RIGHT$`, `MID$` (with and without a length, and past the end), `CHR$`, `ASC`, `STR$`, `VAL`, and idioms: reversing a string, checking a first letter, building a string; `?ILLEGAL QUANTITY  ERROR` |
@@ -152,6 +152,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `032-string-length.bas` | Strings longer than 255 characters (the default, unlimited string limit), positions past 255 in `LEFT$`, `RIGHT$`, and `MID$`, and a negative position as `?ILLEGAL QUANTITY  ERROR` |
 | `033-free-memory.bas` | `FRE` as a signed 16-bit number, the idiom for the real figure, an ignored argument of either type, and the bytes taken by a variable, a string, an array, and a program line (which also clears the variables) |
 | `034-program-control.bas` | `LIST` with one line, a range, up to, and from; `CLR` keeping the program; `CONT` after `END` with a variable changed while stopped; and `STOP` ending the script with `BREAK IN 30` |
+| `035-disk-commands.bas` | The drive's status from its command channel (the power-on message, then OK), a refused write, rename, scratch with a pattern, a refused format, an unknown command, and `LOAD "$",8` with and without a pattern |
 
 ## Decisions & Alternatives
 

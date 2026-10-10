@@ -831,7 +831,7 @@ prints `ALICE 12 `, and leaves the file `SCORES` in the current directory.
 
 | Device | What it is | Notes |
 |---|---|---|
-| 8 to 11 | Disk drives | A file in the current directory. The secondary address 0 reads and 1 writes; with 2 to 14, the name says: `"NAME,S,W"` writes, `"NAME,S,A"` adds to the end, and `"NAME,S,R"` or plain `"NAME"` reads. Writing replaces an existing file only with `@0:`, as for `SAVE`. |
+| 8 to 11 | Disk drives | A file in the current directory. The secondary address 0 reads and 1 writes; with 2 to 14, the name says: `"NAME,S,W"` writes, `"NAME,S,A"` adds to the end, and `"NAME,S,R"` or plain `"NAME"` reads. Writing replaces an existing file only with `@0:`, as for `SAVE`. Secondary address 15 is the drive's command channel (see [Disk commands and the directory](#disk-commands-and-the-directory)). |
 | 1 | Tape (the default) | A file in the current directory: the secondary address 0 (the default) reads, 1 or 2 writes. |
 | 0 | Keyboard | Read with `INPUT#` and `GET#`, as `INPUT` and `GET` read stdin. |
 | 3, 4, 5 | Screen, printers | Write with `PRINT#` or `CMD`: the output appears with the program's output. |
@@ -839,7 +839,7 @@ prints `ALICE 12 `, and leaves the file `SCORES` in the current directory.
 - **`PRINT# F, items`** writes like `PRINT`, ending each line with a newline unless the items end with `;` or `,`. Note that there is no space between `PRINT` and `#`: `PRINT #2` is a `?SYNTAX  ERROR`, as on a C64.
 - **`INPUT# F, variables`** reads values like `INPUT`, without a prompt. A number it cannot read is a `?FILE DATA  ERROR`.
 - **`GET# F, variables`** reads one character at a time; a line end reads as `CHR$(13)`, and the end of the file as an empty string. (`GET #F` with a space also works.)
-- **`ST`** tells a reading loop when to stop: it is 64 once reading reaches the end of the file, and 0 otherwise.
+- **`ST`** tells a reading loop when to stop: it is 64 once reading reaches the end of the file, 66 when reading a disk file that could not be opened, and 0 otherwise.
 
   ```
   20 INPUT#2,A$:PRINT A$:IF ST=0 THEN 20
@@ -848,9 +848,60 @@ prints `ALICE 12 `, and leaves the file `SCORES` in the current directory.
 - **`CLOSE F`** finishes the file. Output reaches the disk when the file is closed; files still open are closed when the variables are cleared (`RUN`, `NEW`, changing the program) and when c64sh ends.
 - **Commas in `PRINT#`** move to the next print zone of the *screen's* cursor, as on a C64, so `PRINT#2,"A","B"` usually puts 10 spaces between them.
 - **Files are text** with Unix line ends, so other tools can read and write them.
-- **Errors**: opening a file number already open is `?FILE OPEN  ERROR`, more than 10 open files is `?TOO MANY FILES  ERROR`, a file number not open is `?FILE NOT OPEN  ERROR`, reading an output file (or the screen) is `?NOT INPUT FILE  ERROR`, writing an input file is `?NOT OUTPUT FILE  ERROR`, and opening a missing file to read is `?FILE NOT FOUND  ERROR`.
+- **Errors**: opening a file number already open is `?FILE OPEN  ERROR`, more than 10 open files is `?TOO MANY FILES  ERROR`, a file number not open is `?FILE NOT OPEN  ERROR`, reading an output file (or the screen) is `?NOT INPUT FILE  ERROR`, writing an input file is `?NOT OUTPUT FILE  ERROR`, and opening a missing tape file to read is `?FILE NOT FOUND  ERROR`.
+- **Disk errors are not BASIC errors**, as on a 1541: opening a disk file that does not exist, or writing one that exists without `@0:`, carries on, and the drive's status says what went wrong (below). The program decides what to do about it.
 
 See [`examples/features/022-data-files.bas`](../examples/features/022-data-files.bas) for every form.
+
+### Disk commands and the directory
+
+A disk drive has a **command channel**, secondary address 15, as on a 1541. Reading it gives the drive's **status**; writing to it sends **commands**:
+
+```
+10 OPEN 15,8,15
+20 PRINT#15,"S0:OLD*"
+30 INPUT#15,E,E$,T,S
+40 PRINT E;E$;T;S
+50 CLOSE 15
+```
+
+scratches (deletes) every file whose name starts with `OLD`, and prints ` 1 FILES SCRATCHED 3  0 ` if there were three.
+
+**The status** is four values: an error number (0 means all is well), a message, and two numbers (a count of files scratched, or 0). Reading it resets it to `0, OK`. It begins as ` 73 CBM DOS V2.6 1541`, as a 1541's does when switched on.
+
+| Status | Means |
+|---|---|
+| `0, OK` | The last command or file worked |
+| `1, FILES SCRATCHED, N` | `N` files were deleted |
+| `62, FILE NOT FOUND` | The file opened, loaded, or renamed does not exist |
+| `63, FILE EXISTS` | A file of that name exists (write with `@0:` to replace it) |
+| `26, WRITE PROTECT ON` | A format was refused (below) |
+| `30` to `34, SYNTAX ERROR` | The command was not understood |
+
+**Commands** are sent with `PRINT#15,"…"`, or as the name in `OPEN 15,8,15,"…"`:
+
+| Command | Does |
+|---|---|
+| `S0:NAME` | **Scratch**: delete the file. Several names may be given, separated by commas, and `*` matches the rest of a name and `?` any one character: `S0:*` deletes every file in the current directory, so use it with care. |
+| `R0:NEW=OLD` | **Rename** `OLD` to `NEW`. |
+| `N0:NAME,ID` | **Format**: on a C64 this erases the whole disk. c64sh refuses, with `26, WRITE PROTECT ON`, as a 1541 refuses a protected disk. |
+| `I0`, `V0` | Initialize, validate: accepted, with nothing to do. |
+| `UJ` | Reset the drive: the status becomes the power-on message. |
+
+The `0` after the letter is the drive number and may be left out (`S:NAME`). A name without an extension also finds a saved program: `S0:GAME` deletes `GAME.bas` if there is no file called `GAME`. Hidden files (names starting with `.`) and directories are never touched.
+
+**The directory**: `LOAD "$",8` loads a listing of the current directory as a program, replacing the one in memory as on a C64, and `LIST` shows it:
+
+```
+0 "C64SH           " 00 2A
+1    "GAME.bas"         PRG
+3    "SCORES"           SEQ
+664 BLOCKS FREE.
+```
+
+Each line number is a file's size in 254-byte blocks; programs (`.bas`) show as `PRG`, other files as `SEQ`. `LOAD "$:G*",8` lists only the files matching a pattern. The first line is the disk's header, in reverse video on a terminal; c64sh's disk is always called `C64SH`, with 664 blocks free, as an empty 1541 disk has.
+
+See [`examples/features/035-disk-commands.bas`](../examples/features/035-disk-commands.bas) for every form.
 
 ## Environment variables
 
@@ -993,8 +1044,9 @@ These features are c64sh's own: they are not part of Commodore 64 BASIC V2 and d
 - **The shell colors its own text** in a terminal (see [Shell colors](#shell-colors)); a C64 shows everything in the current color.
 - **Ctrl-C stops a program waiting in `INPUT`.** On a C64, the STOP key does nothing until Return is pressed.
 - **Typed input keeps lowercase letters**, where a C64 keyboard types uppercase.
-- **Programs are saved as text**, not as the C64's tokenized program files, and every device that holds programs is the current directory.
-- **Disk drives have no command channel** (`OPEN 15,8,15`) yet, so file errors are reported as BASIC errors (`?FILE NOT FOUND  ERROR` when opening) rather than through the drive's error channel; and data files use Unix line ends, where a C64 writes a carriage return.
+- **Programs are saved as text**, never as the C64's tokenized `.prg` files, on purpose: c64sh programs can use lowercase letters, any Unicode character, and extensions, none of which a C64's format can hold. So programs can't be exchanged with a real C64 or an emulator. Every device that holds programs is the current directory.
+- **`SAVE` over an existing disk file** prints `c64sh: NAME.bas: file exists (use SAVE "@0:NAME" to replace it)`, where a 1541 only flashes its light, so a save is never lost silently. The drive's status says `63, FILE EXISTS` too.
+- **Data files use Unix line ends**, where a C64 writes a carriage return.
 
 ## Not yet supported
 
@@ -1019,3 +1071,5 @@ These C64 BASIC keywords work directly on the C64's memory and processor:
 | `USR(x)` | Calls a machine-code routine set up beforehand with `POKE`, passing it `x` and returning a number. |
 
 c64sh will not support them: each would need an emulated C64 behind it, with its memory, its video, sound, and I/O chips, and a 6502 processor to run machine code. c64sh runs BASIC in a terminal, without emulating the machine. These keywords give `?SYNTAX  ERROR`.
+
+**Tokenized `.prg` files** are not planned either. A C64 saves programs as tokens in `PRG` files, which emulators and real C64s exchange. c64sh saves programs as text, and its programs can hold what a `PRG` file cannot: lowercase letters, any Unicode character, and c64sh's extensions. Giving up that exchange is deliberate, in favor of a BASIC that is comfortable on a modern machine.

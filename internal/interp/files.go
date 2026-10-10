@@ -12,7 +12,8 @@ import (
 	"github.com/bryanesmith/c64sh/internal/lexer"
 )
 
-// Storage holds the files that LOAD, SAVE, and VERIFY use, by name.
+// Storage holds the files that LOAD, SAVE, VERIFY, data files, and the
+// drive commands use, by name.
 type Storage interface {
 	// ReadFile returns a file's contents, or an error satisfying
 	// errors.Is(err, fs.ErrNotExist) if there is no such file.
@@ -21,6 +22,14 @@ type Storage interface {
 	// it writes nothing and returns an error satisfying
 	// errors.Is(err, fs.ErrExist).
 	WriteFile(name string, data []byte, replace bool) error
+	// Files returns the files, without directories or hidden files
+	// (names beginning with "."), in order of name.
+	Files() ([]StoredFile, error)
+	// Remove deletes a file.
+	Remove(name string) error
+	// Rename renames a file. If newName exists, it changes nothing and
+	// returns an error satisfying errors.Is(err, fs.ErrExist).
+	Rename(oldName, newName string) error
 }
 
 // StorageError is returned by Exec when storage refused or failed to read
@@ -51,6 +60,7 @@ const programHeader = "#!/usr/bin/env c64sh\n"
 type target struct {
 	name    string // as the program gave it, for messages
 	tape    bool   // device 1; otherwise a disk drive
+	device  int
 	replace bool   // SAVE may replace an existing file
 	base    string // the name without a disk prefix
 }
@@ -101,7 +111,7 @@ func (in *Interp) target(a ast.FileArgs) (target, error) {
 	case t.name == "":
 		return t, &basicerr.Error{Kind: basicerr.MissingFileName}
 	}
-	t.tape, t.replace, t.base = device == 1, device == 1, t.name
+	t.tape, t.replace, t.base, t.device = device == 1, device == 1, t.name, device
 	if !t.tape {
 		for _, prefix := range []string{"@0:", "@:", "0:"} {
 			if base, ok := strings.CutPrefix(t.name, prefix); ok {
@@ -161,10 +171,22 @@ func (in *Interp) execSave(s *ast.SaveStmt) error {
 		se := &StorageError{File: t.file(), Err: err}
 		if errors.Is(err, fs.ErrExist) {
 			se.Replace = `SAVE "@0:` + t.base + `"`
+			in.diskStatus(t, fileExists)
 		}
 		return se
 	}
+	in.diskStatus(t, statusOK)
 	return nil
+}
+
+// diskStatus sets the status of a LOAD, SAVE, or VERIFY's drive, if it
+// is a disk drive.
+//
+// @spec INTERP-174
+func (in *Interp) diskStatus(t target, status string) {
+	if !t.tape {
+		in.setStatus(t.device, status)
+	}
 }
 
 // errNotProgram is returned by readProgram for a file that is not a
@@ -180,6 +202,11 @@ func (in *Interp) readProgram(t target, action string) ([]progLine, error) {
 		in.message("PRESS PLAY ON TAPE", "OK")
 	}
 	in.message("SEARCHING FOR " + t.name)
+	if pattern, ok := directoryPattern(t.base); ok && !t.tape {
+		in.message(action)
+		in.diskStatus(t, statusOK)
+		return in.directory(pattern)
+	}
 	names := []string{t.base}
 	if !strings.Contains(t.base, ".") {
 		names = append(names, t.file())
@@ -196,8 +223,10 @@ func (in *Interp) readProgram(t target, action string) ([]progLine, error) {
 		}
 	}
 	if err != nil {
+		in.diskStatus(t, notFound)
 		return nil, &basicerr.Error{Kind: basicerr.FileNotFound}
 	}
+	in.diskStatus(t, statusOK)
 	if t.tape {
 		in.message("FOUND " + t.name)
 	}

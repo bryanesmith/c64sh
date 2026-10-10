@@ -232,6 +232,14 @@ Everything here works in c64sh. The [user guide](user-guide.md) describes each s
 
 **Why:** an integer array element takes 2 bytes, a number 5, so `M%` fits where a number array would run out of memory. Integer variables are not faster for arithmetic on a C64 (the ROM converts them to floating point anyway), so plain variables are the norm everywhere else.
 
+
+### Real free memory
+
+```basic
+PRINT FRE(0)-65536*(FRE(0)<0)
+```
+
+**Why:** `FRE` returns a signed 16-bit number, so the 38909 bytes a C64 starts with show as -26627. A true comparison is -1, so the expression adds 65536 exactly when the result is negative, and leaves a positive result alone.
 ## Strings
 
 ### Build a string piece by piece

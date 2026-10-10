@@ -104,6 +104,7 @@ Design: `parser-design.md`
 
 - [x] **PARSER-069**: When a `Tab` or `Spc` token appears where a print item is expected, followed by an expression and `)`, the parser shall produce an `*ast.TabItem` or `*ast.SpcItem` holding the expression; a missing `)` shall be a SYNTAX error, and so shall `Tab` or `Spc` anywhere other than a print item.
 - [x] **PARSER-070**: The parser shall accept one argument for `POS`.
+- [x] **PARSER-080**: The parser shall accept one argument for `FRE`.
 
 ## Arrays
 

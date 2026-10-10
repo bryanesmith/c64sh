@@ -544,10 +544,10 @@ func TestDimKeyword(t *testing.T) {
 
 // @spec LEXER-042
 func TestReservedKeywords(t *testing.T) {
-	for _, k := range []string{"STOP", "CONT", "CLR", "FRE", "PEEK", "POKE", "SYS", "WAIT", "USR"} {
+	for _, k := range []string{"STOP", "CONT", "CLR", "PEEK", "POKE", "SYS", "WAIT", "USR"} {
 		runLexCases(t, []lexCase{{k, k, []token.Token{tok(token.Reserved, k, 0), eol(len(k))}}})
 	}
-	runLexCases(t, []lexCase{{"in a name", "FREE", []token.Token{tok(token.Reserved, "FRE", 0), name("E", 3), eol(4)}}})
+	runLexCases(t, []lexCase{{"in a name", "STOPS", []token.Token{tok(token.Reserved, "STOP", 0), name("S", 4), eol(5)}}})
 }
 
 // @spec LEXER-043
@@ -569,6 +569,23 @@ func TestEnvironKeywords(t *testing.T) {
 		{"ENVIRON$", `ENVIRON$("HOME")`, []token.Token{tok(token.Function, "ENVIRON$", 0), tok(token.LParen, "(", 8), tok(token.String, "HOME", 9), tok(token.RParen, ")", 15), eol(16)}},
 		{"ENVIRON", `ENVIRON"A=1"`, []token.Token{tok(token.Environ, "ENVIRON", 0), tok(token.String, "A=1", 7), eol(12)}},
 		{"ENVIRON then a name", "ENVIRONX", []token.Token{tok(token.Environ, "ENVIRON", 0), name("X", 7), eol(8)}},
+	})
+}
+
+// @spec LEXER-018
+func TestKeywordEndsNumberAtE(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"END after a number", "1END", []token.Token{num("1", 0), tok(token.End, "END", 1), eol(4)}},
+		{"EXP after a number", "2EXP(0)", []token.Token{num("2", 0), tok(token.Function, "EXP", 1), tok(token.LParen, "(", 4), num("0", 5), tok(token.RParen, ")", 6), eol(7)}},
+		{"an exponent still works", "1E2", []token.Token{num("1E2", 0), eol(3)}},
+	})
+}
+
+// @spec LEXER-046
+func TestFreKeyword(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"FRE", "FRE(0)", []token.Token{tok(token.Function, "FRE", 0), tok(token.LParen, "(", 3), num("0", 4), tok(token.RParen, ")", 5), eol(6)}},
+		{"FRE in a name", "FREE", []token.Token{tok(token.Function, "FRE", 0), name("E", 3), eol(4)}},
 	})
 }
 

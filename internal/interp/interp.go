@@ -45,6 +45,7 @@ type Interp struct {
 	reverse     bool                    // reverse video is on in the terminal
 	ink         string                  // escape code of the last color written to the terminal
 	env         Environment             // ENVIRON's environment variables
+	cont        *pos                    // where CONT continues the program; nil: CAN'T CONTINUE
 	stringLimit int                     // the most characters a string may hold; -1: no limit
 	arrays      map[string]*array       // arrays, by identity
 	data        dataPos                 // the data pointer: the next DATA item
@@ -219,11 +220,21 @@ func (in *Interp) execStmt(s ast.Stmt) error {
 	case *ast.EnvironStmt:
 		return in.execEnviron(s)
 	case *ast.ListStmt:
-		return in.execList()
+		return in.execList(s)
 	case *ast.NewStmt:
 		return in.execNew()
 	case *ast.EndStmt:
+		if in.cur.line != directLine {
+			in.cont = &pos{in.cur.line, in.cur.stmt + 1}
+		}
 		return errEnd
+	case *ast.StopStmt:
+		return in.execStop()
+	case *ast.ContStmt:
+		return in.execCont()
+	case *ast.ClrStmt:
+		in.clr() // @spec INTERP-158
+		return nil
 	default:
 		panic(fmt.Sprintf("interp: unhandled statement %T", s))
 	}

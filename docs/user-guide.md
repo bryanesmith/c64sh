@@ -516,7 +516,7 @@ prints `B IS 11 ` and `HELLO, ALICE`.
 - **Three kinds**: a name ending in `$` holds a string (`N$`); a name ending in `%` holds a whole number (`C%`); any other name holds a number (`A`, `HEIGHT`). `A`, `A%`, and `A$` are different variables. Putting a string in a number variable, or a number in a string variable, is a `?TYPE MISMATCH  ERROR`.
 - **Integer variables** (`%`) round down what is stored in them: `C%=3.7` stores 3, and `C%=-3.7` stores -4. They hold -32768 to 32767; storing a number outside that range is an `?ILLEGAL QUANTITY  ERROR`. In calculations they are ordinary numbers.
 - **Names** start with an uppercase letter, followed by letters and digits. **Only the first two characters count**, so `HEIGHT` and `HE` are the same variable.
-- **A name cannot contain a keyword**, including keywords c64sh does not support yet (`FREE` contains `FRE`, `STOPS` contains `STOP`), because the C64 finds keywords anywhere: `PREMIUM=1` is a `?SYNTAX  ERROR` (it contains `REM`), and so is `SCORE=1` (it contains `OR`). It also means `PRINTER` prints the variable `ER`, and `LETTER=1` sets `TE`.
+- **A name cannot contain a keyword**, including keywords c64sh does not support (`PEEKS` contains `PEEK`, `FREE` contains `FRE`), because the C64 finds keywords anywhere: `PREMIUM=1` is a `?SYNTAX  ERROR` (it contains `REM`), and so is `SCORE=1` (it contains `OR`). It also means `PRINTER` prints the variable `ER`, and `LETTER=1` sets `TE`.
 - **Spaces inside a name are ignored**: `A B` is the variable `AB`.
 - **A variable never set** is 0, or the empty string.
 - **Values last** from line to line, for the whole session or script.
@@ -612,9 +612,13 @@ prints `HELLO` and `WORLD`.
 | `RUN` | Clears all variables, then runs the program from its first line. |
 | `RUN 20` | Clears all variables, then runs the program from line 20. If there is no line 20: `?UNDEF'D STATEMENT  ERROR`. |
 | `LIST` | Shows the whole program in number order, after a blank line, each line as its number, a space, and the line as typed. A `?` is shown as `PRINT`, the keyword it stands for. |
+| `LIST 20`, `LIST 20-50`, `LIST -50`, `LIST 20-` | Shows only line 20, lines 20 to 50, lines up to 50, or lines from 20. |
 | `GOTO 20` | Continues the program at line 20, keeping all variables. Typed directly, it runs the program from line 20. `GO TO 20` is the same. If there is no line 20: `?UNDEF'D STATEMENT  ERROR`. |
 | `NEW` | Erases the program and clears all variables. |
 | `END` | Stops the program. |
+| `STOP` | Stops the program with `BREAK IN` and its line, as the STOP key (Ctrl-C) does. |
+| `CONT` | Continues the program after `STOP`, `END`, or Ctrl-C, with its variables as they are now. |
+| `CLR` | Clears all variables, keeping the program. |
 
 - **A program stops** after its last line, at `END`, or at an error. `LIST` and `NEW` also stop a program, and `RUN` in a program starts it again from the beginning, with variables cleared.
 - **An error in a program names its line**: `?SYNTAX  ERROR IN 20`.
@@ -629,10 +633,12 @@ prints `HELLO` and `WORLD`.
   prints ` 1  2  3  4  5 `.
 - **Ctrl-C stops a running program**, as the C64's STOP key does, printing `BREAK IN 20` with the line it stopped in. In an interactive session, `READY.` follows, and the program and variables are kept.
 - **Nothing after `RUN`, `GOTO`, `LIST`, `NEW`, or `END` on the same line runs**, in a program or typed directly: `LIST:PRINT "X"` lists the program but does not print `X`.
-- **`LIST` lists the whole program.** Listing part of it (`LIST 10-20`) is not supported yet and is a `?SYNTAX  ERROR`.
-- **These keywords break names that contain them**: `FRIEND=1` is a `?SYNTAX  ERROR` (it contains `END`), as are names containing `RUN`, `NEW`, `LIST`, `GOTO`, `GO` (`GOLD`), or `TO` (`TOTAL`).
+- **`STOP` and `CONT` are for finding mistakes**, as on a C64: put `STOP` where you want to look, `RUN`, then `PRINT` the variables (or change them), and `CONT` to go on. In a script, `STOP` ends the script with `BREAK IN` and exit status 1.
+- **`CONT` can't continue** (`?CAN'T CONTINUE  ERROR`) after an error, after `CLR`, `RUN`, or `NEW`, or after the program is changed, as on a C64. `CONT` inside a program continues at itself, as on a C64, so it loops until you press Ctrl-C.
+- **`CLR` in a running program** also forgets its loops and subroutines, so a later `NEXT` or `RETURN` is an error.
+- **These keywords break names that contain them**: `FRIEND=1` is a `?SYNTAX  ERROR` (it contains `END`), as are names containing `RUN`, `NEW`, `LIST`, `GOTO`, `GO` (`GOLD`), `TO` (`TOTAL`), `STOP`, `CONT`, or `CLR`.
 
-See [`examples/features/014-program-mode.bas`](../examples/features/014-program-mode.bas) and [`examples/features/016-goto.bas`](../examples/features/016-goto.bas) for every form.
+See [`examples/features/014-program-mode.bas`](../examples/features/014-program-mode.bas), [`examples/features/016-goto.bas`](../examples/features/016-goto.bas), and [`examples/features/034-program-control.bas`](../examples/features/034-program-control.bas) for every form.
 
 ## Loops
 
@@ -991,7 +997,6 @@ These features are c64sh's own: they are not part of Commodore 64 BASIC V2 and d
 
 These are valid C64 BASIC but currently give `?SYNTAX  ERROR`:
 
-- `LIST` with line numbers (`LIST 10-20`), `CLR`, `STOP`, and `CONT`
 - All other commands
 
 These are planned; the [roadmap](https://github.com/bryanesmith/c64sh/issues/34) lists them in the order they will be added.

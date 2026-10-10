@@ -150,8 +150,24 @@ type RunStmt struct {
 // program at line n.
 type GotoStmt struct{ Line int }
 
-// ListStmt is LIST: print the stored program.
-type ListStmt struct{}
+// ListStmt is LIST [From] [- [To]]: print the stored program's lines
+// numbered From to To. Without numbers, From is 0 and To is 65535; LIST n
+// is From = To = n.
+type ListStmt struct{ From, To int }
+
+// StopStmt is STOP: stop the program with BREAK, so that CONT can
+// continue it.
+type StopStmt struct{}
+
+// ContStmt is CONT: continue a stopped program.
+type ContStmt struct{}
+
+// ClrStmt is CLR: clear the variables.
+type ClrStmt struct{}
+
+func (*StopStmt) stmt() {}
+func (*ContStmt) stmt() {}
+func (*ClrStmt) stmt()  {}
 
 // NewStmt is NEW: erase the stored program and the variables.
 type NewStmt struct{}

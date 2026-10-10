@@ -544,10 +544,10 @@ func TestDimKeyword(t *testing.T) {
 
 // @spec LEXER-042
 func TestReservedKeywords(t *testing.T) {
-	for _, k := range []string{"STOP", "CONT", "CLR", "PEEK", "POKE", "SYS", "WAIT", "USR"} {
+	for _, k := range []string{"PEEK", "POKE", "SYS", "WAIT", "USR"} {
 		runLexCases(t, []lexCase{{k, k, []token.Token{tok(token.Reserved, k, 0), eol(len(k))}}})
 	}
-	runLexCases(t, []lexCase{{"in a name", "STOPS", []token.Token{tok(token.Reserved, "STOP", 0), name("S", 4), eol(5)}}})
+	runLexCases(t, []lexCase{{"in a name", "SYSOP", []token.Token{tok(token.Reserved, "SYS", 0), name("OP", 3), eol(5)}}})
 }
 
 // @spec LEXER-043
@@ -586,6 +586,16 @@ func TestFreKeyword(t *testing.T) {
 	runLexCases(t, []lexCase{
 		{"FRE", "FRE(0)", []token.Token{tok(token.Function, "FRE", 0), tok(token.LParen, "(", 3), num("0", 4), tok(token.RParen, ")", 5), eol(6)}},
 		{"FRE in a name", "FREE", []token.Token{tok(token.Function, "FRE", 0), name("E", 3), eol(4)}},
+	})
+}
+
+// @spec LEXER-047
+func TestStopContClrKeywords(t *testing.T) {
+	runLexCases(t, []lexCase{
+		{"STOP", "STOP", []token.Token{tok(token.Stop, "STOP", 0), eol(4)}},
+		{"CONT", "CONT", []token.Token{tok(token.Cont, "CONT", 0), eol(4)}},
+		{"CLR", "CLR:LIST", []token.Token{tok(token.Clr, "CLR", 0), tok(token.Colon, ":", 3), tok(token.List, "LIST", 4), eol(8)}},
+		{"in a name", "STOPS", []token.Token{tok(token.Stop, "STOP", 0), name("S", 4), eol(5)}},
 	})
 }
 

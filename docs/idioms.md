@@ -29,6 +29,17 @@ Everything here works in c64sh. The [user guide](user-guide.md) describes each s
 
 **Why:** lines run in number order, not the order they were typed, and BASIC V2 has no command to renumber a program. Leaving gaps lets you insert lines later (15 between 10 and 20) without retyping everything.
 
+### Look inside with STOP and CONT
+
+```basic
+10 FOR I=1 TO 10
+20 T=T+I*I
+30 IF I=5 THEN STOP
+40 NEXT
+50 PRINT T
+```
+
+**Why:** BASIC V2 has no debugger. `STOP` halts the program with `BREAK IN 30` and leaves everything as it was, so you can `PRINT T` at the prompt (or change a variable), then type `CONT` to carry on from where it stopped. Delete the line when the bug is found; changing the program in any way means `CONT` can't continue.
 ### A short main program, subroutines by the thousand
 
 ```basic

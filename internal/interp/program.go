@@ -106,22 +106,55 @@ func atLine(err error, line int) error {
 	if !ok || line < 0 {
 		return err
 	}
-	return &basicerr.Error{Kind: be.Kind, Line: line, HasLine: true}
+	e := *be
+	e.Line, e.HasLine = line, true
+	return &e
 }
 
-// execList writes the program as the C64 ROM lists it ($A6C9): before
-// each line a newline, then the line number, a space, and the text, with
+// execStop stops with BREAK, as the STOP key does, keeping the place to
+// continue from in a running program ($A82C).
+//
+// @spec INTERP-159
+func (in *Interp) execStop() error {
+	if in.cur.line != directLine {
+		in.cont = &pos{in.cur.line, in.cur.stmt + 1}
+	}
+	return &basicerr.Error{Kind: basicerr.Break, Stopped: true}
+}
+
+// execCont continues the program where it stopped ($A857). In a running
+// program, the ROM's place to continue from is the CONT statement itself,
+// so the program loops on it until interrupted.
+//
+// @spec INTERP-162, INTERP-163
+func (in *Interp) execCont() error {
+	if in.cur.line != directLine {
+		return &resume{at: in.cur}
+	}
+	if in.cont == nil {
+		return &basicerr.Error{Kind: basicerr.CantContinue}
+	}
+	if in.cont.line >= len(in.program) {
+		return nil // the program had ended
+	}
+	return &resume{at: *in.cont}
+}
+
+// execList writes the program's lines in the statement's range as the
+// C64 ROM lists them ($A6C9): before each line a newline, then the line number, a space, and the text, with
 // "?" shown as the PRINT keyword it stands for; after the last line, the
 // newline that begins a C64's READY. message.
 //
 // @spec INTERP-059
-func (in *Interp) execList() error {
-	if len(in.program) == 0 {
-		return errEnd
-	}
+func (in *Interp) execList(s *ast.ListStmt) error {
 	var buf strings.Builder
 	for _, l := range in.program {
-		buf.WriteString("\n" + strconv.Itoa(l.number) + " " + listText(l.text))
+		if l.number >= s.From && l.number <= s.To {
+			buf.WriteString("\n" + strconv.Itoa(l.number) + " " + listText(l.text))
+		}
+	}
+	if buf.Len() == 0 {
+		return errEnd
 	}
 	buf.WriteString("\n")
 	if err := in.emit(in.cmdFile(), buf.String()); err != nil {

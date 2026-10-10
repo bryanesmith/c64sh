@@ -153,6 +153,7 @@ The PRINT-comment convention is checked with the lexer: for every line of an exa
 | `033-free-memory.bas` | `FRE` as a signed 16-bit number, the idiom for the real figure, an ignored argument of either type, and the bytes taken by a variable, a string, an array, and a program line (which also clears the variables) |
 | `034-program-control.bas` | `LIST` with one line, a range, up to, and from; `CLR` keeping the program; `CONT` after `END` with a variable changed while stopped; and `STOP` ending the script with `BREAK IN 30` |
 | `035-disk-commands.bas` | The drive's status from its command channel (the power-on message, then OK), a refused write, rename, scratch with a pattern, a refused format, an unknown command, and `LOAD "$",8` with and without a pattern |
+| `036-running-programs.bas` | `SYS` (a c64sh extension) running a program, arguments passed with no shell, expressions and numbers as arguments, `ST` as the exit status, a shell run on purpose, and `?FILE NOT FOUND  ERROR` for a missing program |
 
 ## Decisions & Alternatives
 

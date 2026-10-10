@@ -135,3 +135,8 @@ Design: `parser-design.md`
 - [x] **PARSER-081**: When a statement is `STOP`, `CONT`, or `CLR` followed by `:` or `EOL`, the parser shall produce an `*ast.StopStmt`, `*ast.ContStmt`, or `*ast.ClrStmt` respectively; followed by anything else, a SYNTAX error with an `*ast.BadStmt` in place of the statement.
 - [x] **PARSER-082**: When a statement is `LIST` followed by an optional line number, then optionally `-` and an optional line number, then `:` or `EOL`, the parser shall produce an `*ast.ListStmt` with `From` the first number (0 if absent) and `To` the second (65535 if absent after a `-`; the first number when there is no `-`; 65535 when there are neither).
 - [x] **PARSER-083**: If `LIST` is followed by anything other than PARSER-082's forms, or one of its line numbers is above 63999, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.
+
+## Running programs
+
+- [x] **PARSER-084**: When a statement is `SYS` followed by one or more expressions separated by commas, the first not a number literal, the parser shall produce an `*ast.SysStmt` holding them in order (a c64sh extension).
+- [x] **PARSER-085**: If `SYS` lacks an expression, its first expression is a number literal, or its last expression is followed by anything other than `:` or `EOL`, then the parser shall return a SYNTAX error with an `*ast.BadStmt` in place of the statement.

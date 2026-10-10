@@ -163,6 +163,12 @@ The line editor colors typing with its prompt: the prompt is the input style alo
 
 `Config.Env` is the environment the interpreter's `ENVIRON$` and `ENVIRON` use (`SetEnvironment`), and where the shell reads its settings; when it is nil, the interpreter keeps its own empty one, and every setting has its default. `Main` sets it to the process's own environment (`os.LookupEnv`, `os.Setenv`, `os.Unsetenv`, `os.Environ`), so that changes reach programs c64sh starts. Tests leave it nil or give a `MapEnvironment`.
 
+## Running programs
+
+The shell gives the interpreter a `System` that runs each program as a child process (`os/exec`), with no shell between: the name is found on the `PATH` unless it holds a `/`, and the arguments are passed as they are. The child shares the shell's stdin, stdout, and stderr, so it reads the keyboard and writes to the terminal, or to wherever c64sh's streams go.
+
+At a terminal, the shell first restores the terminal mode it had before the line ran (leaving the program mode `INPUT` and `GET` use), so the child gets the terminal as it expects, and switches back to program mode when the child ends. Ctrl-C reaches the child, which is in the same process group; the interpreter discards the interrupt c64sh receives at the same time (see the interpreter design). The exit status is the child's, or 128 plus the signal's number for a child ended by a signal, as Unix shells report it.
+
 ## Settings
 
 *c64sh extension.* The shell's settings are environment variables, so they can come from the user's own shell or be set in the run-commands file with `ENVIRON`; c64sh has no configuration format of its own.

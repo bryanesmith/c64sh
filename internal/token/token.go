@@ -73,6 +73,7 @@ const (
 	Stop                  // STOP
 	Cont                  // CONT
 	Clr                   // CLR
+	Sys                   // SYS (with a string: a c64sh extension)
 )
 
 var kindNames = [...]string{
@@ -141,6 +142,7 @@ var kindNames = [...]string{
 	Stop:      "Stop",
 	Cont:      "Cont",
 	Clr:       "Clr",
+	Sys:       "Sys",
 }
 
 func (k Kind) String() string {

@@ -134,6 +134,18 @@ type MapEnvironment map[string]string
 // one, they use an empty MapEnvironment.
 func (in *Interp) SetEnvironment(e Environment)
 
+// System runs the programs SYS runs (a c64sh extension).
+type System interface {
+    // Run runs the named program with args and returns its exit status.
+    // The name is found on the PATH unless it holds a "/". An error
+    // means the program could not be started.
+    Run(name string, args []string) (status int, err error)
+}
+
+// SetSystem sets what runs programs for SYS. Without one, SYS fails
+// with DEVICE NOT PRESENT.
+func (in *Interp) SetSystem(s System)
+
 // SetStringLimit sets the most characters a string may hold: -1 for no
 // limit (the default), or a whole number from 0, such as the C64's 255.
 func (in *Interp) SetStringLimit(n int)
@@ -610,6 +622,15 @@ String functions evaluate their arguments in order; each must have its type (a s
 
 Environment values are often longer than a C64 string's 255 characters (`PATH` is). Strings are unlimited by default (see *String length*), so `ENVIRON "PATH="+ENVIRON$("PATH")+":/opt/bin"` extends any `PATH`. With a string limit set, `ENVIRON$` still returns the whole value, so `PRINT ENVIRON$("PATH")` shows it, and the string functions read it; storing it in a variable, or joining it with `+`, is `STRING TOO LONG` as for any other string, so a value is never silently cut short.
 
+## Running programs
+
+*c64sh extension.* `SYS "PROGRAM", A1, A2, …` evaluates its expressions in order and runs the program through its `System`: the first value names the program, which must be a string (a number is a SYNTAX error, as `SYS` with an address is unsupported), and the rest are its arguments, each passed exactly as it is, with no shell to interpret it. An argument that is a number is passed as `STR$` writes it, without the leading space, so `SYS "sleep",1` works.
+
+- **Output.** Before running the program, the interpreter ends a line that program output left unfinished, as `FreshLine` does, so the program's output starts on its own line; afterwards it takes the cursor column to be 0, as the program normally ends its output with a line end.
+- **Status.** `ST` is set to the program's exit status, 0 for success.
+- **Ctrl-C** goes to the program: an interrupt while it runs is discarded when it ends, so it does not also stop the BASIC program.
+- **Errors.** A program that cannot be started (not on the `PATH`, or not executable) is `FILE NOT FOUND`; without a `System`, `DEVICE NOT PRESENT`.
+
 ## The clock
 
 `TI` counts **jiffies**, sixtieths of a second, as the C64's clock does: it starts at 0 when the `Interp` is created (or a clock is set with `SetClock`), the counterpart of a C64's power-on, and counts the clock's time since, rounded down to whole jiffies. `TI$` is the same clock as six digits, hours, minutes, and seconds: `TI` of 216000 is `"010000"`. Both wrap to 0 after 24 hours (5184000 jiffies).
@@ -775,6 +796,8 @@ If writing to the output fails (for example, stdout is a closed pipe), `Exec` re
 | Values longer than the string limit | `ENVIRON$` returns all of it; storing or `+` is `STRING TOO LONG` | Truncate to the limit; `STRING TOO LONG` from `ENVIRON$` itself | Truncating would silently corrupt a value written back (a cut-short `PATH`); an error from `ENVIRON$` would make long values impossible even to print. |
 | `ENVIRON`'s form | GW-BASIC's single string | Also join `;`-separated parts, without the string limit | With strings unlimited by default, `+` builds any value, so a second form would only add surface. |
 | `ENVIRON$(N)` order | By name | The process's order, as GW-BASIC lists its table | The process's order is arbitrary; by name, a listing is stable and easy to read. |
+| `SYS` exit status | In `ST` | A new variable; ignored | `ST` already holds the status of the last input or output, and a program is one more; no new name is needed. |
+| Number arguments to `SYS` | Passed as `STR$` writes them, without the leading space | `TYPE MISMATCH` | `SYS "sleep",1` reads naturally; `STR$`'s leading space would make a different argument. |
 | Disk errors on `OPEN` | Reported only through the command channel, as on a 1541 | `FILE NOT FOUND` and a c64sh message, as before the command channel existed | A program written for a C64 checks the channel, and one that opens a file that may not exist expects to go on. Authenticity wins unless the alternative is very compelling. |
 | `SAVE` over an existing disk file | Still a `StorageError` with a message, besides the drive's status | Silent, as a 1541 is (its drive light flashes) | Losing a save without a word is the one case where the C64's silence costs work. |
 | Formatting | Refused with `26,WRITE PROTECT ON` | Delete every file; ignore it | A disk is a directory that holds other files; `WRITE PROTECT ON` is the 1541's own refusal, and programs already handle it. |

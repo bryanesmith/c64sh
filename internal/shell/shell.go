@@ -97,7 +97,7 @@ func isTerminal(r any) bool {
 // Interactive selects the behavior; File, or stdin when File is empty,
 // selects the input.
 //
-// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004, SHELL-CLOCK-001, SHELL-SCREEN-002, SHELL-ENV-001
+// @spec SHELL-MODE-003, SHELL-CLI-005, SHELL-CLI-006, SHELL-FILE-001, SHELL-FILE-002, SHELL-FILE-004, SHELL-CLOCK-001, SHELL-SCREEN-002, SHELL-ENV-001, SHELL-SYS-001
 // @spec SHELL-SET-001, SHELL-SET-004, SHELL-RC-005
 func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 	input, name := stdin, "stdin"
@@ -125,6 +125,7 @@ func Run(cfg Config, stdin io.Reader, stdout, stderr io.Writer) int {
 		s.interp.SetEnvironment(cfg.Env)
 	}
 	s.interp.SetStorage(dirStorage{})
+	s.interp.SetSystem(childSystem{s: s, stdin: stdin, stdout: stdout, stderr: stderr})
 	if cfg.Interactive {
 		s.interp.SetMessages(stderr)
 	}
@@ -241,6 +242,7 @@ type session struct {
 	where       string // while the run-commands file runs, "c64sh: FILE:N: " for messages
 	interp      *interp.Interp
 	programMode func() (restore func(), err error) // for INPUT and GET at a terminal; nil otherwise
+	restoreTTY  func()                             // leaves program mode while a line runs in it
 }
 
 // setConsole gives the interpreter a console reading stdin for INPUT and
@@ -398,11 +400,8 @@ var (
 //
 // @spec SHELL-BREAK-001, SHELL-BREAK-002
 func (s *session) exec(tree *ast.Line) error {
-	if s.programMode != nil {
-		if restore, err := s.programMode(); err == nil {
-			defer restore()
-		}
-	}
+	s.enterProgramMode()
+	defer s.leaveProgramMode()
 	sigs := make(chan os.Signal, 1)
 	notifyInterrupt(sigs)
 	defer stopInterrupt(sigs)
@@ -416,6 +415,28 @@ func (s *session) exec(tree *ast.Line) error {
 		}
 	}()
 	return s.interp.Exec(tree)
+}
+
+// enterProgramMode switches the terminal to program mode, if stdin is a
+// terminal, remembering how to leave it.
+func (s *session) enterProgramMode() {
+	if s.programMode == nil {
+		return
+	}
+	if restore, err := s.programMode(); err == nil {
+		s.restoreTTY = restore
+	}
+}
+
+// leaveProgramMode restores the terminal's mode from before program mode,
+// and reports whether it was in program mode.
+func (s *session) leaveProgramMode() bool {
+	if s.restoreTTY == nil {
+		return false
+	}
+	s.restoreTTY()
+	s.restoreTTY = nil
+	return true
 }
 
 // reportStorage writes a storage failure the way c64sh reports problems

@@ -117,7 +117,7 @@ func (p *parser) parseLine() (*ast.Line, error) {
 	return line, nil
 }
 
-// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OnStatement | DimStatement | DataStatement | ReadStatement | RestoreStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | EnvironStatement | StopStatement | ContStatement | ClrStatement | ListStatement | NewStatement | EndStatement ] .
+// Statement = [ PrintStatement | RemStatement | LetStatement | IfStatement | RunStatement | GotoStatement | ForStatement | NextStatement | GosubStatement | ReturnStatement | InputStatement | GetStatement | DefStatement | LoadStatement | SaveStatement | VerifyStatement | OnStatement | DimStatement | DataStatement | ReadStatement | RestoreStatement | OpenStatement | CloseStatement | PrintFileStatement | CmdStatement | InputFileStatement | EnvironStatement | SysStatement | StopStatement | ContStatement | ClrStatement | ListStatement | NewStatement | EndStatement ] .
 //
 // An empty statement returns a nil Stmt.
 func (p *parser) parseStatement() (ast.Stmt, error) {
@@ -211,6 +211,8 @@ func (p *parser) parseStatement() (ast.Stmt, error) {
 		return stmt, nil
 	case token.List:
 		return p.parseListStatement()
+	case token.Sys:
+		return p.parseSysStatement()
 	case token.Stop:
 		return p.parseCommand(&ast.StopStmt{})
 	case token.Cont:
@@ -496,6 +498,35 @@ func (p *parser) parseGotoStatement() (*ast.GotoStmt, error) {
 		return nil, err
 	}
 	return &ast.GotoStmt{Line: n}, nil
+}
+
+// SysStatement = sys Expression { "," Expression } .
+//
+// SYS with a string runs a program, a c64sh extension; SYS with an
+// address, which a C64 uses to call machine code, is unsupported, so a
+// number literal first is a syntax error.
+//
+// @spec PARSER-084, PARSER-085
+func (p *parser) parseSysStatement() (ast.Stmt, error) {
+	p.next()
+	if p.peek() == token.Number {
+		return nil, syntaxError()
+	}
+	stmt := &ast.SysStmt{}
+	for {
+		arg, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+		stmt.Args = append(stmt.Args, arg)
+		if !p.accept(token.Comma) {
+			break
+		}
+	}
+	if k := p.peek(); k != token.Colon && k != token.EOL {
+		return nil, syntaxError()
+	}
+	return stmt, nil
 }
 
 // ListStatement = list [ number ] [ "-" [ number ] ] .

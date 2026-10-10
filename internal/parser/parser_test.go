@@ -187,6 +187,12 @@ func dumpStmt(s ast.Stmt) string {
 			return "LIST"
 		}
 		return fmt.Sprintf("LIST %d-%d", s.From, s.To)
+	case *ast.SysStmt:
+		var args []string
+		for _, a := range s.Args {
+			args = append(args, dumpExpr(a))
+		}
+		return "SYS " + strings.Join(args, ",")
 	case *ast.StopStmt:
 		return "STOP"
 	case *ast.ContStmt:
@@ -1256,5 +1262,27 @@ func TestListRangeErrors(t *testing.T) {
 		{"above 63999", toks(list, number("64000")), `BADSTMT`, true},
 		{"end above 63999", toks(list, minus, number("70000")), `BADSTMT`, true},
 		{"a string", toks(list, str("A")), `BADSTMT`, true},
+	})
+}
+
+// @spec PARSER-084
+func TestSys(t *testing.T) {
+	sys := token.Token{Kind: token.Sys, Value: "SYS"}
+	runParseCases(t, []parseCase{
+		{"program", toks(sys, str("ls")), `SYS "ls"`, false},
+		{"arguments", toks(sys, str("ls"), comma, str("-la"), comma, name("D$")), `SYS "ls","-la",$D$[D$]`, false},
+		{"a variable first", toks(sys, name("P$")), `SYS $P$[P$]`, false},
+		{"then a statement", toks(sys, str("true"), colon, pr), `SYS "true" : PRINT[]`, false},
+	})
+}
+
+// @spec PARSER-085
+func TestSysSyntaxErrors(t *testing.T) {
+	sys := token.Token{Kind: token.Sys, Value: "SYS"}
+	runParseCases(t, []parseCase{
+		{"alone", toks(sys), `BADSTMT`, true},
+		{"an address", toks(sys, number("64738")), `BADSTMT`, true},
+		{"semicolon", toks(sys, str("ls"), semi, str("-la")), `BADSTMT`, true},
+		{"trailing comma", toks(sys, str("ls"), comma), `BADSTMT`, true},
 	})
 }

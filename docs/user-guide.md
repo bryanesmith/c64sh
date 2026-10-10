@@ -34,6 +34,7 @@ To learn the language by building a game, start with the [tutorial](tutorial/ind
 - [Saving programs](#saving-programs)
 - [Data files](#data-files)
 - [Environment variables](#environment-variables)
+- [Running programs](#running-programs)
 - [Comments](#comments)
 - [Errors](#errors)
 - [Exit status](#exit-status)
@@ -927,6 +928,33 @@ ENVIRON "PATH=";ENVIRON$("PATH");":/opt/bin"
 
 See [`examples/features/031-environment.bas`](../examples/features/031-environment.bas) for every form, and [idiomatic BASIC](idioms.md#the-environment) for common patterns.
 
+## Running programs
+
+*c64sh extension: not part of C64 BASIC V2. On a C64, `SYS` calls machine code at a memory address, which c64sh never supports; `SYS` with a string reads as "call the system".*
+
+`SYS` runs a program, found on your `PATH`, with its arguments:
+
+```
+SYS "ls","-la"
+SYS "vim","NOTES.TXT"
+```
+
+- **Each argument is its own string**, and there is no shell in between: spaces, quotes, `*`, `$`, and `|` are passed to the program as they are, so `SYS "grep","TWO WORDS","NOTES.TXT"` needs no quoting. A number is passed as digits (`SYS "sleep",1`).
+- **Long commands** are built from variables, as BASIC builds long strings:
+
+  ```
+  10 U$="https://api.example.com/items"
+  20 D$="{""NAME"":""C64""}"
+  30 SYS "curl","-X","POST","-H","Content-Type: application/json","-d",D$,U$
+  ```
+- **The program gets the terminal**, so editors and other full-screen programs work, and **Ctrl-C goes to the program**, not to BASIC: the BASIC program carries on after it.
+- **`ST` holds the program's exit status**: 0 for success, the program's own number for failure, and 128 plus the signal's number if a signal ended it (130 for Ctrl-C).
+- **Pipes, redirection, and wildcards** need a shell, which you can run on purpose: `SYS "sh","-c","ls *.bas | wc -l"`.
+- A program that cannot be found is a `?FILE NOT FOUND  ERROR`. `SYS` with a number is a `?SYNTAX  ERROR`, as it always was in c64sh.
+- **Break glass**: `SYS "zsh"` starts your usual shell from inside c64sh; exit it to come back.
+
+See [`examples/features/036-running-programs.bas`](../examples/features/036-running-programs.bas) for every form, and [idiomatic BASIC](idioms.md#run-a-program-and-check-it-worked) for a common pattern.
+
 ## Comments
 
 `REM` starts a comment. Everything after it, to the end of the line, is ignored:
@@ -1029,6 +1057,7 @@ These features are c64sh's own: they are not part of Commodore 64 BASIC V2 and d
 | Extension | What it does |
 |---|---|
 | [Environment variables](#environment-variables) | `ENVIRON$` reads and `ENVIRON` sets environment variables such as `PATH` |
+| [Running programs](#running-programs) | `SYS "ls","-la"` runs a program on the `PATH` |
 
 ## Differences from a real C64
 
@@ -1066,7 +1095,7 @@ These C64 BASIC keywords work directly on the C64's memory and processor:
 |---|---|
 | `PEEK(a)` | Returns the byte stored at memory address `a`, such as `PEEK(197)`, the key being pressed. |
 | `POKE a,v` | Writes byte `v` to memory address `a`. This is how C64 programs set colors, graphics, and sound: `POKE 53280,0` makes the border black. |
-| `SYS a` | Runs machine code starting at address `a`. |
+| `SYS a` | Runs machine code starting at address `a`. (c64sh's `SYS` with a string runs a program instead; see [Running programs](#running-programs).) |
 | `WAIT a,m` | Pauses until a bit at address `a` changes, such as a hardware signal. |
 | `USR(x)` | Calls a machine-code routine set up beforehand with `POKE`, passing it `x` and returning a number. |
 

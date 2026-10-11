@@ -15,6 +15,7 @@ Everything here works in c64sh. The [user guide](user-guide.md) describes each s
 - [Data and arrays](#data-and-arrays)
 - [Files](#files)
 - [Time](#time)
+- [Programs from other BASICs](#programs-from-other-basics)
 - [The environment](#the-environment) (c64sh extension)
 
 ## Program structure
@@ -569,6 +570,92 @@ SAVE "@0:GAME",8
 ```
 
 **Why:** BASIC V2 has no `SLEEP`; looping until the clock has moved on waits for a set time, the same on every computer. (An empty `FOR` loop also waits, but for different times on different machines.)
+
+## Programs from other BASICs
+
+Books and magazines of the time, such as Creative Computing's *BASIC Computer Games*, printed programs written for other computers' BASICs: Microsoft BASIC on the Altair or TRS-80, Dartmouth and DEC BASIC on minicomputers. Most of a listing types in unchanged, because those BASICs share BASIC V2's core, but a few statements have no BASIC V2 equivalent. C64 owners rewrote them with the patterns below.
+
+### ELSE: a GOTO past the other branch
+
+Other BASICs:
+
+```
+20 IF X>5 THEN Y=1 ELSE Y=2
+```
+
+BASIC V2:
+
+```basic
+20 IF X>5 THEN Y=1:GOTO 40
+30 Y=2
+40 PRINT Y
+```
+
+**Why:** BASIC V2 has no `ELSE`, but a false `IF` skips the rest of its line, so the line after it is the `ELSE` branch, and a `GOTO` at the end of the `THEN` branch jumps past it. `IF X>5 THEN 110 ELSE 200` is simpler still: `IF X>5 THEN 110` on one line, `GOTO 200` on the next. When there is no free line number between the two, renumber the lines around them by hand, or move the branch to a subroutine. For choosing between two values, a comparison does it on one line, since true is -1: `Y=2+(X>5)`.
+
+### PRINT USING: pad and round by hand
+
+Other BASICs:
+
+```
+20 PRINT USING "####.##";X
+```
+
+BASIC V2:
+
+```basic
+10 X=3.5
+20 C=INT(X*100+.5):D=INT(C/100):F=C-D*100
+30 PRINT RIGHT$("    "+STR$(D),5)+"."+RIGHT$(STR$(100+F),2)
+```
+
+**Why:** BASIC V2 has no formatted output, and `PRINT` drops trailing zeros (`3.5`, not `3.50`). Counting in hundredths (`C`) rounds once; the whole part (`D`) is right-aligned as in *Right-align numbers in a column*, and adding 100 to the hundredths (`F`) keeps a leading zero, so `5` becomes `05`. This prints `    3.50`, for numbers that are not negative.
+
+### MAT: a FOR loop over the elements
+
+Other BASICs:
+
+```
+30 MAT C=A*B
+40 MAT PRINT C
+```
+
+BASIC V2:
+
+```basic
+10 DIM A(3,3),B(3,3),C(3,3)
+30 FOR I=1 TO 3:FOR J=1 TO 3:C(I,J)=0
+32 FOR K=1 TO 3:C(I,J)=C(I,J)+A(I,K)*B(K,J):NEXT K
+34 NEXT J,I
+40 FOR I=1 TO 3:FOR J=1 TO 3:PRINT C(I,J),:NEXT J:PRINT:NEXT I
+```
+
+**Why:** Dartmouth and DEC BASIC work on whole arrays with `MAT`; BASIC V2 works on one element at a time, so each `MAT` statement becomes loops. `MAT` arrays count from 1, so the loops start at 1 and leave element 0 unused. `MAT A=ZER` (all zeros) becomes a loop setting each element to 0, `MAT A=CON` (all ones) a loop setting each to 1, and `MAT B=TRN(A)` a loop setting `B(J,I)=A(I,J)`.
+
+### Words with a one-line translation
+
+| Other BASICs | BASIC V2 |
+|---|---|
+| `RANDOMIZE` | `X=RND(-TI)`, as in *Seed with RND(-TI), then use RND(1)* |
+| `CLS` | `PRINT CHR$(147);` |
+| `HOME` | `PRINT CHR$(19);` |
+| `CLEAR` | `CLR` |
+| `A$=INKEY$` | `GET A$` |
+| `STRING$(10,"-")` | a loop, as in *Build a string piece by piece* |
+| `INSTR(A$," ")` | a loop, as in *Split at a space* |
+| `X MOD Y` | `X-INT(X/Y)*Y`, as in *Remainder without MOD* |
+| `\` between statements | `:` |
+| `'` before a comment | `:REM` |
+| `DEFINT`, `DEFDBL`, `DEFSNG` | delete them |
+| `POKE`, `PEEK`, `CALL`, `NULL`, `WIDTH` | delete them |
+
+**Why:** `DEFINT` and `DEFDBL` only choose how numbers are stored. Deleting them leaves the program working, but BASIC V2 keeps 9 digits, so a program that relies on double precision (16 digits) prints less accurate results. `POKE`, `PEEK`, and `CALL` addresses belong to the computer the program was written for: on a C64 they would poke something else entirely, and in c64sh `POKE` and `PEEK` are reserved words, a `?SYNTAX  ERROR`. Listings use them to clear the screen or set up a terminal, which the lines above do instead.
+
+### Long names and wide listings
+
+Other BASICs allowed longer names: `ANSWER$` and `ANOTHER` are different variables there, but the same variable (`AN`) in BASIC V2, and `ANOTHER` contains `NOT`, which is a syntax error. Shorten every long name as in *Short names, no keywords inside*.
+
+Many listings were printed on 72-column Teletypes, with lines like `PRINT TAB(60);"X"`. In c64sh `TAB` goes past column 40, so these print as the book shows them; on a 40-column C64 screen they wrap.
 
 ## The environment
 
